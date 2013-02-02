@@ -1,3 +1,30 @@
+libvirt (0.8.3-5+squeeze2) stable-security; urgency=low
+
+  * [ac67c93] CVE-2011-1486: Make error reporting in libvirtd thread safe
+    (Closes: #623222)
+  * [eafb3d8] CVE-2011-2511: Fix integer overflow in VirDomainGetVcpus
+    (Closes: #633630)
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 13 Jul 2011 20:32:22 +0200
+
+libvirt (0.8.3-5+squeeze1) stable-security; urgency=low
+
+  * [0ee351f] [CVE-2011-1146] Add missing checks for read only connections.
+    Some API forgot to check the read-only status of the connection for
+    entry point which modify the state of the system or may lead to a remote
+    execution using user data.
+    The entry points concerned are:
+      - virConnectDomainXMLToNative
+      - virNodeDeviceDettach
+      - virNodeDeviceReAttach
+      - virNodeDeviceReset
+      - virDomainRevertToSnapshot
+      - virDomainSnapshotDelete
+    src/libvirt.c: fix the above set of entry points to error on read-only
+    (Closes: #617773)
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 14 Mar 2011 21:33:33 +0100
+
 libvirt (0.8.3-5+squeeze0) stable; urgency=low
 
   [ Laurent Léonard ]
