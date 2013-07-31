@@ -1,3 +1,24 @@
+libvirt (0.8.3-5+squeeze5) stable-security; urgency=low
+
+  * [465cafd] Invoke initgroups when starting kvm
+    so we don't fail to open /dev/kvm. (Closes: #703208)
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 17 Mar 2013 14:39:03 +0100
+
+libvirt (0.8.3-5+squeeze4) stable-security; urgency=low
+
+  * [9d7846f] CVE-2013-1766: Use libvirt-qemu as group to run qemu/kvm
+    instances.  This makes sure we don't chown files to groups possibly used
+    by other programs. (Closes: #701649)
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 09 Mar 2013 17:03:01 +0100
+
+libvirt (0.8.3-5+squeeze3) stable-security; urgency=low
+
+  * [0bbbca1] Add missing return on error path (Closes: #699224)
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 22 Feb 2013 20:32:53 +0100
+
 libvirt (0.8.3-5+squeeze2) stable-security; urgency=low
 
   * [ac67c93] CVE-2011-1486: Make error reporting in libvirtd thread safe
