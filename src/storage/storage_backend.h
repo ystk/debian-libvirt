@@ -29,6 +29,7 @@
 # include "storage_conf.h"
 
 typedef char * (*virStorageBackendFindPoolSources)(virConnectPtr conn, const char *srcSpec, unsigned int flags);
+typedef int (*virStorageBackendCheckPool)(virConnectPtr conn, virStoragePoolObjPtr pool, bool *active);
 typedef int (*virStorageBackendStartPool)(virConnectPtr conn, virStoragePoolObjPtr pool);
 typedef int (*virStorageBackendBuildPool)(virConnectPtr conn, virStoragePoolObjPtr pool, unsigned int flags);
 typedef int (*virStorageBackendRefreshPool)(virConnectPtr conn, virStoragePoolObjPtr pool);
@@ -42,6 +43,11 @@ typedef int (*virStorageBackendRefreshVol)(virConnectPtr conn, virStoragePoolObj
 typedef int (*virStorageBackendDeleteVol)(virConnectPtr conn, virStoragePoolObjPtr pool, virStorageVolDefPtr vol, unsigned int flags);
 typedef int (*virStorageBackendBuildVolFrom)(virConnectPtr conn, virStoragePoolObjPtr pool,
                                              virStorageVolDefPtr origvol, virStorageVolDefPtr newvol,
+                                             unsigned int flags);
+typedef int (*virStorageBackendVolumeResize)(virConnectPtr conn,
+                                             virStoragePoolObjPtr pool,
+                                             virStorageVolDefPtr vol,
+                                             unsigned long long capacity,
                                              unsigned int flags);
 
 /* File creation/cloning functions used for cloning between backends */
@@ -65,6 +71,7 @@ struct _virStorageBackend {
     int type;
 
     virStorageBackendFindPoolSources findPoolSources;
+    virStorageBackendCheckPool checkPool;
     virStorageBackendStartPool startPool;
     virStorageBackendBuildPool buildPool;
     virStorageBackendRefreshPool refreshPool;
@@ -76,6 +83,7 @@ struct _virStorageBackend {
     virStorageBackendCreateVol createVol;
     virStorageBackendRefreshVol refreshVol;
     virStorageBackendDeleteVol deleteVol;
+    virStorageBackendVolumeResize resizeVol;
 };
 
 virStorageBackendPtr virStorageBackendForType(int type);
@@ -91,6 +99,7 @@ enum {
     VIR_STORAGE_VOL_OPEN_REG    = 1 << 1, /* regular files okay */
     VIR_STORAGE_VOL_OPEN_BLOCK  = 1 << 2, /* block files okay */
     VIR_STORAGE_VOL_OPEN_CHAR   = 1 << 3, /* char files okay */
+    VIR_STORAGE_VOL_OPEN_DIR    = 1 << 4, /* directories okay */
 };
 
 # define VIR_STORAGE_VOL_OPEN_DEFAULT (VIR_STORAGE_VOL_OPEN_ERROR    |\
@@ -105,9 +114,13 @@ ATTRIBUTE_NONNULL(1);
 int virStorageBackendUpdateVolInfo(virStorageVolDefPtr vol,
                                    int withCapacity);
 
+int virStorageBackendUpdateVolInfoFlags(virStorageVolDefPtr vol,
+                                        int withCapacity,
+                                        unsigned int openflags);
 int virStorageBackendUpdateVolTargetInfo(virStorageVolTargetPtr target,
                                          unsigned long long *allocation,
-                                         unsigned long long *capacity);
+                                         unsigned long long *capacity,
+                                         unsigned int openflags);
 int virStorageBackendUpdateVolTargetInfoFD(virStorageVolTargetPtr target,
                                            int fd,
                                            unsigned long long *allocation,
@@ -133,8 +146,7 @@ int virStorageBackendRunProgRegex(virStoragePoolObjPtr pool,
                                   const char **regex,
                                   int *nvars,
                                   virStorageBackendListVolRegexFunc func,
-                                  void *data,
-                                  int *exitstatus);
+                                  void *data, const char *cmd_to_ignore);
 
 int virStorageBackendRunProgNul(virStoragePoolObjPtr pool,
                                 const char **prog,

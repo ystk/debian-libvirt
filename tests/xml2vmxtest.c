@@ -1,6 +1,6 @@
 #include <config.h>
 
-#ifdef WITH_ESX
+#ifdef WITH_VMX
 
 # include <stdio.h>
 # include <string.h>
@@ -9,13 +9,15 @@
 # include "internal.h"
 # include "memory.h"
 # include "testutils.h"
-# include "esx/esx_vmx.h"
+# include "vmx/vmx.h"
 
-static char *progname = NULL;
-static char *abs_srcdir = NULL;
-static virCapsPtr caps = NULL;
+static virCapsPtr caps;
+static virVMXContext ctx;
 
-# define MAX_FILE 4096
+static int testDefaultConsoleType(const char *ostype ATTRIBUTE_UNUSED)
+{
+    return VIR_DOMAIN_CHR_CONSOLE_TARGET_TYPE_SERIAL;
+}
 
 static void
 testCapsInit(void)
@@ -27,6 +29,8 @@ testCapsInit(void)
     if (caps == NULL) {
         return;
     }
+
+    caps->defaultConsoleTargetType = testDefaultConsoleType;
 
     virCapabilitiesSetMacPrefix(caps, (unsigned char[]){ 0x00, 0x0c, 0x29 });
     virCapabilitiesAddHostMigrateTransport(caps, "esx");
@@ -67,32 +71,30 @@ testCapsInit(void)
 }
 
 static int
-testCompareFiles(const char *xml, const char *vmx,
-                 esxVI_ProductVersion productVersion)
+testCompareFiles(const char *xml, const char *vmx, int virtualHW_version)
 {
     int result = -1;
-    char xmlData[MAX_FILE];
-    char vmxData[MAX_FILE];
+    char *xmlData = NULL;
+    char *vmxData = NULL;
     char *formatted = NULL;
-    char *xmlPtr = &(xmlData[0]);
-    char *vmxPtr = &(vmxData[0]);
     virDomainDefPtr def = NULL;
 
-    if (virtTestLoadFile(xml, &xmlPtr, MAX_FILE) < 0) {
+    if (virtTestLoadFile(xml, &xmlData) < 0) {
         goto failure;
     }
 
-    if (virtTestLoadFile(vmx, &vmxPtr, MAX_FILE) < 0) {
+    if (virtTestLoadFile(vmx, &vmxData) < 0) {
         goto failure;
     }
 
-    def = virDomainDefParseString(caps, xmlData, VIR_DOMAIN_XML_INACTIVE);
+    def = virDomainDefParseString(caps, xmlData, 1 << VIR_DOMAIN_VIRT_VMWARE,
+                                  VIR_DOMAIN_XML_INACTIVE);
 
     if (def == NULL) {
         goto failure;
     }
 
-    formatted = esxVMX_FormatConfig(NULL, caps, def, productVersion);
+    formatted = virVMXFormatConfig(&ctx, caps, def, virtualHW_version);
 
     if (formatted == NULL) {
         goto failure;
@@ -106,6 +108,8 @@ testCompareFiles(const char *xml, const char *vmx,
     result = 0;
 
   failure:
+    VIR_FREE(xmlData);
+    VIR_FREE(vmxData);
     VIR_FREE(formatted);
     virDomainDefFree(def);
 
@@ -115,49 +119,103 @@ testCompareFiles(const char *xml, const char *vmx,
 struct testInfo {
     const char *input;
     const char *output;
-    esxVI_ProductVersion version;
+    int virtualHW_version;
 };
 
 static int
 testCompareHelper(const void *data)
 {
+    int result = -1;
     const struct testInfo *info = data;
-    char xml[PATH_MAX];
-    char vmx[PATH_MAX];
+    char *xml = NULL;
+    char *vmx = NULL;
 
-    snprintf(xml, PATH_MAX, "%s/xml2vmxdata/xml2vmx-%s.xml", abs_srcdir,
-             info->input);
-    snprintf(vmx, PATH_MAX, "%s/xml2vmxdata/xml2vmx-%s.vmx", abs_srcdir,
-             info->output);
+    if (virAsprintf(&xml, "%s/xml2vmxdata/xml2vmx-%s.xml", abs_srcdir,
+                    info->input) < 0 ||
+        virAsprintf(&vmx, "%s/xml2vmxdata/xml2vmx-%s.vmx", abs_srcdir,
+                    info->output) < 0) {
+        goto cleanup;
+    }
 
-    return testCompareFiles(xml, vmx, info->version);
+    result = testCompareFiles(xml, vmx, info->virtualHW_version);
+
+  cleanup:
+    VIR_FREE(xml);
+    VIR_FREE(vmx);
+
+    return result;
 }
 
 static int
-mymain(int argc, char **argv)
+testAutodetectSCSIControllerModel(virDomainDiskDefPtr def ATTRIBUTE_UNUSED,
+                                  int *model, void *opaque ATTRIBUTE_UNUSED)
+{
+    *model = VIR_DOMAIN_CONTROLLER_MODEL_SCSI_LSILOGIC;
+
+    return 0;
+}
+
+static char *
+testFormatVMXFileName(const char *src, void *opaque ATTRIBUTE_UNUSED)
+{
+    bool success = false;
+    char *copyOfDatastorePath = NULL;
+    char *tmp = NULL;
+    char *saveptr = NULL;
+    char *datastoreName = NULL;
+    char *directoryAndFileName = NULL;
+    char *absolutePath = NULL;
+
+    if (STRPREFIX(src, "[")) {
+        /* Found potential datastore path */
+        copyOfDatastorePath = strdup(src);
+
+        if (copyOfDatastorePath == NULL) {
+            goto cleanup;
+        }
+
+        /* Expected format: '[<datastore>] <path>' where <path> is optional */
+        if ((tmp = STRSKIP(copyOfDatastorePath, "[")) == NULL || *tmp == ']' ||
+            (datastoreName = strtok_r(tmp, "]", &saveptr)) == NULL) {
+            goto cleanup;
+        }
+
+        directoryAndFileName = strtok_r(NULL, "", &saveptr);
+
+        if (directoryAndFileName == NULL) {
+            directoryAndFileName = (char *)"";
+        } else {
+            directoryAndFileName += strspn(directoryAndFileName, " ");
+        }
+
+        virAsprintf(&absolutePath, "/vmfs/volumes/%s/%s", datastoreName,
+                    directoryAndFileName);
+    } else if (STRPREFIX(src, "/")) {
+        /* Found absolute path */
+        absolutePath = strdup(src);
+    } else {
+        /* Found relative path, this is not supported */
+        goto cleanup;
+    }
+
+    success = true;
+
+  cleanup:
+    if (! success) {
+        VIR_FREE(absolutePath);
+    }
+
+    VIR_FREE(copyOfDatastorePath);
+
+    return absolutePath;
+}
+
+static int
+mymain(void)
 {
     int result = 0;
-    char cwd[PATH_MAX];
 
-    progname = argv[0];
-
-    if (argc > 1) {
-        fprintf(stderr, "Usage: %s\n", progname);
-        return EXIT_FAILURE;
-    }
-
-    abs_srcdir = getenv("abs_srcdir");
-
-    if (abs_srcdir == NULL) {
-        abs_srcdir = getcwd(cwd, sizeof(cwd));
-    }
-
-    if (argc > 1) {
-        fprintf(stderr, "Usage: %s\n", progname);
-        return EXIT_FAILURE;
-    }
-
-# define DO_TEST(_in, _out, _version)                                      \
+# define DO_TEST(_in, _out, _version)                                         \
         do {                                                                  \
             struct testInfo info = { _in, _out, _version };                   \
             virResetLastError();                                              \
@@ -173,52 +231,71 @@ mymain(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    DO_TEST("minimal", "minimal", esxVI_ProductVersion_ESX35);
-    DO_TEST("minimal-64bit", "minimal-64bit", esxVI_ProductVersion_ESX35);
+    ctx.opaque = NULL;
+    ctx.parseFileName = NULL;
+    ctx.formatFileName = testFormatVMXFileName;
+    ctx.autodetectSCSIControllerModel = testAutodetectSCSIControllerModel;
 
-    DO_TEST("graphics-vnc", "graphics-vnc", esxVI_ProductVersion_ESX35);
+    DO_TEST("minimal", "minimal", 4);
+    DO_TEST("minimal-64bit", "minimal-64bit", 4);
 
-    DO_TEST("scsi-driver", "scsi-driver", esxVI_ProductVersion_ESX35);
-    DO_TEST("scsi-writethrough", "scsi-writethrough", esxVI_ProductVersion_ESX35);
+    DO_TEST("graphics-vnc", "graphics-vnc", 4);
 
-    DO_TEST("harddisk-scsi-file", "harddisk-scsi-file", esxVI_ProductVersion_ESX35);
-    DO_TEST("harddisk-ide-file", "harddisk-ide-file", esxVI_ProductVersion_ESX35);
+    DO_TEST("scsi-driver", "scsi-driver", 4);
+    DO_TEST("scsi-writethrough", "scsi-writethrough", 4);
 
-    DO_TEST("cdrom-scsi-file", "cdrom-scsi-file", esxVI_ProductVersion_ESX35);
-    DO_TEST("cdrom-scsi-device", "cdrom-scsi-device", esxVI_ProductVersion_ESX35);
-    DO_TEST("cdrom-ide-file", "cdrom-ide-file", esxVI_ProductVersion_ESX35);
-    DO_TEST("cdrom-ide-device", "cdrom-ide-device", esxVI_ProductVersion_ESX35);
+    DO_TEST("harddisk-scsi-file", "harddisk-scsi-file", 4);
+    DO_TEST("harddisk-ide-file", "harddisk-ide-file", 4);
 
-    DO_TEST("floppy-file", "floppy-file", esxVI_ProductVersion_ESX35);
-    DO_TEST("floppy-device", "floppy-device", esxVI_ProductVersion_ESX35);
+    DO_TEST("cdrom-scsi-file", "cdrom-scsi-file", 4);
+    DO_TEST("cdrom-scsi-device", "cdrom-scsi-device", 4);
+    DO_TEST("cdrom-ide-file", "cdrom-ide-file", 4);
+    DO_TEST("cdrom-ide-device", "cdrom-ide-device", 4);
 
-    DO_TEST("ethernet-e1000", "ethernet-e1000", esxVI_ProductVersion_ESX35);
-    DO_TEST("ethernet-vmxnet2", "ethernet-vmxnet2", esxVI_ProductVersion_ESX35);
+    DO_TEST("floppy-file", "floppy-file", 4);
+    DO_TEST("floppy-device", "floppy-device", 4);
 
-    DO_TEST("ethernet-custom", "ethernet-custom", esxVI_ProductVersion_ESX35);
-    DO_TEST("ethernet-bridged", "ethernet-bridged", esxVI_ProductVersion_ESX35);
+    DO_TEST("ethernet-e1000", "ethernet-e1000", 4);
+    DO_TEST("ethernet-vmxnet2", "ethernet-vmxnet2", 4);
 
-    DO_TEST("ethernet-generated", "ethernet-generated", esxVI_ProductVersion_ESX35);
-    DO_TEST("ethernet-static", "ethernet-static", esxVI_ProductVersion_ESX35);
-    DO_TEST("ethernet-vpx", "ethernet-vpx", esxVI_ProductVersion_ESX35);
-    DO_TEST("ethernet-other", "ethernet-other", esxVI_ProductVersion_ESX35);
+    DO_TEST("ethernet-custom", "ethernet-custom", 4);
+    DO_TEST("ethernet-bridged", "ethernet-bridged", 4);
+    DO_TEST("ethernet-nat", "ethernet-nat", 4);
 
-    DO_TEST("serial-file", "serial-file", esxVI_ProductVersion_ESX35);
-    DO_TEST("serial-device", "serial-device", esxVI_ProductVersion_ESX35);
-    DO_TEST("serial-pipe", "serial-pipe", esxVI_ProductVersion_ESX35);
+    DO_TEST("ethernet-generated", "ethernet-generated", 4);
+    DO_TEST("ethernet-static", "ethernet-static", 4);
+    DO_TEST("ethernet-vpx", "ethernet-vpx", 4);
+    DO_TEST("ethernet-other", "ethernet-other", 4);
 
-    DO_TEST("parallel-file", "parallel-file", esxVI_ProductVersion_ESX35);
-    DO_TEST("parallel-device", "parallel-device", esxVI_ProductVersion_ESX35);
+    DO_TEST("serial-file", "serial-file", 4);
+    DO_TEST("serial-device", "serial-device", 4);
+    DO_TEST("serial-pipe", "serial-pipe", 4);
+    DO_TEST("serial-network-server", "serial-network-server", 7);
+    DO_TEST("serial-network-client", "serial-network-client", 7);
 
-    DO_TEST("esx-in-the-wild-1", "esx-in-the-wild-1", esxVI_ProductVersion_ESX35);
-    DO_TEST("esx-in-the-wild-2", "esx-in-the-wild-2", esxVI_ProductVersion_ESX35);
-    DO_TEST("esx-in-the-wild-3", "esx-in-the-wild-3", esxVI_ProductVersion_ESX35);
-    DO_TEST("esx-in-the-wild-4", "esx-in-the-wild-4", esxVI_ProductVersion_ESX35);
+    DO_TEST("parallel-file", "parallel-file", 4);
+    DO_TEST("parallel-device", "parallel-device", 4);
 
-    DO_TEST("gsx-in-the-wild-1", "gsx-in-the-wild-1", esxVI_ProductVersion_ESX35);
-    DO_TEST("gsx-in-the-wild-2", "gsx-in-the-wild-2", esxVI_ProductVersion_ESX35);
-    DO_TEST("gsx-in-the-wild-3", "gsx-in-the-wild-3", esxVI_ProductVersion_ESX35);
-    DO_TEST("gsx-in-the-wild-4", "gsx-in-the-wild-4", esxVI_ProductVersion_ESX35);
+    DO_TEST("esx-in-the-wild-1", "esx-in-the-wild-1", 4);
+    DO_TEST("esx-in-the-wild-2", "esx-in-the-wild-2", 4);
+    DO_TEST("esx-in-the-wild-3", "esx-in-the-wild-3", 4);
+    DO_TEST("esx-in-the-wild-4", "esx-in-the-wild-4", 4);
+    DO_TEST("esx-in-the-wild-5", "esx-in-the-wild-5", 4);
+    DO_TEST("esx-in-the-wild-6", "esx-in-the-wild-6", 4);
+
+    DO_TEST("gsx-in-the-wild-1", "gsx-in-the-wild-1", 4);
+    DO_TEST("gsx-in-the-wild-2", "gsx-in-the-wild-2", 4);
+    DO_TEST("gsx-in-the-wild-3", "gsx-in-the-wild-3", 4);
+    DO_TEST("gsx-in-the-wild-4", "gsx-in-the-wild-4", 4);
+
+    DO_TEST("ws-in-the-wild-1", "ws-in-the-wild-1", 8);
+    DO_TEST("ws-in-the-wild-2", "ws-in-the-wild-2", 8);
+
+    DO_TEST("annotation", "annotation", 4);
+
+    DO_TEST("smbios", "smbios", 4);
+
+    DO_TEST("svga", "svga", 4);
 
     virCapabilitiesFree(caps);
 
@@ -228,10 +305,11 @@ mymain(int argc, char **argv)
 VIRT_TEST_MAIN(mymain)
 
 #else
+# include "testutils.h"
 
-int main (void)
+int main(void)
 {
-    return 77; /* means 'test skipped' for automake */
+    return EXIT_AM_SKIP;
 }
 
-#endif /* WITH_ESX */
+#endif /* WITH_VMX */

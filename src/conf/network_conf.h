@@ -1,7 +1,7 @@
 /*
  * network_conf.h: network XML handling
  *
- * Copyright (C) 2006-2008 Red Hat, Inc.
+ * Copyright (C) 2006-2008, 2012 Red Hat, Inc.
  * Copyright (C) 2006-2008 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -24,18 +24,27 @@
 #ifndef __NETWORK_CONF_H__
 # define __NETWORK_CONF_H__
 
+# define DNS_RECORD_LENGTH_SRV  (512 - 30)  /* Limit minus overhead as mentioned in RFC-2782 */
+
 # include <libxml/parser.h>
 # include <libxml/tree.h>
 # include <libxml/xpath.h>
 
 # include "internal.h"
 # include "threads.h"
+# include "virsocketaddr.h"
+# include "virnetdevbandwidth.h"
+# include "virnetdevvportprofile.h"
+# include "virmacaddr.h"
 
-/* 2 possible types of forwarding */
 enum virNetworkForwardType {
     VIR_NETWORK_FORWARD_NONE   = 0,
     VIR_NETWORK_FORWARD_NAT,
     VIR_NETWORK_FORWARD_ROUTE,
+    VIR_NETWORK_FORWARD_BRIDGE,
+    VIR_NETWORK_FORWARD_PRIVATE,
+    VIR_NETWORK_FORWARD_VEPA,
+    VIR_NETWORK_FORWARD_PASSTHROUGH,
 
     VIR_NETWORK_FORWARD_LAST,
 };
@@ -43,9 +52,8 @@ enum virNetworkForwardType {
 typedef struct _virNetworkDHCPRangeDef virNetworkDHCPRangeDef;
 typedef virNetworkDHCPRangeDef *virNetworkDHCPRangeDefPtr;
 struct _virNetworkDHCPRangeDef {
-    char *start;
-    char *end;
-    int size;
+    virSocketAddr start;
+    virSocketAddr end;
 };
 
 typedef struct _virNetworkDHCPHostDef virNetworkDHCPHostDef;
@@ -53,7 +61,87 @@ typedef virNetworkDHCPHostDef *virNetworkDHCPHostDefPtr;
 struct _virNetworkDHCPHostDef {
     char *mac;
     char *name;
-    char *ip;
+    virSocketAddr ip;
+};
+
+typedef struct _virNetworkDNSTxtRecordsDef virNetworkDNSTxtRecordsDef;
+typedef virNetworkDNSTxtRecordsDef *virNetworkDNSTxtRecordsDefPtr;
+struct _virNetworkDNSTxtRecordsDef {
+    char *name;
+    char *value;
+};
+
+typedef struct _virNetworkDNSSrvRecordsDef virNetworkDNSSrvRecordsDef;
+typedef virNetworkDNSSrvRecordsDef *virNetworkDNSSrvRecordsDefPtr;
+struct _virNetworkDNSSrvRecordsDef {
+    char *domain;
+    char *service;
+    char *protocol;
+    char *target;
+    int port;
+    int priority;
+    int weight;
+};
+
+struct _virNetworkDNSHostsDef {
+    virSocketAddr ip;
+    int nnames;
+    char **names;
+};
+
+typedef struct _virNetworkDNSHostsDef *virNetworkDNSHostsDefPtr;
+
+struct _virNetworkDNSDef {
+    unsigned int ntxtrecords;
+    virNetworkDNSTxtRecordsDefPtr txtrecords;
+    unsigned int nhosts;
+    virNetworkDNSHostsDefPtr hosts;
+    unsigned int nsrvrecords;
+    virNetworkDNSSrvRecordsDefPtr srvrecords;
+};
+
+typedef struct _virNetworkDNSDef *virNetworkDNSDefPtr;
+
+typedef struct _virNetworkIpDef virNetworkIpDef;
+typedef virNetworkIpDef *virNetworkIpDefPtr;
+struct _virNetworkIpDef {
+    char *family;               /* ipv4 or ipv6 - default is ipv4 */
+    virSocketAddr address;      /* Bridge IP address */
+
+    /* One or the other of the following two will be used for a given
+     * IP address, but never both. The parser guarantees this.
+     * Use virNetworkIpDefPrefix/virNetworkIpDefNetmask rather
+     * than accessing the data directly - these utility functions
+     * will convert one into the other as necessary.
+     */
+    unsigned int prefix;        /* ipv6 - only prefix allowed */
+    virSocketAddr netmask;      /* ipv4 - either netmask or prefix specified */
+
+    unsigned int nranges;        /* Zero or more dhcp ranges */
+    virNetworkDHCPRangeDefPtr ranges;
+
+    unsigned int nhosts;         /* Zero or more dhcp hosts */
+    virNetworkDHCPHostDefPtr hosts;
+
+    char *tftproot;
+    char *bootfile;
+    virSocketAddr bootserver;
+   };
+
+typedef struct _virNetworkForwardIfDef virNetworkForwardIfDef;
+typedef virNetworkForwardIfDef *virNetworkForwardIfDefPtr;
+struct _virNetworkForwardIfDef {
+    char *dev;      /* name of device */
+    int usageCount; /* how many guest interfaces are bound to this device? */
+};
+
+typedef struct _virPortGroupDef virPortGroupDef;
+typedef virPortGroupDef *virPortGroupDefPtr;
+struct _virPortGroupDef {
+    char *name;
+    bool isDefault;
+    virNetDevVPortProfilePtr virtPortProfile;
+    virNetDevBandwidthPtr bandwidth;
 };
 
 typedef struct _virNetworkDef virNetworkDef;
@@ -66,23 +154,29 @@ struct _virNetworkDef {
     char *domain;
     unsigned long delay;   /* Bridge forward delay (ms) */
     unsigned int stp :1; /* Spanning tree protocol */
+    unsigned char mac[VIR_MAC_BUFLEN]; /* mac address of bridge device */
+    bool mac_specified;
 
     int forwardType;    /* One of virNetworkForwardType constants */
-    char *forwardDev;   /* Destination device for forwarding */
 
-    char *ipAddress;    /* Bridge IP address */
-    char *netmask;
-    char *network;
+    /* If there are multiple forward devices (i.e. a pool of
+     * interfaces), they will be listed here.
+     */
+    size_t nForwardPfs;
+    virNetworkForwardIfDefPtr forwardPfs;
 
-    unsigned int nranges;        /* Zero or more dhcp ranges */
-    virNetworkDHCPRangeDefPtr ranges;
+    size_t nForwardIfs;
+    virNetworkForwardIfDefPtr forwardIfs;
 
-    unsigned int nhosts;         /* Zero or more dhcp hosts */
-    virNetworkDHCPHostDefPtr hosts;
+    size_t nips;
+    virNetworkIpDefPtr ips; /* ptr to array of IP addresses on this network */
 
-    char *tftproot;
-    char *bootfile;
-    char *bootserver;
+    virNetworkDNSDefPtr dns; /* ptr to dns related configuration */
+    virNetDevVPortProfilePtr virtPortProfile;
+
+    size_t nPortGroups;
+    virPortGroupDefPtr portGroups;
+    virNetDevBandwidthPtr bandwidth;
 };
 
 typedef struct _virNetworkObj virNetworkObj;
@@ -91,6 +185,7 @@ struct _virNetworkObj {
     virMutex lock;
 
     pid_t dnsmasqPid;
+    pid_t radvdPid;
     unsigned int active : 1;
     unsigned int autostart : 1;
     unsigned int persistent : 1;
@@ -132,8 +227,24 @@ virNetworkDefPtr virNetworkDefParseFile(const char *filename);
 virNetworkDefPtr virNetworkDefParseNode(xmlDocPtr xml,
                                         xmlNodePtr root);
 
-char *virNetworkDefFormat(const virNetworkDefPtr def);
+char *virNetworkDefFormat(const virNetworkDefPtr def, unsigned int flags);
 
+static inline const char *
+virNetworkDefForwardIf(const virNetworkDefPtr def, size_t n)
+{
+    return ((def->forwardIfs && (def->nForwardIfs > n))
+            ? def->forwardIfs[n].dev : NULL);
+}
+
+virPortGroupDefPtr virPortGroupFindByName(virNetworkDefPtr net,
+                                          const char *portgroup);
+
+virNetworkIpDefPtr
+virNetworkDefGetIpByIndex(const virNetworkDefPtr def,
+                          int family, size_t n);
+int virNetworkIpDefPrefix(const virNetworkIpDefPtr def);
+int virNetworkIpDefNetmask(const virNetworkIpDefPtr def,
+                           virSocketAddrPtr netmask);
 
 int virNetworkSaveXML(const char *configDir,
                       virNetworkDefPtr def,
@@ -168,6 +279,8 @@ char *virNetworkAllocateBridge(const virNetworkObjListPtr nets,
 int virNetworkSetBridgeName(const virNetworkObjListPtr nets,
                             virNetworkDefPtr def,
                             int check_collision);
+
+void virNetworkSetBridgeMacAddr(virNetworkDefPtr def);
 
 int virNetworkObjIsDuplicate(virNetworkObjListPtr doms,
                              virNetworkDefPtr def,

@@ -8,6 +8,7 @@
 # include <errno.h>
 # include <limits.h>
 # include <verify.h>
+# include <stdbool.h>
 
 # if STATIC_ANALYSIS
 #  undef NDEBUG /* Don't let a prior NDEBUG definition cause trouble.  */
@@ -17,22 +18,33 @@
 #  define sa_assert(expr) /* empty */
 # endif
 
-# ifdef HAVE_SYS_SYSLIMITS_H
-#  include <sys/syslimits.h>
-# endif
-
 /* The library itself is allowed to use deprecated functions /
  * variables, so effectively undefine the deprecated attribute
  * which would otherwise be defined in libvirt.h.
  */
+# undef VIR_DEPRECATED
 # define VIR_DEPRECATED /*empty*/
 
+/* The library itself needs to know enum sizes.  */
+# define VIR_ENUM_SENTINELS
+
+/* All uses of _() within the library should pick up translations from
+ * libvirt's message files, rather than from the package that is
+ * linking in the library.  Setting this macro before including
+ * "gettext.h" means that gettext() (and _()) will properly expand to
+ * dgettext.  */
+# define DEFAULT_TEXT_DOMAIN PACKAGE
 # include "gettext.h"
+# define _(str) gettext(str)
+# define N_(str) str
 
 # include "libvirt/libvirt.h"
+# include "libvirt/libvirt-qemu.h"
 # include "libvirt/virterror.h"
 
 # include "libvirt_internal.h"
+
+# include "c-strcase.h"
 
 /* On architectures which lack these limits, define them (ie. Cygwin).
  * Note that the libvirt code should be robust enough to handle the
@@ -52,18 +64,15 @@
 #  define INET_ADDRSTRLEN 16
 # endif
 
-# define _(str) dgettext(GETTEXT_PACKAGE, (str))
-# define N_(str) str
-
 /* String equality tests, suggested by Jim Meyering. */
 # define STREQ(a,b) (strcmp(a,b) == 0)
-# define STRCASEEQ(a,b) (strcasecmp(a,b) == 0)
+# define STRCASEEQ(a,b) (c_strcasecmp(a,b) == 0)
 # define STRNEQ(a,b) (strcmp(a,b) != 0)
-# define STRCASENEQ(a,b) (strcasecmp(a,b) != 0)
+# define STRCASENEQ(a,b) (c_strcasecmp(a,b) != 0)
 # define STREQLEN(a,b,n) (strncmp(a,b,n) == 0)
-# define STRCASEEQLEN(a,b,n) (strncasecmp(a,b,n) == 0)
+# define STRCASEEQLEN(a,b,n) (c_strncasecmp(a,b,n) == 0)
 # define STRNEQLEN(a,b,n) (strncmp(a,b,n) != 0)
-# define STRCASENEQLEN(a,b,n) (strncasecmp(a,b,n) != 0)
+# define STRCASENEQLEN(a,b,n) (c_strncasecmp(a,b,n) != 0)
 # define STRPREFIX(a,b) (strncmp(a,b,strlen(b)) == 0)
 # define STRSKIP(a,b) (STRPREFIX(a,b) ? (a) + strlen(b) : NULL)
 
@@ -74,7 +83,7 @@
 
 
 # define NUL_TERMINATE(buf) do { (buf)[sizeof(buf)-1] = '\0'; } while (0)
-# define ARRAY_CARDINALITY(Array) (sizeof (Array) / sizeof *(Array))
+# define ARRAY_CARDINALITY(Array) (sizeof(Array) / sizeof(*(Array)))
 
 /* C99 uses __func__.  __FUNCTION__ is legacy. */
 # ifndef __GNUC__
@@ -108,6 +117,15 @@
 #  endif
 
 /**
+ * ATTRIBUTE_NORETURN:
+ *
+ * Macro to indicate that a function won't return to the caller
+ */
+#  ifndef ATTRIBUTE_NORETURN
+#   define ATTRIBUTE_NORETURN __attribute__((__noreturn__))
+#  endif
+
+/**
  * ATTRIBUTE_SENTINEL:
  *
  * Macro to check for NULL-terminated varargs lists
@@ -126,7 +144,7 @@
  * Macro used to check printf like functions, if compiling
  * with gcc.
  *
- * We use gnulib which guarentees we always have GNU style
+ * We use gnulib which guarantees we always have GNU style
  * printf format specifiers even on broken Win32 platforms
  * hence we have to force 'gnu_printf' for new GCC
  */
@@ -164,7 +182,7 @@
 #  endif
 
 #  ifndef ATTRIBUTE_NONNULL
-#   if __GNUC_PREREQ (3, 3)
+#   if __GNUC_PREREQ (3, 3) && STATIC_ANALYSIS
 #    define ATTRIBUTE_NONNULL(m) __attribute__((__nonnull__(m)))
 #   else
 #    define ATTRIBUTE_NONNULL(m)
@@ -187,7 +205,7 @@
  * Use this when passing possibly-NULL strings to printf-a-likes.
  */
 # define NULLSTR(s) \
-    ((void)verify_true(sizeof *(s) == sizeof (char)), \
+    ((void)verify_true(sizeof(*(s)) == sizeof(char)),   \
      (s) ? (s) : "(null)")
 
 /**
@@ -195,7 +213,7 @@
  *
  * macro to flag unimplemented blocks
  */
-# define TODO 								\
+# define TODO								\
     fprintf(stderr, "Unimplemented block at %s:%d\n",			\
             __FILE__, __LINE__);
 
@@ -214,8 +232,7 @@
     do {                                                                \
         unsigned long __unsuppflags = flags & ~(supported);             \
         if (__unsuppflags) {                                            \
-            virReportErrorHelper(NULL,                                  \
-                                 VIR_FROM_THIS,                         \
+            virReportErrorHelper(VIR_FROM_THIS,                         \
                                  VIR_ERR_INVALID_ARG,                   \
                                  __FILE__,                              \
                                  __FUNCTION__,                          \
@@ -225,5 +242,80 @@
             return retval;                                              \
         }                                                               \
     } while (0)
+
+/* divide value by size, rounding up */
+# define VIR_DIV_UP(value, size) (((value) + (size) - 1) / (size))
+
+
+# if WITH_DTRACE_PROBES
+#  ifndef LIBVIRT_PROBES_H
+#   define LIBVIRT_PROBES_H
+#   include "probes.h"
+#  endif /* LIBVIRT_PROBES_H */
+
+/* Systemtap 1.2 headers have a bug where they cannot handle a
+ * variable declared with array type.  Work around this by casting all
+ * arguments.  This is some gross use of the preprocessor because
+ * PROBE is a var-arg macro, but it is better than the alternative of
+ * making all callers to PROBE have to be aware of the issues.  And
+ * hopefully, if we ever add a call to PROBE with other than 9
+ * end arguments, you can figure out the pattern to extend this hack.
+ */
+#  define VIR_COUNT_ARGS(...) VIR_ARG11(__VA_ARGS__, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+#  define VIR_ARG11(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, ...) _11
+#  define VIR_ADD_CAST_EXPAND(a, b, ...) VIR_ADD_CAST_PASTE(a, b, __VA_ARGS__)
+#  define VIR_ADD_CAST_PASTE(a, b, ...) a##b(__VA_ARGS__)
+
+/* The double cast is necessary to silence gcc warnings; any pointer
+ * can safely go to intptr_t and back to void *, which collapses
+ * arrays into pointers; while any integer can be widened to intptr_t
+ * then cast to void *.  */
+#  define VIR_ADD_CAST(a) ((void *)(intptr_t)(a))
+#  define VIR_ADD_CAST1(a)                                  \
+    VIR_ADD_CAST(a)
+#  define VIR_ADD_CAST2(a, b)                               \
+    VIR_ADD_CAST(a), VIR_ADD_CAST(b)
+#  define VIR_ADD_CAST3(a, b, c)                            \
+    VIR_ADD_CAST(a), VIR_ADD_CAST(b), VIR_ADD_CAST(c)
+#  define VIR_ADD_CAST4(a, b, c, d)                         \
+    VIR_ADD_CAST(a), VIR_ADD_CAST(b), VIR_ADD_CAST(c),      \
+    VIR_ADD_CAST(d)
+#  define VIR_ADD_CAST5(a, b, c, d, e)                      \
+    VIR_ADD_CAST(a), VIR_ADD_CAST(b), VIR_ADD_CAST(c),      \
+    VIR_ADD_CAST(d), VIR_ADD_CAST(e)
+#  define VIR_ADD_CAST6(a, b, c, d, e, f)                   \
+    VIR_ADD_CAST(a), VIR_ADD_CAST(b), VIR_ADD_CAST(c),      \
+    VIR_ADD_CAST(d), VIR_ADD_CAST(e), VIR_ADD_CAST(f)
+#  define VIR_ADD_CAST7(a, b, c, d, e, f, g)                \
+    VIR_ADD_CAST(a), VIR_ADD_CAST(b), VIR_ADD_CAST(c),      \
+    VIR_ADD_CAST(d), VIR_ADD_CAST(e), VIR_ADD_CAST(f),      \
+    VIR_ADD_CAST(g)
+#  define VIR_ADD_CAST8(a, b, c, d, e, f, g, h)             \
+    VIR_ADD_CAST(a), VIR_ADD_CAST(b), VIR_ADD_CAST(c),      \
+    VIR_ADD_CAST(d), VIR_ADD_CAST(e), VIR_ADD_CAST(f),      \
+    VIR_ADD_CAST(g), VIR_ADD_CAST(h)
+#  define VIR_ADD_CAST9(a, b, c, d, e, f, g, h, i)          \
+    VIR_ADD_CAST(a), VIR_ADD_CAST(b), VIR_ADD_CAST(c),      \
+    VIR_ADD_CAST(d), VIR_ADD_CAST(e), VIR_ADD_CAST(f),      \
+    VIR_ADD_CAST(g), VIR_ADD_CAST(h), VIR_ADD_CAST(i)
+
+#  define VIR_ADD_CASTS(...)                                            \
+    VIR_ADD_CAST_EXPAND(VIR_ADD_CAST, VIR_COUNT_ARGS(__VA_ARGS__),      \
+                        __VA_ARGS__)
+
+#  define PROBE_EXPAND(NAME, ARGS) NAME(ARGS)
+#  define PROBE(NAME, FMT, ...)                              \
+    VIR_DEBUG_INT("trace." __FILE__ , __func__, __LINE__,    \
+                  #NAME ": " FMT, __VA_ARGS__);              \
+    if (LIBVIRT_ ## NAME ## _ENABLED()) {                   \
+        PROBE_EXPAND(LIBVIRT_ ## NAME,                      \
+                     VIR_ADD_CASTS(__VA_ARGS__));            \
+    }
+# else
+#  define PROBE(NAME, FMT, ...)                              \
+    VIR_DEBUG_INT("trace." __FILE__, __func__, __LINE__,     \
+                  #NAME ": " FMT, __VA_ARGS__);
+# endif
+
 
 #endif                          /* __VIR_INTERNAL_H__ */

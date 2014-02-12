@@ -1,7 +1,7 @@
 /*
  * xend_internal.h
  *
- * Copyright (C) 2006-2008, 2010 Red Hat, Inc.
+ * Copyright (C) 2006-2008, 2010-2012 Red Hat, Inc.
  * Copyright (C) 2005,2006
  *
  *      Anthony Liguori <aliguori@us.ibm.com>
@@ -18,20 +18,13 @@
 
 # include <sys/types.h>
 # include <stdint.h>
-# include <stdbool.h>
-# include <libxml/uri.h>
 
 # include "internal.h"
 # include "capabilities.h"
 # include "domain_conf.h"
 # include "driver.h"
 # include "buf.h"
-
-# ifdef __sun
-#  define DEFAULT_VIF_SCRIPT "vif-vnic"
-# else
-#  define DEFAULT_VIF_SCRIPT "vif-bridge"
-# endif
+# include "viruri.h"
 
 int
 xenDaemonOpen_unix(virConnectPtr conn, const char *path);
@@ -43,7 +36,7 @@ xenDaemonOpen_unix(virConnectPtr conn, const char *path);
  * \return 0 for success; -1 (with errno) on error
  *
  * xen_create() returns after a domain has been allocated including
- * its memory.  This does not guarentee, though, that the devices
+ * its memory.  This does not guarantee, though, that the devices
  * have come up properly.  For instance, if you create a VBD with an
  * invalid filename, the error won't occur until after this function
  * returns.
@@ -96,37 +89,14 @@ xenDaemonDomainFetch(virConnectPtr xend,
                      const char *name,
                      const char *cpus);
 
-virDomainDefPtr
-xenDaemonParseSxprString(virConnectPtr conn,
-                         const char *sexpr,
-                         int xendConfigVersion);
-
-int
-xenDaemonParseSxprSound(virDomainDefPtr def,
-                        const char *str);
-
-virDomainChrDefPtr
-xenDaemonParseSxprChar(const char *value,
-                       const char *tty);
-
-int
-xenDaemonFormatSxprChr(virDomainChrDefPtr def,
-                       virBufferPtr buf);
-int
-xenDaemonFormatSxprSound(virDomainDefPtr def,
-                         virBufferPtr buf);
-
-char *
-xenDaemonFormatSxpr(virConnectPtr conn,
-                    virDomainDefPtr def,
-                    int xendConfigVersion);
 
   int is_sound_model_valid(const char *model);
   int is_sound_model_conflict(const char *model, const char *soundstr);
 
 
 /* refactored ones */
-virDrvOpenStatus xenDaemonOpen(virConnectPtr conn, virConnectAuthPtr auth, int flags);
+virDrvOpenStatus xenDaemonOpen(virConnectPtr conn, virConnectAuthPtr auth,
+                               unsigned int flags);
 int xenDaemonClose(virConnectPtr conn);
 int xenDaemonGetVersion(virConnectPtr conn, unsigned long *hvVer);
 int xenDaemonNodeGetInfo(virConnectPtr conn, virNodeInfoPtr info);
@@ -135,14 +105,21 @@ int xenDaemonDomainSuspend(virDomainPtr domain);
 int xenDaemonDomainResume(virDomainPtr domain);
 int xenDaemonDomainShutdown(virDomainPtr domain);
 int xenDaemonDomainReboot(virDomainPtr domain, unsigned int flags);
-int xenDaemonDomainDestroy(virDomainPtr domain);
+int xenDaemonDomainDestroyFlags(virDomainPtr domain, unsigned int flags);
 int xenDaemonDomainSave(virDomainPtr domain, const char *filename);
+int xenDaemonDomainCoreDump(virDomainPtr domain, const char *filename,
+                            unsigned int flags);
 int xenDaemonDomainRestore(virConnectPtr conn, const char *filename);
 int xenDaemonDomainSetMemory(virDomainPtr domain, unsigned long memory);
 int xenDaemonDomainSetMaxMemory(virDomainPtr domain, unsigned long memory);
 int xenDaemonDomainGetInfo(virDomainPtr domain, virDomainInfoPtr info);
-char *xenDaemonDomainDumpXML(virDomainPtr domain, int flags, const char *cpus);
-unsigned long xenDaemonDomainGetMaxMemory(virDomainPtr domain);
+int xenDaemonDomainGetState(virDomainPtr domain,
+                            int *state,
+                            int *reason,
+                            unsigned int flags);
+char *xenDaemonDomainGetXMLDesc(virDomainPtr domain, unsigned int flags,
+                                const char *cpus);
+unsigned long long xenDaemonDomainGetMaxMemory(virDomainPtr domain);
 char **xenDaemonListDomainsOld(virConnectPtr xend);
 
 virDomainPtr xenDaemonDomainDefineXML(virConnectPtr xend, const char *sexpr);
@@ -151,15 +128,22 @@ int xenDaemonDomainUndefine(virDomainPtr domain);
 
 int	xenDaemonDomainSetVcpus		(virDomainPtr domain,
                                          unsigned int vcpus);
+int	xenDaemonDomainSetVcpusFlags	(virDomainPtr domain,
+                                         unsigned int vcpus,
+                                         unsigned int flags);
 int	xenDaemonDomainPinVcpu		(virDomainPtr domain,
                                          unsigned int vcpu,
                                          unsigned char *cpumap,
                                          int maplen);
+int     xenDaemonDomainGetVcpusFlags    (virDomainPtr domain,
+                                         unsigned int flags);
 int	xenDaemonDomainGetVcpus		(virDomainPtr domain,
                                          virVcpuInfoPtr info,
                                          int maxinfo,
                                          unsigned char *cpumaps,
                                          int maplen);
+int xenDaemonUpdateDeviceFlags(virDomainPtr domain, const char *xml,
+                               unsigned int flags);
 int xenDaemonDomainGetAutostart          (virDomainPtr dom,
                                           int *autostart);
 int xenDaemonDomainSetAutostart          (virDomainPtr domain,
@@ -169,6 +153,8 @@ int xenDaemonDomainSetAutostart          (virDomainPtr domain,
 extern struct xenUnifiedDriver xenDaemonDriver;
 int xenDaemonInit (void);
 
+virDomainPtr xenDaemonCreateXML(virConnectPtr conn, const char *xmlDesc,
+                                unsigned int flags);
 virDomainPtr xenDaemonLookupByID(virConnectPtr conn, int id);
 virDomainPtr xenDaemonLookupByUUID(virConnectPtr conn, const unsigned char *uuid);
 virDomainPtr xenDaemonLookupByName(virConnectPtr conn, const char *domname);

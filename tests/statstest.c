@@ -3,24 +3,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/utsname.h>
 
 #include "stats_linux.h"
 #include "internal.h"
 #include "xen/block_stats.h"
 #include "testutils.h"
+#include "command.h"
 
-#if WITH_XEN
 static void testQuietError(void *userData ATTRIBUTE_UNUSED,
                            virErrorPtr error ATTRIBUTE_UNUSED)
 {
     /* nada */
 }
-#endif
 
-#if __linux__ && WITH_XEN
 static int testDevice(const char *path, int expect)
 {
-    int actual = xenLinuxDomainDeviceID(NULL, 1, path);
+    int actual = xenLinuxDomainDeviceID(1, path);
 
     if (actual == expect) {
         return 0;
@@ -43,22 +42,35 @@ static int testDeviceHelper(const void *data)
     return testDevice(info->dev, info->num);
 }
 
-#endif
-
 static int
-mymain(int argc ATTRIBUTE_UNUSED,
-       char **argv ATTRIBUTE_UNUSED)
+mymain(void)
 {
     int ret = 0;
-#if __linux__ && WITH_XEN
-    /* Some of our tests delibrately test failure cases, so
+    int status;
+    virCommandPtr cmd;
+    struct utsname ut;
+
+    /* Skip test if xend is not running.  Calling xend on a non-xen
+       kernel causes some versions of xend to issue a crash report, so
+       we first probe uname results.  */
+    uname(&ut);
+    if (strstr(ut.release, "xen") == NULL)
+        return EXIT_AM_SKIP;
+    cmd = virCommandNewArgList("/usr/sbin/xend", "status", NULL);
+    if (virCommandRun(cmd, &status) != 0 || status != 0) {
+        virCommandFree(cmd);
+        return EXIT_AM_SKIP;
+    }
+    virCommandFree(cmd);
+
+    /* Some of our tests deliberately test failure cases, so
      * register a handler to stop error messages cluttering
      * up display
      */
     if (!virTestGetDebug())
         virSetErrorFunc(NULL, testQuietError);
 
-# define DO_TEST(dev, num)                                              \
+#define DO_TEST(dev, num)                                              \
     do {                                                               \
         struct testInfo info = { dev, num };                           \
         if (virtTestRun("Device " dev " -> " # num,                    \
@@ -201,8 +213,7 @@ mymain(int argc ATTRIBUTE_UNUSED,
     DO_TEST("/dev/xvda1", 51713);
     DO_TEST("/dev/xvda15", 51727);
 
-#endif
-    return(ret==0 ? EXIT_SUCCESS : EXIT_FAILURE);
+    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

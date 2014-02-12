@@ -13,13 +13,14 @@
 
 m4_ifndef([AC_AUTOCONF_VERSION],
   [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
-m4_if(m4_defn([AC_AUTOCONF_VERSION]), [2.63],,
-[m4_warning([this file was generated for autoconf 2.63.
+m4_if(m4_defn([AC_AUTOCONF_VERSION]), [2.68],,
+[m4_warning([this file was generated for autoconf 2.68.
 You have another version of autoconf.  It may work, but is not guaranteed to.
 If you have problems, you may need to regenerate the build system entirely.
 To do so, use the procedure documented by the package, typically `autoreconf'.])])
 
 # pkg.m4 - Macros to locate and utilise pkg-config.            -*- Autoconf -*-
+# serial 1 (pkg-config-0.24)
 # 
 # Copyright © 2004 Scott James Remnant <scott@netsplit.com>.
 #
@@ -47,7 +48,10 @@ To do so, use the procedure documented by the package, typically `autoreconf'.])
 AC_DEFUN([PKG_PROG_PKG_CONFIG],
 [m4_pattern_forbid([^_?PKG_[A-Z_]+$])
 m4_pattern_allow([^PKG_CONFIG(_PATH)?$])
-AC_ARG_VAR([PKG_CONFIG], [path to pkg-config utility])dnl
+AC_ARG_VAR([PKG_CONFIG], [path to pkg-config utility])
+AC_ARG_VAR([PKG_CONFIG_PATH], [directories to add to pkg-config's search path])
+AC_ARG_VAR([PKG_CONFIG_LIBDIR], [path overriding pkg-config's built-in search path])
+
 if test "x$ac_cv_env_PKG_CONFIG_set" != "xset"; then
 	AC_PATH_TOOL([PKG_CONFIG], [pkg-config])
 fi
@@ -60,7 +64,6 @@ if test -n "$PKG_CONFIG"; then
 		AC_MSG_RESULT([no])
 		PKG_CONFIG=""
 	fi
-		
 fi[]dnl
 ])# PKG_PROG_PKG_CONFIG
 
@@ -69,20 +72,19 @@ fi[]dnl
 # Check to see whether a particular set of modules exists.  Similar
 # to PKG_CHECK_MODULES(), but does not set variables or print errors.
 #
-#
-# Similar to PKG_CHECK_MODULES, make sure that the first instance of
-# this or PKG_CHECK_MODULES is called, or make sure to call
-# PKG_CHECK_EXISTS manually
+# Please remember that m4 expands AC_REQUIRE([PKG_PROG_PKG_CONFIG])
+# only at the first occurence in configure.ac, so if the first place
+# it's called might be skipped (such as if it is within an "if", you
+# have to call PKG_CHECK_EXISTS manually
 # --------------------------------------------------------------
 AC_DEFUN([PKG_CHECK_EXISTS],
 [AC_REQUIRE([PKG_PROG_PKG_CONFIG])dnl
 if test -n "$PKG_CONFIG" && \
     AC_RUN_LOG([$PKG_CONFIG --exists --print-errors "$1"]); then
-  m4_ifval([$2], [$2], [:])
+  m4_default([$2], [:])
 m4_ifvaln([$3], [else
   $3])dnl
 fi])
-
 
 # _PKG_CONFIG([VARIABLE], [COMMAND], [MODULES])
 # ---------------------------------------------
@@ -136,6 +138,7 @@ and $1[]_LIBS to avoid the need to call pkg-config.
 See the pkg-config man page for more details.])
 
 if test $pkg_failed = yes; then
+   	AC_MSG_RESULT([no])
         _PKG_SHORT_ERRORS_SUPPORTED
         if test $_pkg_short_errors_supported = yes; then
 	        $1[]_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors "$2" 2>&1`
@@ -145,7 +148,7 @@ if test $pkg_failed = yes; then
 	# Put the nasty error message in config.log where it belongs
 	echo "$$1[]_PKG_ERRORS" >&AS_MESSAGE_LOG_FD
 
-	ifelse([$4], , [AC_MSG_ERROR(dnl
+	m4_default([$4], [AC_MSG_ERROR(
 [Package requirements ($2) were not met:
 
 $$1_PKG_ERRORS
@@ -153,25 +156,24 @@ $$1_PKG_ERRORS
 Consider adjusting the PKG_CONFIG_PATH environment variable if you
 installed software in a non-standard prefix.
 
-_PKG_TEXT
-])],
-		[AC_MSG_RESULT([no])
-                $4])
+_PKG_TEXT])
+        ])
 elif test $pkg_failed = untried; then
-	ifelse([$4], , [AC_MSG_FAILURE(dnl
+     	AC_MSG_RESULT([no])
+	m4_default([$4], [AC_MSG_FAILURE(
 [The pkg-config script could not be found or is too old.  Make sure it
 is in your PATH or set the PKG_CONFIG environment variable to the full
 path to pkg-config.
 
 _PKG_TEXT
 
-To get pkg-config, see <http://pkg-config.freedesktop.org/>.])],
-		[$4])
+To get pkg-config, see <http://pkg-config.freedesktop.org/>.])
+        ])
 else
 	$1[]_CFLAGS=$pkg_cv_[]$1[]_CFLAGS
 	$1[]_LIBS=$pkg_cv_[]$1[]_LIBS
         AC_MSG_RESULT([yes])
-	ifelse([$3], , :, [$3])
+	$3
 fi[]dnl
 ])# PKG_CHECK_MODULES
 
@@ -766,6 +768,46 @@ fi
 rmdir .tst 2>/dev/null
 AC_SUBST([am__leading_dot])])
 
+# Add --enable-maintainer-mode option to configure.         -*- Autoconf -*-
+# From Jim Meyering
+
+# Copyright (C) 1996, 1998, 2000, 2001, 2002, 2003, 2004, 2005, 2008
+# Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# serial 5
+
+# AM_MAINTAINER_MODE([DEFAULT-MODE])
+# ----------------------------------
+# Control maintainer-specific portions of Makefiles.
+# Default is to disable them, unless `enable' is passed literally.
+# For symmetry, `disable' may be passed as well.  Anyway, the user
+# can override the default with the --enable/--disable switch.
+AC_DEFUN([AM_MAINTAINER_MODE],
+[m4_case(m4_default([$1], [disable]),
+       [enable], [m4_define([am_maintainer_other], [disable])],
+       [disable], [m4_define([am_maintainer_other], [enable])],
+       [m4_define([am_maintainer_other], [enable])
+        m4_warn([syntax], [unexpected argument to AM@&t@_MAINTAINER_MODE: $1])])
+AC_MSG_CHECKING([whether to am_maintainer_other maintainer-specific portions of Makefiles])
+  dnl maintainer-mode's default is 'disable' unless 'enable' is passed
+  AC_ARG_ENABLE([maintainer-mode],
+[  --][am_maintainer_other][-maintainer-mode  am_maintainer_other make rules and dependencies not useful
+			  (and sometimes confusing) to the casual installer],
+      [USE_MAINTAINER_MODE=$enableval],
+      [USE_MAINTAINER_MODE=]m4_if(am_maintainer_other, [enable], [no], [yes]))
+  AC_MSG_RESULT([$USE_MAINTAINER_MODE])
+  AM_CONDITIONAL([MAINTAINER_MODE], [test $USE_MAINTAINER_MODE = yes])
+  MAINT=$MAINTAINER_MODE_TRUE
+  AC_SUBST([MAINT])dnl
+]
+)
+
+AU_DEFUN([jm_MAINTAINER_MODE], [AM_MAINTAINER_MODE])
+
 # Check to see how 'make' treats includes.	            -*- Autoconf -*-
 
 # Copyright (C) 2001, 2002, 2003, 2005, 2009  Free Software Foundation, Inc.
@@ -954,32 +996,6 @@ AC_DEFUN([_AM_SET_OPTIONS],
 # Execute IF-SET if OPTION is set, IF-NOT-SET otherwise.
 AC_DEFUN([_AM_IF_OPTION],
 [m4_ifset(_AM_MANGLE_OPTION([$1]), [$2], [$3])])
-
-# Copyright (C) 1996, 1997, 1998, 2000, 2001, 2002, 2003, 2005, 2006
-# Free Software Foundation, Inc.
-#
-# This file is free software; the Free Software Foundation
-# gives unlimited permission to copy and/or distribute it,
-# with or without modifications, as long as this notice is preserved.
-
-# serial 5
-
-AC_DEFUN([AM_C_PROTOTYPES],
-[AC_REQUIRE([AC_C_PROTOTYPES])
-if test "$ac_cv_prog_cc_stdc" != no; then
-  U= ANSI2KNR=
-else
-  U=_ ANSI2KNR=./ansi2knr
-fi
-# Ensure some checks needed by ansi2knr itself.
-AC_REQUIRE([AC_HEADER_STDC])
-AC_CHECK_HEADERS([string.h])
-AC_SUBST([U])dnl
-AC_SUBST([ANSI2KNR])dnl
-_AM_SUBST_NOTMAKE([ANSI2KNR])dnl
-])
-
-AU_DEFUN([fp_C_PROTOTYPES], [AM_C_PROTOTYPES])
 
 # Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
 # Free Software Foundation, Inc.
@@ -1185,6 +1201,23 @@ minverhex = 0
 for i in list(range(0, 4)): minverhex = (minverhex << 8) + minver[[i]]
 sys.exit(sys.hexversion < minverhex)"
   AS_IF([AM_RUN_LOG([$1 -c "$prog"])], [$3], [$4])])
+
+# Copyright (C) 2001, 2003, 2005  Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_RUN_LOG(COMMAND)
+# -------------------
+# Run COMMAND, save the exit status in ac_status, and log it.
+# (This has been adapted from Autoconf's _AC_RUN_LOG macro.)
+AC_DEFUN([AM_RUN_LOG],
+[{ echo "$as_me:$LINENO: $1" >&AS_MESSAGE_LOG_FD
+   ($1) >&AS_MESSAGE_LOG_FD 2>&AS_MESSAGE_LOG_FD
+   ac_status=$?
+   echo "$as_me:$LINENO: \$? = $ac_status" >&AS_MESSAGE_LOG_FD
+   (exit $ac_status); }])
 
 # Check to make sure that the build environment is sane.    -*- Autoconf -*-
 
@@ -1426,74 +1459,157 @@ m4_include([gnulib/m4/alloca.m4])
 m4_include([gnulib/m4/arpa_inet_h.m4])
 m4_include([gnulib/m4/asm-underscore.m4])
 m4_include([gnulib/m4/base64.m4])
+m4_include([gnulib/m4/btowc.m4])
+m4_include([gnulib/m4/byteswap.m4])
+m4_include([gnulib/m4/calloc.m4])
 m4_include([gnulib/m4/canonicalize.m4])
+m4_include([gnulib/m4/chown.m4])
 m4_include([gnulib/m4/close.m4])
+m4_include([gnulib/m4/configmake.m4])
 m4_include([gnulib/m4/count-one-bits.m4])
 m4_include([gnulib/m4/dirname.m4])
-m4_include([gnulib/m4/dos.m4])
 m4_include([gnulib/m4/double-slash-root.m4])
+m4_include([gnulib/m4/dup.m4])
+m4_include([gnulib/m4/dup2.m4])
 m4_include([gnulib/m4/eealloc.m4])
+m4_include([gnulib/m4/environ.m4])
 m4_include([gnulib/m4/errno_h.m4])
+m4_include([gnulib/m4/error.m4])
+m4_include([gnulib/m4/exponentd.m4])
 m4_include([gnulib/m4/extensions.m4])
+m4_include([gnulib/m4/fatal-signal.m4])
 m4_include([gnulib/m4/fclose.m4])
 m4_include([gnulib/m4/fcntl-o.m4])
+m4_include([gnulib/m4/fcntl.m4])
 m4_include([gnulib/m4/fcntl_h.m4])
+m4_include([gnulib/m4/fdatasync.m4])
+m4_include([gnulib/m4/fdopen.m4])
+m4_include([gnulib/m4/fflush.m4])
+m4_include([gnulib/m4/ffs.m4])
 m4_include([gnulib/m4/float_h.m4])
+m4_include([gnulib/m4/fnmatch.m4])
+m4_include([gnulib/m4/fpieee.m4])
+m4_include([gnulib/m4/fpurge.m4])
+m4_include([gnulib/m4/freading.m4])
+m4_include([gnulib/m4/fseek.m4])
 m4_include([gnulib/m4/fseeko.m4])
+m4_include([gnulib/m4/fstat.m4])
+m4_include([gnulib/m4/fsync.m4])
+m4_include([gnulib/m4/ftell.m4])
+m4_include([gnulib/m4/ftello.m4])
+m4_include([gnulib/m4/ftruncate.m4])
+m4_include([gnulib/m4/func.m4])
 m4_include([gnulib/m4/getaddrinfo.m4])
+m4_include([gnulib/m4/getcwd.m4])
 m4_include([gnulib/m4/getdelim.m4])
+m4_include([gnulib/m4/getdtablesize.m4])
+m4_include([gnulib/m4/getgroups.m4])
 m4_include([gnulib/m4/gethostname.m4])
 m4_include([gnulib/m4/getline.m4])
+m4_include([gnulib/m4/getpagesize.m4])
 m4_include([gnulib/m4/getpass.m4])
 m4_include([gnulib/m4/gettimeofday.m4])
+m4_include([gnulib/m4/getugroups.m4])
 m4_include([gnulib/m4/gnulib-common.m4])
 m4_include([gnulib/m4/gnulib-comp.m4])
+m4_include([gnulib/m4/grantpt.m4])
 m4_include([gnulib/m4/hostent.m4])
 m4_include([gnulib/m4/include_next.m4])
 m4_include([gnulib/m4/inet_ntop.m4])
 m4_include([gnulib/m4/inet_pton.m4])
+m4_include([gnulib/m4/inline.m4])
 m4_include([gnulib/m4/intmax_t.m4])
-m4_include([gnulib/m4/inttypes_h.m4])
+m4_include([gnulib/m4/inttypes.m4])
 m4_include([gnulib/m4/ioctl.m4])
-m4_include([gnulib/m4/longlong.m4])
+m4_include([gnulib/m4/langinfo_h.m4])
+m4_include([gnulib/m4/largefile.m4])
+m4_include([gnulib/m4/localcharset.m4])
+m4_include([gnulib/m4/locale-fr.m4])
+m4_include([gnulib/m4/locale-ja.m4])
+m4_include([gnulib/m4/locale-tr.m4])
+m4_include([gnulib/m4/locale-zh.m4])
+m4_include([gnulib/m4/locale_h.m4])
+m4_include([gnulib/m4/localeconv.m4])
+m4_include([gnulib/m4/localename.m4])
 m4_include([gnulib/m4/lseek.m4])
 m4_include([gnulib/m4/lstat.m4])
 m4_include([gnulib/m4/malloc.m4])
 m4_include([gnulib/m4/malloca.m4])
+m4_include([gnulib/m4/manywarnings.m4])
+m4_include([gnulib/m4/mbrtowc.m4])
+m4_include([gnulib/m4/mbsinit.m4])
+m4_include([gnulib/m4/mbsrtowcs.m4])
+m4_include([gnulib/m4/mbstate_t.m4])
+m4_include([gnulib/m4/mbtowc.m4])
+m4_include([gnulib/m4/md5.m4])
 m4_include([gnulib/m4/memchr.m4])
+m4_include([gnulib/m4/mgetgroups.m4])
 m4_include([gnulib/m4/mkstemp.m4])
+m4_include([gnulib/m4/mkstemps.m4])
 m4_include([gnulib/m4/mktime.m4])
 m4_include([gnulib/m4/mmap-anon.m4])
+m4_include([gnulib/m4/mode_t.m4])
+m4_include([gnulib/m4/msvc-inval.m4])
+m4_include([gnulib/m4/msvc-nothrow.m4])
 m4_include([gnulib/m4/multiarch.m4])
 m4_include([gnulib/m4/netdb_h.m4])
 m4_include([gnulib/m4/netinet_in_h.m4])
+m4_include([gnulib/m4/nl_langinfo.m4])
+m4_include([gnulib/m4/nocrash.m4])
+m4_include([gnulib/m4/nonblocking.m4])
 m4_include([gnulib/m4/onceonly.m4])
+m4_include([gnulib/m4/open.m4])
+m4_include([gnulib/m4/passfd.m4])
 m4_include([gnulib/m4/pathmax.m4])
 m4_include([gnulib/m4/perror.m4])
 m4_include([gnulib/m4/physmem.m4])
-m4_include([gnulib/m4/po.m4])
+m4_include([gnulib/m4/pipe.m4])
+m4_include([gnulib/m4/pipe2.m4])
 m4_include([gnulib/m4/poll.m4])
+m4_include([gnulib/m4/poll_h.m4])
 m4_include([gnulib/m4/posix-shell.m4])
+m4_include([gnulib/m4/posix_openpt.m4])
+m4_include([gnulib/m4/posix_spawn.m4])
 m4_include([gnulib/m4/printf.m4])
 m4_include([gnulib/m4/pthread.m4])
+m4_include([gnulib/m4/pthread_sigmask.m4])
+m4_include([gnulib/m4/ptsname.m4])
+m4_include([gnulib/m4/ptsname_r.m4])
+m4_include([gnulib/m4/pty.m4])
+m4_include([gnulib/m4/pty_h.m4])
+m4_include([gnulib/m4/putenv.m4])
+m4_include([gnulib/m4/raise.m4])
 m4_include([gnulib/m4/random_r.m4])
 m4_include([gnulib/m4/rawmemchr.m4])
+m4_include([gnulib/m4/read.m4])
 m4_include([gnulib/m4/readlink.m4])
 m4_include([gnulib/m4/realloc.m4])
+m4_include([gnulib/m4/regex.m4])
 m4_include([gnulib/m4/sched_h.m4])
 m4_include([gnulib/m4/select.m4])
 m4_include([gnulib/m4/servent.m4])
+m4_include([gnulib/m4/setenv.m4])
+m4_include([gnulib/m4/setlocale.m4])
+m4_include([gnulib/m4/sig_atomic_t.m4])
+m4_include([gnulib/m4/sigaction.m4])
+m4_include([gnulib/m4/signal_h.m4])
+m4_include([gnulib/m4/signalblocking.m4])
+m4_include([gnulib/m4/sigpipe.m4])
 m4_include([gnulib/m4/sleep.m4])
 m4_include([gnulib/m4/snprintf.m4])
+m4_include([gnulib/m4/socketlib.m4])
 m4_include([gnulib/m4/sockets.m4])
 m4_include([gnulib/m4/socklen.m4])
 m4_include([gnulib/m4/sockpfaf.m4])
+m4_include([gnulib/m4/spawn_h.m4])
 m4_include([gnulib/m4/ssize_t.m4])
+m4_include([gnulib/m4/stat-time.m4])
 m4_include([gnulib/m4/stat.m4])
+m4_include([gnulib/m4/stdalign.m4])
+m4_include([gnulib/m4/stdarg.m4])
 m4_include([gnulib/m4/stdbool.m4])
 m4_include([gnulib/m4/stddef_h.m4])
 m4_include([gnulib/m4/stdint.m4])
-m4_include([gnulib/m4/stdint_h.m4])
 m4_include([gnulib/m4/stdio_h.m4])
 m4_include([gnulib/m4/stdlib_h.m4])
 m4_include([gnulib/m4/stpcpy.m4])
@@ -1501,6 +1617,7 @@ m4_include([gnulib/m4/strcase.m4])
 m4_include([gnulib/m4/strchrnul.m4])
 m4_include([gnulib/m4/strdup.m4])
 m4_include([gnulib/m4/strerror.m4])
+m4_include([gnulib/m4/strerror_r.m4])
 m4_include([gnulib/m4/string_h.m4])
 m4_include([gnulib/m4/strings_h.m4])
 m4_include([gnulib/m4/strndup.m4])
@@ -1514,28 +1631,51 @@ m4_include([gnulib/m4/sys_select_h.m4])
 m4_include([gnulib/m4/sys_socket_h.m4])
 m4_include([gnulib/m4/sys_stat_h.m4])
 m4_include([gnulib/m4/sys_time_h.m4])
+m4_include([gnulib/m4/sys_types_h.m4])
+m4_include([gnulib/m4/sys_uio_h.m4])
 m4_include([gnulib/m4/sys_utsname_h.m4])
 m4_include([gnulib/m4/sys_wait_h.m4])
 m4_include([gnulib/m4/tempname.m4])
+m4_include([gnulib/m4/termios_h.m4])
+m4_include([gnulib/m4/thread.m4])
+m4_include([gnulib/m4/threadlib.m4])
 m4_include([gnulib/m4/time_h.m4])
 m4_include([gnulib/m4/time_r.m4])
 m4_include([gnulib/m4/timegm.m4])
 m4_include([gnulib/m4/tm_gmtoff.m4])
+m4_include([gnulib/m4/ttyname_r.m4])
 m4_include([gnulib/m4/uname.m4])
 m4_include([gnulib/m4/ungetc.m4])
 m4_include([gnulib/m4/unistd_h.m4])
+m4_include([gnulib/m4/unlockpt.m4])
 m4_include([gnulib/m4/usleep.m4])
 m4_include([gnulib/m4/vasnprintf.m4])
 m4_include([gnulib/m4/vasprintf.m4])
-m4_include([gnulib/m4/warn-on-use.m4])
+m4_include([gnulib/m4/vsnprintf.m4])
+m4_include([gnulib/m4/wait-process.m4])
+m4_include([gnulib/m4/waitpid.m4])
+m4_include([gnulib/m4/warnings.m4])
 m4_include([gnulib/m4/wchar_h.m4])
-m4_include([m4/compiler-flags.m4])
+m4_include([gnulib/m4/wcrtomb.m4])
+m4_include([gnulib/m4/wctob.m4])
+m4_include([gnulib/m4/wctomb.m4])
+m4_include([gnulib/m4/wctype_h.m4])
+m4_include([gnulib/m4/write.m4])
+m4_include([gnulib/m4/xalloc.m4])
+m4_include([m4/codeset.m4])
 m4_include([m4/gettext.m4])
+m4_include([m4/glibc21.m4])
 m4_include([m4/iconv.m4])
+m4_include([m4/intlmacosx.m4])
+m4_include([m4/inttypes-pri.m4])
+m4_include([m4/inttypes_h.m4])
+m4_include([m4/lcmessage.m4])
 m4_include([m4/lib-ld.m4])
 m4_include([m4/lib-link.m4])
 m4_include([m4/lib-prefix.m4])
 m4_include([m4/libtool.m4])
+m4_include([m4/lock.m4])
+m4_include([m4/longlong.m4])
 m4_include([m4/ltoptions.m4])
 m4_include([m4/ltsugar.m4])
 m4_include([m4/ltversion.m4])
@@ -1544,7 +1684,8 @@ m4_include([m4/nls.m4])
 m4_include([m4/po.m4])
 m4_include([m4/progtest.m4])
 m4_include([m4/size_max.m4])
+m4_include([m4/stdint_h.m4])
+m4_include([m4/virt-compile-warnings.m4])
 m4_include([m4/wchar_t.m4])
 m4_include([m4/wint_t.m4])
 m4_include([m4/xsize.m4])
-m4_include([acinclude.m4])

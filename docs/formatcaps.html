@@ -34,12 +34,20 @@
             </div>
           </li><li>
             <div>
+              <a title="Applications known to use libvirt" class="inactive" href="apps.html">Applications</a>
+            </div>
+          </li><li>
+            <div>
               <a title="Get the latest source releases, binary builds and get access to the source repository" class="inactive" href="downloads.html">Downloads</a>
             </div>
           </li><li>
             <div>
               <a title="Information for users, administrators and developers" class="active" href="docs.html">Documentation</a>
               <ul class="l1"><li>
+                  <div>
+                    <a title="How to compile libvirt" class="inactive" href="compiling.html">Compiling</a>
+                  </div>
+                </li><li>
                   <div>
                     <a title="Information about deploying and using libvirt" class="inactive" href="deployment.html">Deployment</a>
                   </div>
@@ -57,6 +65,10 @@
                       </li><li>
                         <div>
                           <a title="The virtual network XML format" class="inactive" href="formatnetwork.html">Networks</a>
+                        </div>
+                      </li><li>
+                        <div>
+                          <a title="Network filter XML format" class="inactive" href="formatnwfilter.html">Network Filtering</a>
                         </div>
                       </li><li>
                         <div>
@@ -100,6 +112,14 @@
                   <div>
                     <a title="Working on the internals of libvirt API, driver and daemon code" class="inactive" href="internals.html">Internals</a>
                   </div>
+                </li><li>
+                  <div>
+                    <a title="A guide and reference for developing with libvirt" class="inactive" href="devguide.html">Development Guide</a>
+                  </div>
+                </li><li>
+                  <div>
+                    <a title="Command reference for virsh" class="inactive" href="virshcmdref.html">Virsh Commands</a>
+                  </div>
                 </li></ul>
             </div>
           </li><li>
@@ -117,6 +137,10 @@
           </li><li>
             <div>
               <a title="How to contact the developers via email and IRC" class="inactive" href="contact.html">Contact</a>
+            </div>
+          </li><li>
+            <div>
+              <a title="Available test suites for libvirt" class="inactive" href="testsuites.html">Test suites</a>
             </div>
           </li><li>
             <div>
@@ -156,6 +180,11 @@ BIOS you will see</p>
       &lt;feature name='xtpr'/&gt;
       ...
     &lt;/cpu&gt;
+    &lt;power_management&gt;
+      &lt;suspend_mem/&gt;
+      &lt;suspend_disk/&gt;
+      &lt;suspend_hybrid/&gt;
+    &lt;power_management/&gt;
   &lt;/host&gt;</span>
 
   &lt;!-- xen-3.0-x86_64 --&gt;
@@ -183,24 +212,35 @@ BIOS you will see</p>
     &lt;/arch&gt;
     &lt;features&gt;
       &lt;cpuselection/&gt;
+      &lt;deviceboot/&gt;
     &lt;/features&gt;
   &lt;/guest&gt;</span>
   ...
 &lt;/capabilities&gt;</pre>
-        <p>The first block (in red) indicates the host hardware capabilities, currently
-it is limited to the CPU properties but other information may be available,
-it shows the CPU architecture, topology, model name, and additional features
-which are not included in the model but the CPU provides them. Features of the
-chip are shown within the feature block (the block is similar to what you will
-find in a Xen fully virtualized domain description).</p>
-        <p>The second block (in blue) indicates the paravirtualization support of the
-Xen support, you will see the os_type of xen to indicate a paravirtual
-kernel, then architecture information and potential features.</p>
-        <p>The third block (in green) gives similar information but when running a
-32 bit OS fully virtualized with Xen using the hvm support.</p>
-        <p>This section is likely to be updated and augmented in the future, see <a href="https://www.redhat.com/archives/libvir-list/2007-March/msg00215.html">the
-discussion</a> which led to the capabilities format in the mailing-list
-archives.</p>
+        <p>The first block (in red) indicates the host hardware
+          capabilities, such as CPU properties and the power
+          management features of the host platform.  CPU models are
+          shown as additional features relative to the closest base
+          model, within a feature block (the block is similar to what
+          you will find in a Xen fully virtualized domain
+          description). Further, the power management features
+          supported by the host are shown, such as Suspend-to-RAM (S3),
+          Suspend-to-Disk (S4) and Hybrid-Suspend (a combination of S3
+          and S4). In case the host does not support
+          any such feature, then an empty &lt;power_management/&gt;
+          tag will be shown. </p>
+        <p>The second block (in blue) indicates the paravirtualization
+          support of the Xen support, you will see the os_type of xen
+          to indicate a paravirtual kernel, then architecture
+          information and potential features.</p>
+        <p>The third block (in green) gives similar information but
+          when running a 32 bit OS fully virtualized with Xen using
+          the hvm support.</p>
+        <p>This section is likely to be updated and augmented in the
+          future,
+          see <a href="https://www.redhat.com/archives/libvir-list/2007-March/msg00215.html">the
+          discussion</a> which led to the capabilities format in the
+          mailing-list archives.</p>
       </div>
     </div>
     <div id="footer">

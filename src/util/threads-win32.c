@@ -1,7 +1,7 @@
 /*
  * threads-win32.c: basic thread synchronization primitives
  *
- * Copyright (C) 2009-2010 Red Hat, Inc.
+ * Copyright (C) 2009-2011 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,6 +21,8 @@
 
 #include <config.h>
 
+#include <process.h>
+
 #include "memory.h"
 
 struct virThreadLocalData {
@@ -33,7 +35,7 @@ typedef virThreadLocalData *virThreadLocalDataPtr;
 virMutex virThreadLocalLock;
 unsigned int virThreadLocalCount = 0;
 virThreadLocalDataPtr virThreadLocalList = NULL;
-
+DWORD selfkey;
 
 virThreadLocal virCondEvent;
 
@@ -45,7 +47,8 @@ int virThreadInitialize(void)
         return -1;
     if (virThreadLocalInit(&virCondEvent, virCondEventCleanup) < 0)
         return -1;
-
+    if ((selfkey = TlsAlloc()) == TLS_OUT_OF_INDEXES)
+        return -1;
     return 0;
 }
 
@@ -66,6 +69,27 @@ void virThreadOnExit(void)
     virMutexUnlock(&virThreadLocalLock);
 }
 
+int virOnce(virOnceControlPtr once, virOnceFunc func)
+{
+    if (!once->complete) {
+        if (InterlockedIncrement(&once->init) == 1) {
+            /* We're the first thread. */
+            func();
+            once->complete = 1;
+        } else {
+            /* We're a later thread.  Decrement the init counter back
+             * to avoid overflow, then yield until the first thread
+             * marks that the function is complete.  It is rare that
+             * multiple threads will be waiting here, and since each
+             * thread is yielding except the first, we should get out
+             * soon enough.  */
+            InterlockedDecrement(&once->init);
+            while (!once->complete)
+                Sleep(0);
+        }
+    }
+    return 0;
+}
 
 int virMutexInit(virMutexPtr m)
 {
@@ -131,7 +155,10 @@ int virCondWait(virCondPtr c, virMutexPtr m)
         if (!event) {
             return -1;
         }
-        virThreadLocalSet(&virCondEvent, event);
+        if (virThreadLocalSet(&virCondEvent, event) < 0) {
+            CloseHandle(event);
+            return -1;
+        }
     }
 
     virMutexLock(&c->lock);
@@ -205,6 +232,131 @@ void virCondBroadcast(virCondPtr c)
 }
 
 
+struct virThreadArgs {
+    virThreadFunc func;
+    void *opaque;
+};
+
+static void virThreadHelperDaemon(void *data)
+{
+    struct virThreadArgs *args = data;
+    virThread self;
+    HANDLE handle = GetCurrentThread();
+    HANDLE process = GetCurrentProcess();
+
+    self.joinable = false;
+    DuplicateHandle(process, handle, process,
+                    &self.thread, 0, FALSE,
+                    DUPLICATE_SAME_ACCESS);
+    TlsSetValue(selfkey, &self);
+
+    args->func(args->opaque);
+
+    TlsSetValue(selfkey, NULL);
+    CloseHandle(self.thread);
+
+    VIR_FREE(args);
+}
+
+static unsigned int __stdcall virThreadHelperJoinable(void *data)
+{
+    struct virThreadArgs *args = data;
+    virThread self;
+    HANDLE handle = GetCurrentThread();
+    HANDLE process = GetCurrentProcess();
+
+    self.joinable = true;
+    DuplicateHandle(process, handle, process,
+                    &self.thread, 0, FALSE,
+                    DUPLICATE_SAME_ACCESS);
+    TlsSetValue(selfkey, &self);
+
+    args->func(args->opaque);
+
+    TlsSetValue(selfkey, NULL);
+    CloseHandle(self.thread);
+
+    VIR_FREE(args);
+    return 0;
+}
+
+int virThreadCreate(virThreadPtr thread,
+                    bool joinable,
+                    virThreadFunc func,
+                    void *opaque)
+{
+    struct virThreadArgs *args;
+    uintptr_t ret;
+
+    if (VIR_ALLOC(args) < 0)
+        return -1;
+
+    args->func = func;
+    args->opaque = opaque;
+
+    thread->joinable = joinable;
+    if (joinable) {
+        ret = _beginthreadex(NULL, 0,
+                             virThreadHelperJoinable,
+                             args, 0, NULL);
+        if (ret == 0)
+            return -1;
+    } else {
+        ret = _beginthread(virThreadHelperDaemon,
+                           0, args);
+        if (ret == -1L)
+            return -1;
+    }
+
+    thread->thread = (HANDLE)ret;
+
+    return 0;
+}
+
+void virThreadSelf(virThreadPtr thread)
+{
+    virThreadPtr self = TlsGetValue(selfkey);
+
+    if (self == NULL) {
+        /* called on a thread not created by virThreadCreate, e.g. the main thread */
+        thread->thread = 0;
+        thread->joinable = false;
+    } else {
+        thread->thread = self->thread;
+        thread->joinable = self->joinable;
+    }
+}
+
+bool virThreadIsSelf(virThreadPtr thread)
+{
+    virThread self;
+    virThreadSelf(&self);
+    return self.thread == thread->thread ? true : false;
+}
+
+/* For debugging use only; see comments in threads-pthread.c.  */
+int virThreadSelfID(void)
+{
+    return (int)GetCurrentThreadId();
+}
+
+/* For debugging use only; see comments in threads-pthread.c.  */
+int virThreadID(virThreadPtr thread)
+{
+    return (intptr_t)thread->thread;
+}
+
+
+void virThreadJoin(virThreadPtr thread)
+{
+    if (thread->joinable) {
+        WaitForSingleObject(thread->thread, INFINITE);
+        CloseHandle(thread->thread);
+        thread->thread = 0;
+        thread->joinable = false;
+    }
+}
+
 
 int virThreadLocalInit(virThreadLocalPtr l,
                        virThreadLocalCleanup c)
@@ -234,7 +386,7 @@ void *virThreadLocalGet(virThreadLocalPtr l)
     return TlsGetValue(l->key);
 }
 
-void virThreadLocalSet(virThreadLocalPtr l, void *val)
+int virThreadLocalSet(virThreadLocalPtr l, void *val)
 {
-    TlsSetValue(l->key, val);
+    return TlsSetValue(l->key, val) == 0 ? -1 : 0;
 }

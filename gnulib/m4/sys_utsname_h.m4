@@ -1,7 +1,5 @@
-# -*- buffer-read-only: t -*- vi: set ro:
-# DO NOT EDIT! GENERATED AUTOMATICALLY!
-# sys_utsname_h.m4 serial 6
-dnl Copyright (C) 2009-2010 Free Software Foundation, Inc.
+# sys_utsname_h.m4 serial 8
+dnl Copyright (C) 2009-2012 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
@@ -16,13 +14,15 @@ AC_DEFUN([gl_SYS_UTSNAME_H],
 
   dnl <sys/utsname.h> is always overridden, because of GNULIB_POSIXCHECK.
   gl_CHECK_NEXT_HEADERS([sys/utsname.h])
-  AC_CHECK_HEADERS_ONCE([sys/utsname.h])
   if test $ac_cv_header_sys_utsname_h != yes; then
     HAVE_SYS_UTSNAME_H=0
     HAVE_STRUCT_UTSNAME=0
   else
     HAVE_SYS_UTSNAME_H=1
     AC_CHECK_TYPES([struct utsname], [], [HAVE_STRUCT_UTSNAME=0], [[
+/* Minix 3.1.8 has a bug: <stddef.h> must be included before
+   <sys/utsname.h>.  */
+#include <stddef.h>
 #include <sys/utsname.h>
       ]])
   fi
@@ -30,7 +30,11 @@ AC_DEFUN([gl_SYS_UTSNAME_H],
 
   dnl Check for declarations of anything we want to poison if the
   dnl corresponding gnulib module is not in use.
-  gl_WARN_ON_USE_PREPARE([[#include <sys/utsname.h>
+  gl_WARN_ON_USE_PREPARE([[
+    /* Minix 3.1.8 has a bug: <stddef.h> must be included before
+       <sys/utsname.h>.  */
+    #include <stddef.h>
+    #include <sys/utsname.h>
     ]], [uname])
 ])
 

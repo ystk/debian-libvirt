@@ -1,7 +1,7 @@
 /*
  * cpu.c: internal functions for CPU manipulation
  *
- * Copyright (C) 2009--2010 Red Hat, Inc.
+ * Copyright (C) 2009-2012 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,6 +28,7 @@
 #include "xml.h"
 #include "cpu.h"
 #include "cpu_x86.h"
+#include "cpu_powerpc.h"
 #include "cpu_generic.h"
 
 
@@ -36,6 +37,7 @@
 
 static struct cpuArchDriver *drivers[] = {
     &cpuDriverX86,
+    &cpuDriverPowerPC,
     /* generic driver must always be the last one */
     &cpuDriverGeneric
 };
@@ -76,15 +78,8 @@ cpuCompareXML(virCPUDefPtr host,
 
     VIR_DEBUG("host=%p, xml=%s", host, NULLSTR(xml));
 
-    if (!(doc = virXMLParseString(xml, "cpu.xml")))
+    if (!(doc = virXMLParseStringCtxt(xml, _("(CPU_definition)"), &ctxt)))
         goto cleanup;
-
-    if ((ctxt = xmlXPathNewContext(doc)) == NULL) {
-        virReportOOMError();
-        goto cleanup;
-    }
-
-    ctxt->node = xmlDocGetRootElement(doc);
 
     cpu = virCPUDefParseXML(ctxt->node, ctxt, VIR_CPU_TYPE_AUTO);
     if (cpu == NULL)
@@ -225,7 +220,7 @@ cpuDataFree(const char *arch,
         return;
     }
 
-    driver->free(data);
+    (driver->free)(data);
 }
 
 
@@ -253,11 +248,12 @@ cpuNodeData(const char *arch)
 virCPUCompareResult
 cpuGuestData(virCPUDefPtr host,
              virCPUDefPtr guest,
-             union cpuData **data)
+             union cpuData **data,
+             char **msg)
 {
     struct cpuArchDriver *driver;
 
-    VIR_DEBUG("host=%p, guest=%p, data=%p", host, guest, data);
+    VIR_DEBUG("host=%p, guest=%p, data=%p, msg=%p", host, guest, data, msg);
 
     if ((driver = cpuGetSubDriver(host->arch)) == NULL)
         return VIR_CPU_COMPARE_ERROR;
@@ -269,7 +265,7 @@ cpuGuestData(virCPUDefPtr host,
         return VIR_CPU_COMPARE_ERROR;
     }
 
-    return driver->guestData(host, guest, data);
+    return driver->guestData(host, guest, data, msg);
 }
 
 
@@ -311,13 +307,8 @@ cpuBaselineXML(const char **xmlCPUs,
         goto no_memory;
 
     for (i = 0; i < ncpus; i++) {
-        if (!(doc = virXMLParseString(xmlCPUs[i], "cpu.xml")))
+        if (!(doc = virXMLParseStringCtxt(xmlCPUs[i], _("(CPU_definition)"), &ctxt)))
             goto error;
-
-        if ((ctxt = xmlXPathNewContext(doc)) == NULL)
-            goto no_memory;
-
-        ctxt->node = xmlDocGetRootElement(doc);
 
         cpus[i] = virCPUDefParseXML(ctxt->node, ctxt, VIR_CPU_TYPE_HOST);
         if (cpus[i] == NULL)
@@ -332,7 +323,7 @@ cpuBaselineXML(const char **xmlCPUs,
     if (!(cpu = cpuBaseline(cpus, ncpus, models, nmodels)))
         goto error;
 
-    cpustr = virCPUDefFormat(cpu, "", 0);
+    cpustr = virCPUDefFormat(cpu, 0);
 
 cleanup:
     if (cpus) {
@@ -423,4 +414,27 @@ cpuUpdate(virCPUDefPtr guest,
     }
 
     return driver->update(guest, host);
+}
+
+int
+cpuHasFeature(const char *arch,
+              const union cpuData *data,
+              const char *feature)
+{
+    struct cpuArchDriver *driver;
+
+    VIR_DEBUG("arch=%s, data=%p, feature=%s",
+              arch, data, feature);
+
+    if ((driver = cpuGetSubDriver(arch)) == NULL)
+        return -1;
+
+    if (driver->hasFeature == NULL) {
+        virCPUReportError(VIR_ERR_NO_SUPPORT,
+                _("cannot check guest CPU data for %s architecture"),
+                          arch);
+        return -1;
+    }
+
+    return driver->hasFeature(data, feature);
 }

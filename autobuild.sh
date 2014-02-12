@@ -11,14 +11,16 @@ test -n "$1" && RESULTS=$1 || RESULTS=results.log
 test -f Makefile && make -k distclean || :
 rm -rf coverage
 
-#rm -rf build
-#mkdir build
-#cd build
+rm -rf build
+mkdir build
+cd build
 
-./autogen.sh --prefix="$AUTOBUILD_INSTALL_ROOT" \
+# Run with options not normally exercised by the rpm build, for
+# more complete code coverage.
+../autogen.sh --prefix="$AUTOBUILD_INSTALL_ROOT" \
   --enable-test-coverage \
-  --enable-compile-warnings=error \
-  --with-xen-proxy
+  --disable-nls \
+  --enable-werror
 
 # If the MAKEFLAGS envvar does not yet include a -j option,
 # add -jN where N depends on the number of processors.
@@ -39,10 +41,10 @@ make install
 exec 3>&1
 st=$(
   exec 4>&1 >&3
-  { make check syntax-check 2>&1; echo $? >&4; } | tee "$RESULTS"
+  { make check syntax-check 2>&1 3>&- 4>&-; echo $? >&4; } | tee "$RESULTS"
 )
 exec 3>&-
-test $st = 0
+test "$st" = 0
 test -x /usr/bin/lcov && make cov
 
 rm -f *.tar.gz
@@ -62,30 +64,19 @@ if [ -f /usr/bin/rpmbuild ]; then
      -ba --clean libvirt.spec
 fi
 
+# Test mingw cross-compile
 if [ -x /usr/bin/i686-pc-mingw32-gcc ]; then
   make distclean
 
   PKG_CONFIG_PATH="$AUTOBUILD_INSTALL_ROOT/i686-pc-mingw32/sys-root/mingw/lib/pkgconfig" \
   CC="i686-pc-mingw32-gcc" \
-  ./configure \
+  ../configure \
     --build=$(uname -m)-pc-linux \
     --host=i686-pc-mingw32 \
     --prefix="$AUTOBUILD_INSTALL_ROOT/i686-pc-mingw32/sys-root/mingw" \
-    --enable-compile-warnings=error \
-    --without-sasl \
-    --without-avahi \
-    --without-polkit \
-    --without-python \
-    --without-xen \
-    --without-qemu \
-    --without-lxc \
-    --without-uml \
-    --without-vbox \
-    --without-openvz \
-    --without-one \
-    --without-phyp \
-    --without-netcf \
-    --without-libvirtd
+    --enable-werror \
+    --without-libvirtd \
+    --without-python
 
   make
   make install

@@ -1,7 +1,7 @@
 /*
  * driver.c: Helpers for loading drivers
  *
- * Copyright (C) 2006-2009 Red Hat, Inc.
+ * Copyright (C) 2006-2011 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,12 +28,9 @@
 #include "memory.h"
 #include "logging.h"
 #include "util.h"
+#include "configmake.h"
 
-#define DEFAULT_DRIVER_DIR LIBDIR "/libvirt/drivers"
-
-/* Make sure ... INTERNAL_CALL can not be set by the caller */
-verify((VIR_SECRET_GET_VALUE_INTERNAL_CALL &
-        VIR_SECRET_GET_VALUE_FLAGS_MASK) == 0);
+#define DEFAULT_DRIVER_DIR LIBDIR "/libvirt/connection-driver"
 
 #ifdef WITH_DRIVER_MODULES
 
@@ -52,7 +49,7 @@ virDriverLoadModule(const char *name)
     if (moddir == NULL)
         moddir = DEFAULT_DRIVER_DIR;
 
-    DEBUG("Module load %s", name);
+    VIR_DEBUG("Module load %s", name);
 
     if (virAsprintf(&modfile, "%s/libvirt_driver_%s.so", moddir, name) < 0)
         return NULL;

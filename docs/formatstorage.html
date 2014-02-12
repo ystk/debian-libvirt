@@ -34,12 +34,20 @@
             </div>
           </li><li>
             <div>
+              <a title="Applications known to use libvirt" class="inactive" href="apps.html">Applications</a>
+            </div>
+          </li><li>
+            <div>
               <a title="Get the latest source releases, binary builds and get access to the source repository" class="inactive" href="downloads.html">Downloads</a>
             </div>
           </li><li>
             <div>
               <a title="Information for users, administrators and developers" class="active" href="docs.html">Documentation</a>
               <ul class="l1"><li>
+                  <div>
+                    <a title="How to compile libvirt" class="inactive" href="compiling.html">Compiling</a>
+                  </div>
+                </li><li>
                   <div>
                     <a title="Information about deploying and using libvirt" class="inactive" href="deployment.html">Deployment</a>
                   </div>
@@ -57,6 +65,10 @@
                       </li><li>
                         <div>
                           <a title="The virtual network XML format" class="inactive" href="formatnetwork.html">Networks</a>
+                        </div>
+                      </li><li>
+                        <div>
+                          <a title="Network filter XML format" class="inactive" href="formatnwfilter.html">Network Filtering</a>
                         </div>
                       </li><li>
                         <div>
@@ -100,6 +112,14 @@
                   <div>
                     <a title="Working on the internals of libvirt API, driver and daemon code" class="inactive" href="internals.html">Internals</a>
                   </div>
+                </li><li>
+                  <div>
+                    <a title="A guide and reference for developing with libvirt" class="inactive" href="devguide.html">Development Guide</a>
+                  </div>
+                </li><li>
+                  <div>
+                    <a title="Command reference for virsh" class="inactive" href="virshcmdref.html">Virsh Commands</a>
+                  </div>
                 </li></ul>
             </div>
           </li><li>
@@ -117,6 +137,10 @@
           </li><li>
             <div>
               <a title="How to contact the developers via email and IRC" class="inactive" href="contact.html">Contact</a>
+            </div>
+          </li><li>
+            <div>
+              <a title="Available test suites for libvirt" class="inactive" href="testsuites.html">Test suites</a>
             </div>
           </li><li>
             <div>
@@ -170,7 +194,7 @@
       volumes. Some may have constraints on volume size, or placement.
     </p>
         <p>
-      The is the top level tag for a storage pool document is 'pool'. It has
+      The top level tag for a storage pool document is 'pool'. It has
       a single attribute <code>type</code>, which is one of <code>dir</code>,
       <code>fs</code>,<code>netfs</code>,<code>disk</code>,<code>iscsi</code>,
       <code>logical</code>. This corresponds to the storage backend drivers
@@ -215,6 +239,8 @@
         &lt;source&gt;
           &lt;host name="iscsi.example.com"/&gt;
           &lt;device path="demo-target"/&gt;
+          &lt;vendor name="Acme"/&gt;
+          &lt;product name="model"/&gt;
         &lt;/source&gt;
         ...</pre>
         <dl><dt><code>device</code></dt><dd>Provides the source for pools backed by physical devices.
@@ -239,7 +265,12 @@
         backend specific. This is typically used to indicate filesystem
         type, or network filesystem type, or partition table type, or
         LVM metadata type. All drivers are required to have a default
-        value for this, so it is optional. <span class="since">Since 0.4.1</span></dd></dl>
+        value for this, so it is optional. <span class="since">Since 0.4.1</span></dd><dt><code>vendor</code></dt><dd>Provides optional information about the vendor of the
+        storage device. This contains a single
+        attribute <code>name</code> whose value is backend
+        specific. <span class="since">Since 0.8.4</span></dd><dt><code>product</code></dt><dd>Provides an optional product name of the storage device.
+        This contains a single attribute <code>name</code> whose value
+        is backend specific.  <span class="since">Since 0.8.4</span></dd></dl>
         <h3>
           <a name="StoragePoolTarget" id="StoragePoolTarget">Target elements</a>
         </h3>
@@ -337,11 +368,24 @@
         capacity, the pool has the <strong>option</strong> of deciding
         to sparsely allocate a volume. It does not have to honour requests
         for sparse allocation though.<br /><br />
-        By default this is specified in bytes, but an optional
+        By default this is specified in bytes, but an optional attribute
         <code>unit</code> can be specified to adjust the passed value.
-        Values can be: 'K' (kilobytes), 'M' (megabytes), 'G' (gigabytes),
-        'T' (terabytes), 'P' (petabytes), or 'E' (exabytes).
-        <span class="since">Since 0.4.1</span></dd><dt><code>capacity</code></dt><dd>Providing the logical capacity for the volume. This value is
+        Values can be: 'B' or 'bytes' for bytes, 'KB' (kilobytes,
+        10<sup>3</sup> or 1000 bytes), 'K' or 'KiB' (kibibytes,
+        2<sup>10</sup> or 1024 bytes), 'MB' (megabytes, 10<sup>6</sup>
+        or 1,000,000 bytes), 'M' or 'MiB' (mebibytes, 2<sup>20</sup>
+        or 1,048,576 bytes), 'GB' (gigabytes, 10<sup>9</sup> or
+        1,000,000,000 bytes), 'G' or 'GiB' (gibibytes, 2<sup>30</sup>
+        or 1,073,741,824 bytes), 'TB' (terabytes, 10<sup>12</sup> or
+        1,000,000,000,000 bytes), 'T' or 'TiB' (tebibytes,
+        2<sup>40</sup> or 1,099,511,627,776 bytes), 'PB' (petabytes,
+        10<sup>15</sup> or 1,000,000,000,000,000 bytes), 'P' or 'PiB'
+        (pebibytes, 2<sup>50</sup> or 1,125,899,906,842,624 bytes),
+        'EB' (exabytes, 10<sup>18</sup> or 1,000,000,000,000,000,000
+        bytes), or 'E' or 'EiB' (exbibytes, 2<sup>60</sup> or
+        1,152,921,504,606,846,976 bytes).  <span class="since">Since
+        0.4.1, multi-character <code>unit</code> since
+        0.9.11</span></dd><dt><code>capacity</code></dt><dd>Providing the logical capacity for the volume. This value is
         in bytes by default, but a <code>unit</code> attribute can be
         specified with the same semantics as for <code>allocation</code>
         This is compulsory when creating a volume.

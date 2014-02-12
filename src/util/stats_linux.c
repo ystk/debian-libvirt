@@ -25,11 +25,12 @@
 # include "util.h"
 # include "stats_linux.h"
 # include "memory.h"
+# include "virfile.h"
 
 # define VIR_FROM_THIS VIR_FROM_STATS_LINUX
 
 # define virStatsError(code, ...)                               \
-    virReportErrorHelper(NULL, VIR_FROM_THIS, code, __FILE__,  \
+    virReportErrorHelper(VIR_FROM_THIS, code, __FILE__,         \
                          __FUNCTION__, __LINE__, __VA_ARGS__)
 
 
@@ -56,7 +57,7 @@ linuxDomainInterfaceStats(const char *path,
 
     path_len = strlen (path);
 
-    while (fgets (line, sizeof line, fp)) {
+    while (fgets (line, sizeof(line), fp)) {
         long long dummy;
         long long rx_bytes;
         long long rx_packets;
@@ -98,15 +99,15 @@ linuxDomainInterfaceStats(const char *path,
             stats->tx_packets = tx_packets;
             stats->tx_errs = tx_errs;
             stats->tx_drop = tx_drop;
-            fclose (fp);
+            VIR_FORCE_FCLOSE (fp);
 
             return 0;
         }
     }
-    fclose (fp);
+    VIR_FORCE_FCLOSE(fp);
 
     virStatsError(VIR_ERR_INTERNAL_ERROR,
-                  "/proc/net/dev: Interface not found");
+                  _("/proc/net/dev: Interface not found"));
     return -1;
 }
 

@@ -1,7 +1,5 @@
-/* -*- buffer-read-only: t -*- vi: set ro: */
-/* DO NOT EDIT! GENERATED AUTOMATICALLY! */
 /* count-one-bits.h -- counts the number of 1-bits in a word.
-   Copyright (C) 2007-2010 Free Software Foundation, Inc.
+   Copyright (C) 2007-2012 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as published by
@@ -40,7 +38,7 @@
           count += count_one_bits_32 (x >> 31 >> 1);                        \
         return count;
 
-/* Compute and return the the number of 1-bits set in the least
+/* Compute and return the number of 1-bits set in the least
    significant 32 bits of X. */
 static inline int
 count_one_bits_32 (unsigned int x)

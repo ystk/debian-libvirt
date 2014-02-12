@@ -1,6 +1,6 @@
 #!/bin/sh
 # Unit tests for vc-list-files
-# Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
+# Copyright (C) 2008-2012 Free Software Foundation, Inc.
 # This file is part of the GNUlib Library.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 : ${srcdir=.}
-. "$srcdir/init.sh"; path_prepend_ .
+. "$srcdir/init.sh"; path_prepend_ "$abs_aux_dir" .
 
 tmpdir=vc-cvs
 repo=`pwd`/$tmpdir/repo
@@ -36,7 +36,6 @@ for i in with-cvsu without; do
   ok=0
   mkdir $tmpdir && cd $tmpdir &&
     # without cvs, skip the test
-    # The double use of 'exit' is needed for the reference to $? inside the trap.
     { ( cvs -Q -d "$repo" init ) > /dev/null 2>&1 \
       || skip_ "cvs not found in PATH"; } &&
     mkdir w && cd w &&

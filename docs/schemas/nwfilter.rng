@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <grammar ns="" xmlns="http://relaxng.org/ns/structure/1.0" datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
+  <include href='basictypes.rng'/>
   <start>
     <ref name="filter"/>
   </start>
@@ -24,6 +25,27 @@
                   <ref name="match-attribute"/>
                   <ref name="common-l2-attributes"/>
                   <ref name="mac-attributes"/>
+                  <ref name="comment-attribute"/>
+                </element>
+              </zeroOrMore>
+            </optional>
+            <optional>
+              <zeroOrMore>
+                <element name="vlan">
+                  <ref name="match-attribute"/>
+                  <ref name="common-l2-attributes"/>
+                  <ref name="vlan-attributes"/>
+                  <ref name="comment-attribute"/>
+                </element>
+              </zeroOrMore>
+            </optional>
+            <optional>
+              <zeroOrMore>
+                <element name="stp">
+                  <ref name="match-attribute"/>
+                  <ref name="srcmacandmask-attributes"/>
+                  <ref name="stp-attributes"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -33,6 +55,7 @@
                   <ref name="match-attribute"/>
                   <ref name="common-l2-attributes"/>
                   <ref name="arp-attributes"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -42,6 +65,7 @@
                   <ref name="match-attribute"/>
                   <ref name="common-l2-attributes"/>
                   <ref name="arp-attributes"/> <!-- same as arp -->
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -54,6 +78,7 @@
                   <ref name="common-port-attributes"/>
                   <ref name="ip-attributes"/>
                   <ref name="dscp-attribute"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -65,6 +90,7 @@
                   <ref name="common-ipv6-attributes-p1"/>
                   <ref name="common-port-attributes"/>
                   <ref name="ip-attributes"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -76,6 +102,8 @@
                   <ref name="common-port-attributes"/>
                   <ref name="common-ip-attributes-p1"/>
                   <ref name="common-ip-attributes-p2"/>
+                  <ref name="tcp-attributes"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -87,6 +115,7 @@
                   <ref name="common-port-attributes"/>
                   <ref name="common-ip-attributes-p1"/>
                   <ref name="common-ip-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -98,6 +127,7 @@
                   <ref name="common-port-attributes"/>
                   <ref name="common-ip-attributes-p1"/>
                   <ref name="common-ip-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -109,6 +139,7 @@
                   <ref name="common-ip-attributes-p1"/>
                   <ref name="common-ip-attributes-p2"/>
                   <ref name="icmp-attributes"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -119,6 +150,7 @@
                   <ref name="srcmac-attribute"/>
                   <ref name="common-ip-attributes-p1"/>
                   <ref name="common-ip-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -129,6 +161,7 @@
                   <ref name="srcmac-attribute"/>
                   <ref name="common-ip-attributes-p1"/>
                   <ref name="common-ip-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -139,6 +172,7 @@
                   <ref name="srcmac-attribute"/>
                   <ref name="common-ip-attributes-p1"/>
                   <ref name="common-ip-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -149,6 +183,7 @@
                   <ref name="srcmac-attribute"/>
                   <ref name="common-ip-attributes-p1"/>
                   <ref name="common-ip-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -159,6 +194,7 @@
                   <ref name="srcmac-attribute"/>
                   <ref name="common-ip-attributes-p1"/>
                   <ref name="common-ip-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -170,6 +206,8 @@
                   <ref name="common-port-attributes"/>
                   <ref name="common-ipv6-attributes-p1"/>
                   <ref name="common-ipv6-attributes-p2"/>
+                  <ref name="tcp-attributes"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -181,6 +219,7 @@
                   <ref name="common-port-attributes"/>
                   <ref name="common-ipv6-attributes-p1"/>
                   <ref name="common-ipv6-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -192,6 +231,7 @@
                   <ref name="common-port-attributes"/>
                   <ref name="common-ipv6-attributes-p1"/>
                   <ref name="common-ipv6-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -203,6 +243,7 @@
                   <ref name="common-ipv6-attributes-p1"/>
                   <ref name="common-ipv6-attributes-p2"/>
                   <ref name="icmp-attributes"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -213,6 +254,7 @@
                   <ref name="srcmac-attribute"/>
                   <ref name="common-ipv6-attributes-p1"/>
                   <ref name="common-ipv6-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -223,6 +265,7 @@
                   <ref name="srcmac-attribute"/>
                   <ref name="common-ipv6-attributes-p1"/>
                   <ref name="common-ipv6-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -233,6 +276,7 @@
                   <ref name="srcmac-attribute"/>
                   <ref name="common-ipv6-attributes-p1"/>
                   <ref name="common-ipv6-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -243,6 +287,7 @@
                   <ref name="srcmac-attribute"/>
                   <ref name="common-ipv6-attributes-p1"/>
                   <ref name="common-ipv6-attributes-p2"/>
+                  <ref name="comment-attribute"/>
                 </element>
               </zeroOrMore>
             </optional>
@@ -262,11 +307,33 @@
       <attribute name="chain">
         <choice>
           <value>root</value>
-          <value>arp</value>
-          <value>rarp</value>
-          <value>ipv4</value>
-          <value>ipv6</value>
+          <data type="string">
+            <param name="pattern">mac[a-zA-Z0-9_\.:-]{0,9}</param>
+          </data>
+          <data type="string">
+            <param name="pattern">stp[a-zA-Z0-9_\.:-]{0,9}</param>
+          </data>
+          <data type="string">
+            <param name="pattern">vlan[a-zA-Z0-9_\.:-]{0,8}</param>
+          </data>
+          <data type="string">
+            <param name="pattern">arp[a-zA-Z0-9_\.:-]{0,9}</param>
+          </data>
+          <data type="string">
+            <param name="pattern">rarp[a-zA-Z0-9_\.:-]{0,8}</param>
+          </data>
+          <data type="string">
+            <param name="pattern">ipv4[a-zA-Z0-9_\.:-]{0,8}</param>
+          </data>
+          <data type="string">
+            <param name="pattern">ipv6[a-zA-Z0-9_\.:-]{0,8}</param>
+          </data>
         </choice>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="priority">
+        <ref name='priority-type'/>
       </attribute>
     </optional>
   </define>
@@ -275,7 +342,7 @@
     <attribute name="filter">
       <data type="NCName"/>
     </attribute>
-    <optional>
+    <zeroOrMore>
       <element name="parameter">
         <attribute name="name">
           <ref name="filter-param-name"/>
@@ -284,7 +351,7 @@
           <ref name="filter-param-value"/>
         </attribute>
       </element>
-    </optional>
+    </zeroOrMore>
   </define>
 
   <define name="rule-node-attributes">
@@ -329,7 +396,7 @@
     </interleave>
   </define>
 
-  <define name="common-l2-attributes">
+  <define name="srcmacandmask-attributes">
     <interleave>
       <ref name="srcmac-attribute"/>
       <optional>
@@ -337,6 +404,12 @@
            <ref name="addrMAC"/>
          </attribute>
       </optional>
+    </interleave>
+  </define>
+
+  <define name="common-l2-attributes">
+    <interleave>
+      <ref name="srcmacandmask-attributes"/>
       <optional>
          <attribute name="dstmacaddr">
            <ref name="addrMAC"/>
@@ -405,6 +478,11 @@
       <optional>
         <attribute name="connlimit-above">
           <ref name="uint16range"/>
+        </attribute>
+      </optional>
+      <optional>
+        <attribute name="state">
+          <ref name="stateflags-type"/>
         </attribute>
       </optional>
     </interleave>
@@ -515,6 +593,134 @@
     </interleave>
   </define>
 
+  <define name="vlan-attributes">
+    <interleave>
+      <optional>
+        <attribute name="vlanid">
+          <ref name="vlan-vlanid"/>
+        </attribute>
+      </optional>
+      <optional>
+        <attribute name="encap-protocol">
+          <ref name="mac-protocolid"/>
+        </attribute>
+      </optional>
+    </interleave>
+  </define>
+
+  <define name="stp-attributes">
+    <optional>
+      <attribute name="type">
+        <ref name="uint8range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="flags">
+        <ref name="uint8range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="root-priority">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="root-priority-hi">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="root-address">
+        <ref name="addrMAC"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="root-address-mask">
+        <ref name="addrMAC"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="root-cost">
+        <ref name="uint32range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="root-cost-hi">
+        <ref name="uint32range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="sender-priority">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="sender-priority-hi">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="sender-address">
+        <ref name="addrMAC"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="sender-address-mask">
+        <ref name="addrMAC"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="port">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="port-hi">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="age">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="age-hi">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="max-age">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="max-age-hi">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="hello-time">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="hello-time-hi">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="forward-delay">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+    <optional>
+      <attribute name="forward-delay-hi">
+        <ref name="uint16range"/>
+      </attribute>
+    </optional>
+  </define>
+
   <define name="arp-attributes">
     <interleave>
       <optional>
@@ -552,6 +758,11 @@
           <ref name="uint16range"/>
         </attribute>
       </optional>
+      <optional>
+        <attribute name="gratuitous">
+          <ref name="boolean"/>
+        </attribute>
+      </optional>
    </interleave>
   </define>
 
@@ -571,26 +782,33 @@
     </optional>
   </define>
 
+  <define name="comment-attribute">
+    <optional>
+      <attribute name="comment">
+        <ref name="comment-type"/>
+      </attribute>
+    </optional>
+  </define>
+
+  <define name="tcp-attributes">
+    <optional>
+      <attribute name="flags">
+        <ref name="tcpflags-type"/>
+      </attribute>
+    </optional>
+  </define>
+
   <!-- ################  type library ################ -->
 
-  <define name="UUID">
-    <choice>
-      <data type="string">
-        <param name="pattern">[a-fA-F0-9]{32}</param>
-      </data>
-
-      <data type="string">
-        <param name="pattern">[a-fA-F0-9]{8}\-([a-fA-F0-9]{4}\-){3}[a-fA-F0-9]{12}</param>
-      </data>
-    </choice>
+  <define name="variable-name-type">
+    <data type="string">
+      <param name="pattern">$[a-zA-Z0-9_]+(\[[ ]*[@]?[0-9]+[ ]*\])?</param>
+    </data>
   </define>
 
   <define name="addrMAC">
     <choice>
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="string">
         <param name="pattern">([a-fA-F0-9]{1,2}:){5}[a-fA-F0-9]{1,2}</param>
@@ -600,10 +818,7 @@
 
   <define name="addrIP">
     <choice>
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="string">
         <param name="pattern">([0-2]?[0-9]?[0-9]\.){3}[0-2]?[0-9]?[0-9]</param>
@@ -613,10 +828,7 @@
 
   <define name="addrIPv6">
     <choice>
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="string">
         <param name="pattern">([a-fA-F0-9]{0,4}:){2,7}([a-fA-F0-9]*)(([0-2]?[0-9]?[0-9]\.){3}[0-2]?[0-9]?[0-9])?</param>
@@ -626,10 +838,7 @@
 
   <define name="addrMask">
     <choice>
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="int">
         <param name="minInclusive">0</param>
@@ -644,10 +853,7 @@
 
   <define name="addrMaskv6">
     <choice>
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="int">
         <param name="minInclusive">0</param>
@@ -666,10 +872,7 @@
         <param name="pattern">0x([0-3][0-9a-fA-F]|[0-9a-fA-F])</param>
       </data>
 
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="int">
         <param name="minInclusive">0</param>
@@ -680,10 +883,7 @@
 
   <define name="mac-protocolid">
     <choice>
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="string">
         <param name="pattern">0x([6-9a-fA-F][0-9a-fA-F]{2}|[0-9a-fA-F]{4})</param>
@@ -699,34 +899,29 @@
         <value>rarp</value>
         <value>ipv4</value>
         <value>ipv6</value>
+        <value>vlan</value>
       </choice>
     </choice>
   </define>
 
-  <define name="uint8range">
+  <define name="vlan-vlanid">
     <choice>
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="string">
-        <param name="pattern">0x[0-9a-fA-F]{1,2}</param>
+        <param name="pattern">0x([0-9a-fA-F]{1,3})</param>
       </data>
 
       <data type="int">
         <param name="minInclusive">0</param>
-        <param name="maxInclusive">255</param>
+        <param name="maxInclusive">4095</param>
       </data>
     </choice>
   </define>
 
   <define name="uint16range">
     <choice>
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="string">
         <param name="pattern">0x[0-9a-fA-F]{1,4}</param>
@@ -739,12 +934,35 @@
     </choice>
   </define>
 
+  <define name="uint32range">
+    <choice>
+      <ref name="variable-name-type"/>
+
+      <data type="string">
+        <param name="pattern">0x[0-9a-fA-F]{1,8}</param>
+      </data>
+
+      <data type="int">
+        <param name="minInclusive">0</param>
+        <param name="maxInclusive">4294967295</param>
+      </data>
+    </choice>
+  </define>
+
+  <define name="boolean">
+    <choice>
+      <value>yes</value>
+      <value>no</value>
+      <value>true</value>
+      <value>false</value>
+      <value>1</value>
+      <value>0</value>
+    </choice>
+  </define>
+
   <define name="arpOpcodeType">
     <choice>
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="int">
         <param name="minInclusive">0</param>
@@ -760,10 +978,7 @@
 
   <define name="ipProtocolType">
     <choice>
-      <!-- variable -->
-      <data type="string">
-        <param name="pattern">$[a-zA-Z0-9_]+</param>
-      </data>
+      <ref name="variable-name-type"/>
 
       <data type="string">
         <param name="pattern">0x[0-9a-fA-F]{1,2}</param>
@@ -804,6 +1019,9 @@
     <choice>
       <value>drop</value>
       <value>accept</value>
+      <value>reject</value>
+      <value>continue</value>
+      <value>return</value>
     </choice>
   </define>
 
@@ -817,13 +1035,29 @@
 
   <define name='priority-type'>
       <data type="int">
-        <param name="minInclusive">0</param>
+        <param name="minInclusive">-1000</param>
         <param name="maxInclusive">1000</param>
       </data>
   </define>
   <define name='statematch-type'>
     <data type="string">
       <param name="pattern">([Ff][Aa][Ll][Ss][Ee]|0)</param>
+    </data>
+  </define>
+
+  <define name='comment-type'>
+    <data type="string"/>
+  </define>
+
+  <define name='stateflags-type'>
+    <data type="string">
+      <param name="pattern">((NEW|ESTABLISHED|RELATED|INVALID)(,(NEW|ESTABLISHED|RELATED|INVALID))*|NONE)</param>
+    </data>
+  </define>
+
+  <define name='tcpflags-type'>
+    <data type="string">
+      <param name="pattern">((SYN|ACK|URG|PSH|FIN|RST)(,(SYN|ACK|URG|PSH|FIN|RST))*|ALL|NONE)/((SYN|ACK|URG|PSH|FIN|RST)(,(SYN|ACK|URG|PSH|FIN|RST))*|ALL|NONE)</param>
     </data>
   </define>
 </grammar>

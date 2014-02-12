@@ -13,19 +13,43 @@
         <span>Details of new features and bugs fixed in each release</span>
         <ul>
           <li>
-            <a href="ChangeLog.html">Changelog</a>
-            <span>Latest commit messages from the source repository </span>
+            <a href="http://wiki.libvirt.org/page/Maintenance_Releases">Maintenance Releases</a>
+            <span>Details about libvirt maintenance releases</span>
+          </li>
+        </ul>
+        <ul>
+          <li>
+            <a href="http://libvirt.org/git/?p=libvirt.git;a=log">Git log</a>
+            <span>Latest commit messages from the source repository</span>
           </li>
         </ul>
       </li>
       <li>
+        <a href="apps.html">Applications</a>
+        <span>Applications known to use libvirt</span>
+      </li>
+      <li>
         <a href="downloads.html">Downloads</a>
         <span>Get the latest source releases, binary builds and get access to the source repository</span>
+        <ul>
+          <li>
+            <a href="windows.html">Windows</a>
+            <span>Downloads for Windows</span>
+          </li>
+          <li>
+            <a href="bindings.html">Language bindings</a>
+            <span>Bindings of the libvirt API for languages other than C</span>
+          </li>
+        </ul>
       </li>
       <li>
         <a href="docs.html">Documentation</a>
         <span>Information for users, administrators and developers</span>
         <ul>
+          <li>
+            <a href="compiling.html">Compiling</a>
+            <span>How to compile libvirt</span>
+          </li>
           <li>
             <a href="deployment.html">Deployment</a>
             <span>Information about deploying and using libvirt</span>
@@ -43,6 +67,10 @@
                 <span>Configure authentication for the libvirt daemon</span>
               </li>
               <li>
+                <a href="migration.html">Migration</a>
+                <span>Migrating guests between machines</span>
+              </li>
+              <li>
                 <a href="windows.html">Windows port</a>
                 <span>Access the libvirt daemon from a native Windows client</span>
               </li>
@@ -53,6 +81,10 @@
               <li>
                 <a href="firewall.html">Firewall</a>
                 <span>Firewall and network filter configuration</span>
+              </li>
+              <li>
+                <a href="locking.html">Disk locking</a>
+                <span>Ensuring exclusive guest access to disks</span>
               </li>
               <li>
                 <a href="hooks.html">Hooks</a>
@@ -101,12 +133,10 @@
               <li>
                 <a href="formatnetwork.html">Networks</a>
                 <span>The virtual network XML format</span>
-                <ul>
-                  <li>
-                    <a href="formatnwfilter.html">Network Filtering</a>
-                    <span>Network filter XML format</span>
-                  </li>
-                </ul>
+              </li>
+              <li>
+                <a href="formatnwfilter.html">Network Filtering</a>
+                <span>Network filter XML format</span>
               </li>
               <li>
                 <a href="formatstorage.html">Storage</a>
@@ -175,12 +205,16 @@
                 <span>Driver for VirtualBox</span>
               </li>
               <li>
-                <a href="drvone.html">OpenNebula</a>
-                <span>Driver for OpenNebula</span>
-              </li>
-              <li>
                 <a href="drvesx.html">VMware ESX</a>
                 <span>Driver for VMware ESX</span>
+              </li>
+              <li>
+                <a href="drvvmware.html">VMware Workstation / Player</a>
+                <span>Driver for VMware Workstation / Player</span>
+              </li>
+              <li>
+                <a href="drvhyperv.html">Microsoft Hyper-V</a>
+                <span>Driver for Microsoft Hyper-V</span>
               </li>
             </ul>
           </li>
@@ -242,6 +276,14 @@
                 <a href="java.html">Java</a>
                 <span>overview of the Java API bindings</span>
               </li>
+              <li>
+                <a href="csharp.html">C#</a>
+                <span>overview of the C# API bindings</span>
+              </li>
+              <li>
+                <a href="php.html">PHP</a>
+                <span>overview of the PHP API bindings</span>
+              </li>
             </ul>
           </li>
           <li>
@@ -256,7 +298,27 @@
                 <a href="api_extension.html">API extensions</a>
                 <span>Adding new public libvirt APIs</span>
               </li>
+              <li>
+                <a href="internals/command.html">Spawning commands</a>
+                <span>Spawning commands from libvirt driver code</span>
+              </li>
+              <li>
+                <a href="internals/rpc.html">RPC protocol &amp; APIs</a>
+                <span>RPC protocol information and API / dispatch guide</span>
+              </li>
+              <li>
+                <a href="internals/locking.html">Lock managers</a>
+                <span>Use lock managers to protect disk content</span>
+              </li>
             </ul>
+          </li>
+          <li>
+            <a href="devguide.html">Development Guide</a>
+            <span>A guide and reference for developing with libvirt</span>
+          </li>
+          <li>
+            <a href="virshcmdref.html">Virsh Commands</a>
+            <span>Command reference for virsh</span>
           </li>
         </ul>
       </li>
@@ -271,20 +333,38 @@
       <li>
         <a href="bugs.html">Bug reports</a>
         <span>How and where to report bugs and request features</span>
+        <ul>
+          <li>
+            <a href="todo.html">Todo list</a>
+            <span>Main feature request list</span>
+          </li>
+          <li>
+            <a href="pending.html">Pending patches</a>
+            <span>Pending patches awaiting reviews and integration</span>
+          </li>
+        </ul>
       </li>
       <li>
         <a href="contact.html">Contact</a>
         <span>How to contact the developers via email and IRC</span>
       </li>
       <li>
-        <a href="relatedlinks.html">Related Links</a>
-        <span>Miscellaneous links of interest related to libvirt</span>
+        <a href="testsuites.html">Test suites</a>
+        <span>Available test suites for libvirt</span>
         <ul>
           <li>
-            <a href="apps.html">Applications</a>
-            <span>Overview of applications using the libvirt APIs</span>
+            <a href="testtck.html">TCK test suite</a>
+            <span>Virtualization functional test suite in Perl</span>
+          </li>
+          <li>
+            <a href="testapi.html">Libvirt-test-API</a>
+            <span>Libvirt functional API test suite in Python</span>
           </li>
         </ul>
+      </li>
+      <li>
+        <a href="relatedlinks.html">Related Links</a>
+        <span>Miscellaneous links of interest related to libvirt</span>
       </li>
       <li>
         <a href="sitemap.html">Sitemap</a>

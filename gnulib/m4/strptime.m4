@@ -1,7 +1,5 @@
-# -*- buffer-read-only: t -*- vi: set ro:
-# DO NOT EDIT! GENERATED AUTOMATICALLY!
-# strptime.m4 serial 6
-dnl Copyright (C) 2007, 2009, 2010 Free Software Foundation, Inc.
+# strptime.m4 serial 7
+dnl Copyright (C) 2007, 2009-2012 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
@@ -13,8 +11,6 @@ AC_DEFUN([gl_FUNC_STRPTIME],
   AC_CHECK_FUNCS_ONCE([strptime])
   if test $ac_cv_func_strptime != yes; then
     HAVE_STRPTIME=0
-    AC_LIBOBJ([strptime])
-    gl_PREREQ_STRPTIME
   fi
 ])
 

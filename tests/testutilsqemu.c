@@ -1,6 +1,5 @@
 #include <config.h>
 #ifdef WITH_QEMU
-# include <sys/utsname.h>
 # include <stdlib.h>
 
 # include "testutilsqemu.h"
@@ -8,6 +7,7 @@
 # include "memory.h"
 # include "cpu_conf.h"
 # include "qemu/qemu_driver.h"
+# include "qemu/qemu_domain.h"
 
 static virCapsGuestMachinePtr *testQemuAllocMachines(int *nmachines)
 {
@@ -55,8 +55,39 @@ static virCapsGuestMachinePtr *testQemuAllocNewerMachines(int *nmachines)
     return machines;
 }
 
+static int testQemuDefaultConsoleType(const char *ostype ATTRIBUTE_UNUSED)
+{
+    return VIR_DOMAIN_CHR_CONSOLE_TARGET_TYPE_SERIAL;
+}
+
+static int testQemuAddPPC64Guest(virCapsPtr caps)
+{
+    static const char *machine[] = { "pseries" };
+    virCapsGuestMachinePtr *machines = NULL;
+    virCapsGuestPtr guest;
+
+    machines = virCapabilitiesAllocMachines(machine, 1);
+    if (!machines)
+        goto error;
+
+    guest = virCapabilitiesAddGuest(caps, "hvm", "ppc64", 64,
+                                    "/usr/bin/qemu-system-ppc64", NULL,
+                                     1, machines);
+    if (!guest)
+        goto error;
+
+    if (!virCapabilitiesAddGuestDomain(guest, "qemu", NULL, NULL, 0, NULL))
+        goto error;
+
+    return 0;
+
+error:
+    /* No way to free a guest? */
+    virCapabilitiesFreeMachines(machines, 1);
+    return -1;
+}
+
 virCapsPtr testQemuCapsInit(void) {
-    struct utsname utsname;
     virCapsPtr caps;
     virCapsGuestPtr guest;
     virCapsGuestMachinePtr *machines = NULL;
@@ -81,34 +112,40 @@ virCapsPtr testQemuCapsInit(void) {
     };
     static virCPUDef host_cpu = {
         VIR_CPU_TYPE_HOST,      /* type */
+        0,                      /* mode */
         0,                      /* match */
         (char *) "x86_64",      /* arch */
         (char *) "core2duo",    /* model */
+        0,                      /* fallback */
         (char *) "Intel",       /* vendor */
         1,                      /* sockets */
         2,                      /* cores */
         1,                      /* threads */
         ARRAY_CARDINALITY(host_cpu_features), /* nfeatures */
-        host_cpu_features       /* features */
+        ARRAY_CARDINALITY(host_cpu_features), /* nfeatures_max */
+        host_cpu_features,      /* features */
+        0,                      /* ncells */
+        0,                      /* ncells_max */
+        NULL,                   /* cells */
+        0,                      /* cells_cpus */
     };
 
-    uname (&utsname);
-    if ((caps = virCapabilitiesNew(utsname.machine,
+    if ((caps = virCapabilitiesNew(host_cpu.arch,
                                    0, 0)) == NULL)
         return NULL;
+
+    caps->defaultConsoleTargetType = testQemuDefaultConsoleType;
 
     if ((caps->host.cpu = virCPUDefCopy(&host_cpu)) == NULL ||
         (machines = testQemuAllocMachines(&nmachines)) == NULL)
         goto cleanup;
 
-    caps->ns.parse = qemuDomainDefNamespaceParse;
-    caps->ns.free = qemuDomainDefNamespaceFree;
-    caps->ns.format = qemuDomainDefNamespaceFormatXML;
-    caps->ns.href = qemuDomainDefNamespaceHref;
+    qemuDomainSetNamespaceHooks(caps);
 
     if ((guest = virCapabilitiesAddGuest(caps, "hvm", "i686", 32,
                                          "/usr/bin/qemu", NULL,
-                                         nmachines, machines)) == NULL)
+                                         nmachines, machines)) == NULL ||
+        !virCapabilitiesAddGuestFeature(guest, "cpuselection", 1, 0))
         goto cleanup;
     machines = NULL;
 
@@ -125,7 +162,8 @@ virCapsPtr testQemuCapsInit(void) {
 
     if ((guest = virCapabilitiesAddGuest(caps, "hvm", "x86_64", 64,
                                          "/usr/bin/qemu-system-x86_64", NULL,
-                                         nmachines, machines)) == NULL)
+                                         nmachines, machines)) == NULL ||
+        !virCapabilitiesAddGuestFeature(guest, "cpuselection", 1, 0))
         goto cleanup;
     machines = NULL;
 
@@ -165,6 +203,9 @@ virCapsPtr testQemuCapsInit(void) {
                                       NULL,
                                       0,
                                       NULL) == NULL)
+        goto cleanup;
+
+    if (testQemuAddPPC64Guest(caps))
         goto cleanup;
 
     if (virTestGetDebug()) {

@@ -1,7 +1,7 @@
 /*
  * capabilities.h: hypervisor capabilities
  *
- * Copyright (C) 2006-2008 Red Hat, Inc.
+ * Copyright (C) 2006-2008, 2010 Red Hat, Inc.
  * Copyright (C) 2006-2008 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -24,12 +24,10 @@
 #ifndef __VIR_CAPABILITIES_H
 # define __VIR_CAPABILITIES_H
 
-# include <stdbool.h>
-
 # include "internal.h"
-# include "util.h"
 # include "buf.h"
 # include "cpu_conf.h"
+# include "virmacaddr.h"
 
 # include <libxml/xpath.h>
 
@@ -71,7 +69,8 @@ struct _virCapsGuestArch {
     char *name;
     int wordsize;
     virCapsGuestDomainInfo defaultInfo;
-    int ndomains;
+    size_t ndomains;
+    size_t ndomains_max;
     virCapsGuestDomainPtr *domains;
 };
 
@@ -80,7 +79,8 @@ typedef virCapsGuest *virCapsGuestPtr;
 struct _virCapsGuest {
     char *ostype;
     virCapsGuestArch arch;
-    int nfeatures;
+    size_t nfeatures;
+    size_t nfeatures_max;
     virCapsGuestFeaturePtr *features;
 };
 
@@ -102,13 +102,19 @@ typedef struct _virCapsHost virCapsHost;
 typedef virCapsHost *virCapsHostPtr;
 struct _virCapsHost {
     char *arch;
-    int nfeatures;
+    size_t nfeatures;
+    size_t nfeatures_max;
     char **features;
+    unsigned int powerMgmt;    /* Bitmask of the PM capabilities.
+                                * See enum virHostPMCapability.
+                                */
     int offlineMigrate;
     int liveMigrate;
-    int nmigrateTrans;
+    size_t nmigrateTrans;
+    size_t nmigrateTrans_max;
     char **migrateTrans;
-    int nnumaCell;
+    size_t nnumaCell;
+    size_t nnumaCell_max;
     virCapsHostNUMACellPtr *numaCell;
     virCapsHostSecModel secModel;
     virCPUDefPtr cpu;
@@ -134,18 +140,20 @@ typedef struct _virCaps virCaps;
 typedef virCaps* virCapsPtr;
 struct _virCaps {
     virCapsHost host;
-    int nguests;
+    size_t nguests;
+    size_t nguests_max;
     virCapsGuestPtr *guests;
     unsigned char macPrefix[VIR_MAC_PREFIX_BUFLEN];
     unsigned int emulatorRequired : 1;
     const char *defaultDiskDriverName;
     const char *defaultDiskDriverType;
-    int defaultConsoleTargetType;
+    int (*defaultConsoleTargetType)(const char *ostype);
     void *(*privateDataAllocFunc)(void);
     void (*privateDataFreeFunc)(void *);
     int (*privateDataXMLFormat)(virBufferPtr, void *);
     int (*privateDataXMLParse)(xmlXPathContextPtr, void *);
     bool hasWideScsiBus;
+    const char *defaultInitPath;
 
     virDomainXMLNamespace ns;
 };
@@ -229,12 +237,15 @@ virCapabilitiesAddGuestFeature(virCapsGuestPtr guest,
                                int toggle);
 
 extern int
+virCapabilitiesSupportsGuestArch(virCapsPtr caps,
+                                 const char *arch);
+extern int
 virCapabilitiesSupportsGuestOSType(virCapsPtr caps,
                                    const char *ostype);
 extern int
-virCapabilitiesSupportsGuestArch(virCapsPtr caps,
-                                 const char *ostype,
-                                 const char *arch);
+virCapabilitiesSupportsGuestOSTypeArch(virCapsPtr caps,
+                                       const char *ostype,
+                                       const char *arch);
 
 
 extern const char *

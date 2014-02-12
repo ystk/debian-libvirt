@@ -1,7 +1,7 @@
 /*
  * virterror.c: implements error handling and reporting code for libvirt
  *
- * Copy:  Copyright (C) 2006, 2008-2010 Red Hat, Inc.
+ * Copy:  Copyright (C) 2006, 2008-2012 Red Hat, Inc.
  *
  * See COPYING.LIB for the License of this software
  *
@@ -26,54 +26,18 @@ virThreadLocal virLastErr;
 
 virErrorFunc virErrorHandler = NULL;     /* global error handler */
 void *virUserData = NULL;        /* associated data */
-
-/*
- * Macro used to format the message as a string in virRaiseError
- * and borrowed from libxml2.
- */
-#define VIR_GET_VAR_STR(msg, str) {				\
-    int       size, prev_size = -1;				\
-    int       chars;						\
-    char      *larger;						\
-    va_list   ap;						\
-                                                                \
-    str = (char *) malloc(150);					\
-    if (str != NULL) {						\
-                                                                \
-    size = 150;							\
-                                                                \
-    while (1) {							\
-        va_start(ap, msg);					\
-        chars = vsnprintf(str, size, msg, ap);			\
-        va_end(ap);						\
-        if ((chars > -1) && (chars < size)) {			\
-            if (prev_size == chars) {				\
-                break;						\
-            } else {						\
-                prev_size = chars;				\
-            }							\
-        }							\
-        if (chars > -1)						\
-            size += chars + 1;					\
-        else							\
-            size += 100;					\
-        if ((larger = (char *) realloc(str, size)) == NULL) {	\
-            break;						\
-        }							\
-        str = larger;						\
-    }}								\
-}
+virErrorLogPriorityFunc virErrorLogPriorityFilter = NULL;
 
 static virLogPriority virErrorLevelPriority(virErrorLevel level) {
     switch (level) {
         case VIR_ERR_NONE:
-            return(VIR_LOG_INFO);
+            return VIR_LOG_INFO;
         case VIR_ERR_WARNING:
-            return(VIR_LOG_WARN);
+            return VIR_LOG_WARN;
         case VIR_ERR_ERROR:
-            return(VIR_LOG_ERROR);
+            return VIR_LOG_ERROR;
     }
-    return(VIR_LOG_ERROR);
+    return VIR_LOG_ERROR;
 }
 
 static const char *virErrorDomainName(virErrorDomain domain) {
@@ -87,6 +51,9 @@ static const char *virErrorDomainName(virErrorDomain domain) {
             break;
         case VIR_FROM_XENAPI:
             dom = "XenAPI ";
+            break;
+        case VIR_FROM_LIBXL:
+            dom = "xenlight ";
             break;
         case VIR_FROM_XML:
             dom = "XML ";
@@ -104,7 +71,7 @@ static const char *virErrorDomainName(virErrorDomain domain) {
             dom = "Domain ";
             break;
         case VIR_FROM_RPC:
-            dom = "XML-RPC ";
+            dom = "RPC ";
             break;
         case VIR_FROM_QEMU:
             dom = "QEMU ";
@@ -132,6 +99,9 @@ static const char *virErrorDomainName(virErrorDomain domain) {
             break;
         case VIR_FROM_OPENVZ:
             dom = "OpenVZ ";
+            break;
+        case VIR_FROM_VMWARE:
+            dom = "VMware ";
             break;
         case VIR_FROM_XENXM:
             dom = "Xen XM ";
@@ -179,7 +149,7 @@ static const char *virErrorDomainName(virErrorDomain domain) {
             dom = "CPU ";
             break;
         case VIR_FROM_NWFILTER:
-            dom = "Network Filter";
+            dom = "Network Filter ";
             break;
         case VIR_FROM_HOOK:
             dom = "Sync Hook ";
@@ -187,8 +157,38 @@ static const char *virErrorDomainName(virErrorDomain domain) {
         case VIR_FROM_DOMAIN_SNAPSHOT:
             dom = "Domain Snapshot ";
             break;
+        case VIR_FROM_AUDIT:
+            dom = "Audit ";
+            break;
+        case VIR_FROM_SYSINFO:
+            dom = "Sysinfo ";
+            break;
+        case VIR_FROM_STREAMS:
+            dom = "Streams ";
+            break;
+        case VIR_FROM_EVENT:
+            dom = "Events ";
+            break;
+        case VIR_FROM_LOCKING:
+            dom = "Locking ";
+            break;
+        case VIR_FROM_HYPERV:
+            dom = "Hyper-V ";
+            break;
+        case VIR_FROM_CAPABILITIES:
+            dom = "Capabilities ";
+            break;
+        case VIR_FROM_URI:
+            dom = "URI ";
+            break;
+        case VIR_FROM_AUTH:
+            dom = "Auth ";
+            break;
+        case VIR_FROM_DBUS:
+            dom = "DBus ";
+            break;
     }
-    return(dom);
+    return dom;
 }
 
 
@@ -232,12 +232,12 @@ virErrorGenericFailure(virErrorPtr err)
     err->code = VIR_ERR_INTERNAL_ERROR;
     err->domain = VIR_FROM_NONE;
     err->level = VIR_ERR_ERROR;
-    err->message = strdup(_("Unknown failure"));
+    err->message = strdup(_("An error occurred, but the cause is unknown"));
 }
 
 
 /*
- * Internal helper to perform a deep copy of the an error
+ * Internal helper to perform a deep copy of an error
  */
 static int
 virCopyError(virErrorPtr from,
@@ -263,7 +263,7 @@ virCopyError(virErrorPtr from,
     to->int1 = from->int1;
     to->int2 = from->int2;
     /*
-     * Delibrately not setting 'conn', 'dom', 'net' references
+     * Deliberately not setting 'conn', 'dom', 'net' references
      */
     return ret;
 }
@@ -276,7 +276,8 @@ virLastErrorObject(void)
     if (!err) {
         if (VIR_ALLOC(err) < 0)
             return NULL;
-        virThreadLocalSet(&virLastErr, err);
+        if (virThreadLocalSet(&virLastErr, err) < 0)
+            VIR_FREE(err);
     }
     return err;
 }
@@ -310,18 +311,24 @@ virGetLastError(void)
  * Can be used to re-set an old error, which may have been squashed by
  * other functions (like cleanup routines).
  *
- * Returns 0 on success, 1 on failure
+ * Returns 0 on success, -1 on failure.  Leaves errno unchanged.
  */
 int
 virSetError(virErrorPtr newerr)
 {
     virErrorPtr err;
+    int saved_errno = errno;
+    int ret = -1;
+
     err = virLastErrorObject();
     if (!err)
-        return -1;
+        goto cleanup;
 
     virResetError(err);
-    return virCopyError(newerr, err);
+    ret = virCopyError(newerr, err);
+cleanup:
+    errno = saved_errno;
+    return ret;
 }
 
 /**
@@ -342,7 +349,7 @@ int
 virCopyLastError(virErrorPtr to)
 {
     virErrorPtr err = virLastErrorObject();
-    /* We can't guarentee caller has initialized it to zero */
+    /* We can't guarantee caller has initialized it to zero */
     memset(to, 0, sizeof(*to));
     if (err)
         virCopyError(err, to);
@@ -354,7 +361,8 @@ virCopyLastError(virErrorPtr to)
 /**
  * virSaveLastError:
  *
- * Save the last error into a new error object.
+ * Save the last error into a new error object.  On success, errno is
+ * unchanged; on failure, errno is ENOMEM.
  *
  * Returns a pointer to the copied error or NULL if allocation failed.
  * It is the caller's responsibility to free the error with
@@ -364,11 +372,13 @@ virErrorPtr
 virSaveLastError(void)
 {
     virErrorPtr to;
+    int saved_errno = errno;
 
     if (VIR_ALLOC(to) < 0)
         return NULL;
 
     virCopyLastError(to);
+    errno = saved_errno;
     return to;
 }
 
@@ -438,7 +448,7 @@ virResetLastError(void)
  * Since 0.6.0, all errors reported in the per-connection object
  * are also duplicated in the global error object. As such an
  * application can always use virGetLastError(). This method
- * remains for backwards compatability.
+ * remains for backwards compatibility.
  *
  * Returns a pointer to the last error or NULL if none occurred.
  */
@@ -469,7 +479,7 @@ virConnGetLastError(virConnectPtr conn)
  * Since 0.6.0, all errors reported in the per-connection object
  * are also duplicated in the global error object. As such an
  * application can always use virGetLastError(). This method
- * remains for backwards compatability.
+ * remains for backwards compatibility.
  *
  * One will need to free the result with virResetError()
  *
@@ -479,7 +489,7 @@ virConnGetLastError(virConnectPtr conn)
 int
 virConnCopyLastError(virConnectPtr conn, virErrorPtr to)
 {
-    /* We can't guarentee caller has initialized it to zero */
+    /* We can't guarantee caller has initialized it to zero */
     memset(to, 0, sizeof(*to));
 
     if (conn == NULL)
@@ -612,7 +622,7 @@ virDispatchError(virConnectPtr conn)
     virErrorFunc handler = virErrorHandler;
     void *userData = virUserData;
 
-    /* Should never happen, but doesn't hurt to check */
+    /* Can only happen on OOM.  */
     if (!err)
         return;
 
@@ -644,7 +654,6 @@ virDispatchError(virConnectPtr conn)
 
 /**
  * virRaiseErrorFull:
- * @conn: the connection to the hypervisor if available
  * @filename: filename where error was raised
  * @funcname: function name where error was raised
  * @linenr: line number where error was raised
@@ -663,8 +672,7 @@ virDispatchError(virConnectPtr conn)
  * immediately if a callback is found and store it for later handling.
  */
 void
-virRaiseErrorFull(virConnectPtr conn ATTRIBUTE_UNUSED,
-                  const char *filename ATTRIBUTE_UNUSED,
+virRaiseErrorFull(const char *filename ATTRIBUTE_UNUSED,
                   const char *funcname,
                   size_t linenr,
                   int domain,
@@ -677,44 +685,46 @@ virRaiseErrorFull(virConnectPtr conn ATTRIBUTE_UNUSED,
                   int int2,
                   const char *fmt, ...)
 {
+    int save_errno = errno;
     virErrorPtr to;
     char *str;
+    int priority;
 
     /*
      * All errors are recorded in thread local storage
-     * For compatability, public API calls will copy them
+     * For compatibility, public API calls will copy them
      * to the per-connection error object when necessary
      */
     to = virLastErrorObject();
-    if (!to)
+    if (!to) {
+        errno = save_errno;
         return; /* Hit OOM allocating thread error object, sod all we can do now */
+    }
 
     virResetError(to);
 
-    if (code == VIR_ERR_OK)
+    if (code == VIR_ERR_OK) {
+        errno = save_errno;
         return;
+    }
 
     /*
-     * formats the message
+     * formats the message; drop message on OOM situations
      */
     if (fmt == NULL) {
         str = strdup(_("No error message provided"));
     } else {
-        VIR_GET_VAR_STR(fmt, str);
+        va_list ap;
+        va_start(ap, fmt);
+        virVasprintf(&str, fmt, ap);
+        va_end(ap);
     }
-
-    /*
-     * Hook up the error or warning to the logging facility
-     * XXXX should we include filename as 'category' instead of domain name ?
-     */
-    virLogMessage(virErrorDomainName(domain), virErrorLevelPriority(level),
-                  funcname, linenr, 1, "%s", str);
 
     /*
      * Save the information about the error
      */
     /*
-     * Delibrately not setting conn, dom & net fields since
+     * Deliberately not setting conn, dom & net fields since
      * they're utterly unsafe
      */
     to->domain = domain;
@@ -729,6 +739,20 @@ virRaiseErrorFull(virConnectPtr conn ATTRIBUTE_UNUSED,
         to->str3 = strdup(str3);
     to->int1 = int1;
     to->int2 = int2;
+
+    /*
+     * Hook up the error or warning to the logging facility
+     * XXXX should we include filename as 'category' instead of domain name ?
+     */
+    priority = virErrorLevelPriority(level);
+    if (virErrorLogPriorityFilter)
+        priority = virErrorLogPriorityFilter(to, priority);
+    virLogMessage(filename, priority,
+                  funcname, linenr,
+                  virErrorLogPriorityFilter ? 0 : 1,
+                  "%s", str);
+
+    errno = save_errno;
 }
 
 /**
@@ -741,14 +765,14 @@ virRaiseErrorFull(virConnectPtr conn ATTRIBUTE_UNUSED,
  *
  * Returns the constant string associated to @error
  */
-const char *
+static const char *
 virErrorMsg(virErrorNumber error, const char *info)
 {
     const char *errmsg = NULL;
 
     switch (error) {
         case VIR_ERR_OK:
-            return (NULL);
+            return NULL;
         case VIR_ERR_INTERNAL_ERROR:
             if (info != NULL)
               errmsg = _("internal error %s");
@@ -784,9 +808,9 @@ virErrorMsg(virErrorNumber error, const char *info)
             break;
         case VIR_ERR_INVALID_ARG:
             if (info == NULL)
-                errmsg = _("invalid argument in");
+                errmsg = _("invalid argument");
             else
-                errmsg = _("invalid argument in %s");
+                errmsg = _("invalid argument: %s");
             break;
         case VIR_ERR_OPERATION_FAILED:
             if (info != NULL)
@@ -865,9 +889,9 @@ virErrorMsg(virErrorNumber error, const char *info)
             break;
         case VIR_ERR_NO_NAME:
             if (info == NULL)
-                errmsg = _("missing domain name information");
+                errmsg = _("missing name information");
             else
-                errmsg = _("missing domain name information in %s");
+                errmsg = _("missing name information in %s");
             break;
         case VIR_ERR_NO_OS:
             if (info == NULL)
@@ -895,9 +919,9 @@ virErrorMsg(virErrorNumber error, const char *info)
             break;
         case VIR_ERR_XML_ERROR:
             if (info == NULL)
-                errmsg = _("XML description not well formed or invalid");
+                errmsg = _("XML description is invalid or not well formed");
             else
-                errmsg = _("XML description for %s is not well formed or invalid");
+                errmsg = _("XML error: %s");
             break;
         case VIR_ERR_DOM_EXIST:
             if (info == NULL)
@@ -1007,65 +1031,83 @@ virErrorMsg(virErrorNumber error, const char *info)
             else
                 errmsg = _("authentication failed: %s");
             break;
+        case VIR_ERR_AUTH_CANCELLED:
+            if (info == NULL)
+                errmsg = _("authentication cancelled");
+            else
+                errmsg = _("authentication cancelled: %s");
+            break;
         case VIR_ERR_NO_STORAGE_POOL:
             if (info == NULL)
-                    errmsg = _("Storage pool not found");
+                errmsg = _("Storage pool not found");
             else
-                    errmsg = _("Storage pool not found: %s");
+                errmsg = _("Storage pool not found: %s");
             break;
         case VIR_ERR_NO_STORAGE_VOL:
             if (info == NULL)
-                    errmsg = _("Storage volume not found");
+                errmsg = _("Storage volume not found");
             else
-                    errmsg = _("Storage volume not found: %s");
+                errmsg = _("Storage volume not found: %s");
+            break;
+        case VIR_ERR_STORAGE_PROBE_FAILED:
+            if (info == NULL)
+                errmsg = _("Storage pool probe failed");
+            else
+                errmsg = _("Storage pool probe failed: %s");
+            break;
+        case VIR_ERR_STORAGE_POOL_BUILT:
+            if (info == NULL)
+                errmsg = _("Storage pool already built");
+            else
+                errmsg = _("Storage pool already built: %s");
             break;
         case VIR_ERR_INVALID_STORAGE_POOL:
             if (info == NULL)
-                    errmsg = _("invalid storage pool pointer in");
+                errmsg = _("invalid storage pool pointer in");
             else
-                    errmsg = _("invalid storage pool pointer in %s");
+                errmsg = _("invalid storage pool pointer in %s");
             break;
         case VIR_ERR_INVALID_STORAGE_VOL:
             if (info == NULL)
-                    errmsg = _("invalid storage volume pointer in");
+                errmsg = _("invalid storage volume pointer in");
             else
-                    errmsg = _("invalid storage volume pointer in %s");
+                errmsg = _("invalid storage volume pointer in %s");
             break;
         case VIR_WAR_NO_STORAGE:
             if (info == NULL)
-                    errmsg = _("Failed to find a storage driver");
+                errmsg = _("Failed to find a storage driver");
             else
-                    errmsg = _("Failed to find a storage driver: %s");
+                errmsg = _("Failed to find a storage driver: %s");
             break;
         case VIR_WAR_NO_NODE:
             if (info == NULL)
-                    errmsg = _("Failed to find a node driver");
+                errmsg = _("Failed to find a node driver");
             else
-                    errmsg = _("Failed to find a node driver: %s");
+                errmsg = _("Failed to find a node driver: %s");
             break;
         case VIR_ERR_INVALID_NODE_DEVICE:
             if (info == NULL)
-                    errmsg = _("invalid node device pointer");
+                errmsg = _("invalid node device pointer");
             else
-                    errmsg = _("invalid node device pointer in %s");
+                errmsg = _("invalid node device pointer in %s");
             break;
         case VIR_ERR_NO_NODE_DEVICE:
             if (info == NULL)
-                    errmsg = _("Node device not found");
+                errmsg = _("Node device not found");
             else
-                    errmsg = _("Node device not found: %s");
+                errmsg = _("Node device not found: %s");
             break;
         case VIR_ERR_NO_SECURITY_MODEL:
             if (info == NULL)
-                    errmsg = _("Security model not found");
+                errmsg = _("Security model not found");
             else
-                    errmsg = _("Security model not found: %s");
+                errmsg = _("Security model not found: %s");
             break;
         case VIR_ERR_OPERATION_INVALID:
             if (info == NULL)
-                    errmsg = _("Requested operation is not valid");
+                errmsg = _("Requested operation is not valid");
             else
-                    errmsg = _("Requested operation is not valid: %s");
+                errmsg = _("Requested operation is not valid: %s");
             break;
         case VIR_WAR_NO_INTERFACE:
             if (info == NULL)
@@ -1117,21 +1159,21 @@ virErrorMsg(virErrorNumber error, const char *info)
             break;
         case VIR_ERR_INVALID_NWFILTER:
             if (info == NULL)
-                    errmsg = _("Invalid network filter");
+                errmsg = _("Invalid network filter");
             else
-                    errmsg = _("Invalid network filter: %s");
+                errmsg = _("Invalid network filter: %s");
             break;
         case VIR_ERR_NO_NWFILTER:
             if (info == NULL)
-                    errmsg = _("Network filter not found");
+                errmsg = _("Network filter not found");
             else
-                    errmsg = _("Network filter not found: %s");
+                errmsg = _("Network filter not found: %s");
             break;
         case VIR_ERR_BUILD_FIREWALL:
             if (info == NULL)
-                    errmsg = _("Error while building firewall");
+                errmsg = _("Error while building firewall");
             else
-                    errmsg = _("Error while building firewall: %s");
+                errmsg = _("Error while building firewall: %s");
             break;
         case VIR_ERR_CONFIG_UNSUPPORTED:
             if (info == NULL)
@@ -1169,16 +1211,63 @@ virErrorMsg(virErrorNumber error, const char *info)
             else
                 errmsg = _("Domain snapshot not found: %s");
             break;
+        case VIR_ERR_INVALID_STREAM:
+            if (info == NULL)
+                errmsg = _("invalid stream pointer");
+            else
+                errmsg = _("invalid stream pointer in %s");
+            break;
+        case VIR_ERR_ARGUMENT_UNSUPPORTED:
+            if (info == NULL)
+                errmsg = _("argument unsupported");
+            else
+                errmsg = _("argument unsupported: %s");
+            break;
+        case VIR_ERR_SNAPSHOT_REVERT_RISKY:
+            if (info == NULL)
+                errmsg = _("revert requires force");
+            else
+                errmsg = _("revert requires force: %s");
+            break;
+        case VIR_ERR_OPERATION_ABORTED:
+            if (info == NULL)
+                errmsg = _("operation aborted");
+            else
+                errmsg = _("operation aborted: %s");
+            break;
+        case VIR_ERR_NO_DOMAIN_METADATA:
+            if (info == NULL)
+                errmsg = _("metadata not found");
+            else
+                errmsg = _("metadata not found: %s");
+            break;
+        case VIR_ERR_MIGRATE_UNSAFE:
+            if (!info)
+                errmsg = _("Unsafe migration");
+            else
+                errmsg = _("Unsafe migration: %s");
+            break;
+        case VIR_ERR_OVERFLOW:
+            if (!info)
+                errmsg = _("numerical overflow");
+            else
+                errmsg = _("numerical overflow: %s");
+            break;
+        case VIR_ERR_BLOCK_COPY_ACTIVE:
+            if (!info)
+                errmsg = _("block copy still active");
+            else
+                errmsg = _("block copy still active: %s");
+            break;
     }
-    return (errmsg);
+    return errmsg;
 }
 
 /**
  * virReportErrorHelper:
  *
- * @conn: the connection to the hypervisor if available
  * @domcode: the virErrorDomain indicating where it's coming from
- * @errcode: the virErrorNumber code for the error
+ * @errorcode: the virErrorNumber code for the error
  * @filename: Source file error is dispatched from
  * @funcname: Function error is dispatched from
  * @linenr: Line number error is dispatched from
@@ -1188,14 +1277,14 @@ virErrorMsg(virErrorNumber error, const char *info)
  * Helper function to do most of the grunt work for individual driver
  * ReportError
  */
-void virReportErrorHelper(virConnectPtr conn,
-                          int domcode,
-                          int errcode,
+void virReportErrorHelper(int domcode,
+                          int errorcode,
                           const char *filename,
                           const char *funcname,
                           size_t linenr,
                           const char *fmt, ...)
 {
+    int save_errno = errno;
     va_list args;
     char errorMessage[1024];
     const char *virerr;
@@ -1208,12 +1297,12 @@ void virReportErrorHelper(virConnectPtr conn,
         errorMessage[0] = '\0';
     }
 
-    virerr = virErrorMsg(errcode, (errorMessage[0] ? errorMessage : NULL));
-    virRaiseErrorFull(conn, filename, funcname, linenr,
-                      domcode, errcode, VIR_ERR_ERROR,
+    virerr = virErrorMsg(errorcode, (errorMessage[0] ? errorMessage : NULL));
+    virRaiseErrorFull(filename, funcname, linenr,
+                      domcode, errorcode, VIR_ERR_ERROR,
                       virerr, errorMessage, NULL,
                       -1, -1, virerr, errorMessage);
-
+    errno = save_errno;
 }
 
 /**
@@ -1222,31 +1311,20 @@ void virReportErrorHelper(virConnectPtr conn,
  * @errBuf: the buffer to save the error to
  * @errBufLen: the buffer length
  *
- * Generate an erro string for the given errno
+ * Generate an error string for the given errno
  *
  * Returns a pointer to the error string, possibly indicating that the
  *         error is unknown
  */
 const char *virStrerror(int theerrno, char *errBuf, size_t errBufLen)
 {
-#ifdef HAVE_STRERROR_R
-# ifdef __USE_GNU
-    /* Annoying linux specific API contract */
-    return strerror_r(theerrno, errBuf, errBufLen);
-# else
+    int save_errno = errno;
+    const char *ret;
+
     strerror_r(theerrno, errBuf, errBufLen);
-    return errBuf;
-# endif
-#else
-    /* Mingw lacks strerror_r and its strerror is definitely not
-     * threadsafe, so safest option is to just print the raw errno
-     * value - we can at least reliably & safely look it up in the
-     * header files for debug purposes
-     */
-    int n = snprintf(errBuf, errBufLen, "errno=%d", theerrno);
-    return (0 < n && n < errBufLen
-            ? errBuf : _("internal error: buffer too small"));
-#endif
+    ret = errBuf;
+    errno = save_errno;
+    return ret;
 }
 
 /**
@@ -1268,6 +1346,7 @@ void virReportSystemErrorFull(int domcode,
                               size_t linenr,
                               const char *fmt, ...)
 {
+    int save_errno = errno;
     char strerror_buf[1024];
     char msgDetailBuf[1024];
 
@@ -1284,8 +1363,8 @@ void virReportSystemErrorFull(int domcode,
         n = vsnprintf(msgDetailBuf, sizeof(msgDetailBuf), fmt, args);
         va_end(args);
 
-        size_t len = strlen (msgDetailBuf);
-        if (0 <= n && n + 2 + len < sizeof (msgDetailBuf)) {
+        size_t len = strlen(errnoDetail);
+        if (0 <= n && n + 2 + len < sizeof(msgDetailBuf)) {
           char *p = msgDetailBuf + n;
           stpcpy (stpcpy (p, ": "), errnoDetail);
           msgDetail = msgDetailBuf;
@@ -1295,9 +1374,10 @@ void virReportSystemErrorFull(int domcode,
     if (!msgDetail)
         msgDetail = errnoDetail;
 
-    virRaiseErrorFull(NULL, filename, funcname, linenr,
+    virRaiseErrorFull(filename, funcname, linenr,
                       domcode, VIR_ERR_SYSTEM_ERROR, VIR_ERR_ERROR,
                       msg, msgDetail, NULL, -1, -1, msg, msgDetail);
+    errno = save_errno;
 }
 
 /**
@@ -1318,7 +1398,18 @@ void virReportOOMErrorFull(int domcode,
     const char *virerr;
 
     virerr = virErrorMsg(VIR_ERR_NO_MEMORY, NULL);
-    virRaiseErrorFull(NULL, filename, funcname, linenr,
+    virRaiseErrorFull(filename, funcname, linenr,
                       domcode, VIR_ERR_NO_MEMORY, VIR_ERR_ERROR,
                       virerr, NULL, NULL, -1, -1, virerr, NULL);
+}
+
+/**
+ * virSetErrorLogPriorityFunc:
+ * @func: function to install
+ *
+ * Install a function used to filter error logging based on error priority.
+ */
+void virSetErrorLogPriorityFunc(virErrorLogPriorityFunc func)
+{
+    virErrorLogPriorityFilter = func;
 }
