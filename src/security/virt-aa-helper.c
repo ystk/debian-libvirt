@@ -1,7 +1,9 @@
 
 /*
  * virt-aa-helper: wrapper program used by AppArmor security driver.
- * Copyright (C) 2009 Canonical Ltd.
+ *
+ * Copyright (C) 2010-2011 Red Hat, Inc.
+ * Copyright (C) 2009-2011 Canonical Ltd.
  *
  * See COPYING.LIB for the License of this software
  *
@@ -19,15 +21,17 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <stdbool.h>
 #include <sys/utsname.h>
+#include <locale.h>
 
 #include "internal.h"
 #include "buf.h"
 #include "util.h"
 #include "memory.h"
+#include "command.h"
 
 #include "security_driver.h"
 #include "security_apparmor.h"
@@ -36,6 +40,11 @@
 #include "uuid.h"
 #include "hostusb.h"
 #include "pci.h"
+#include "virfile.h"
+#include "configmake.h"
+#include "virrandom.h"
+
+#define VIR_FROM_THIS VIR_FROM_SECURITY
 
 static char *progname;
 
@@ -53,7 +62,8 @@ typedef struct {
     char *hvm;                  /* type of hypervisor (eg hvm, xen) */
     char *arch;                 /* machine architecture */
     int bits;                   /* bits in the guest */
-    char *newdisk;              /* newly added disk */
+    char *newfile;              /* newly added file */
+    bool append;                /* append to .files instead of rewrite */
 } vahControl;
 
 static int
@@ -67,7 +77,7 @@ vahDeinit(vahControl * ctl)
     VIR_FREE(ctl->files);
     VIR_FREE(ctl->hvm);
     VIR_FREE(ctl->arch);
-    VIR_FREE(ctl->newdisk);
+    VIR_FREE(ctl->newfile);
 
     return 0;
 }
@@ -78,26 +88,28 @@ vahDeinit(vahControl * ctl)
 static void
 vah_usage(void)
 {
-    fprintf(stdout, "\n%s [options] [< def.xml]\n\n"
+    printf(_("\n%s [options] [< def.xml]\n\n"
             "  Options:\n"
             "    -a | --add                     load profile\n"
             "    -c | --create                  create profile from template\n"
             "    -D | --delete                  unload and delete profile\n"
+            "    -f | --add-file <file>         add file to profile\n"
+            "    -F | --append-file <file>      append file to profile\n"
             "    -r | --replace                 reload profile\n"
             "    -R | --remove                  unload profile\n"
             "    -h | --help                    this help\n"
             "    -u | --uuid <uuid>             uuid (profile name)\n"
-            "\n", progname);
+            "\n"), progname);
 
-    fprintf(stdout, "This command is intended to be used by libvirtd "
-            "and not used directly.\n");
+    puts(_("This command is intended to be used by libvirtd "
+           "and not used directly.\n"));
     return;
 }
 
 static void
 vah_error(vahControl * ctl, int doexit, const char *str)
 {
-    fprintf(stderr, _("%s: error: %s\n"), progname, str);
+    fprintf(stderr, _("%s: error: %s%c"), progname, str, '\n');
 
     if (doexit) {
         if (ctl != NULL)
@@ -109,13 +121,13 @@ vah_error(vahControl * ctl, int doexit, const char *str)
 static void
 vah_warning(const char *str)
 {
-    fprintf(stderr, _("%s: warning: %s\n"), progname, str);
+    fprintf(stderr, _("%s: warning: %s%c"), progname, str, '\n');
 }
 
 static void
 vah_info(const char *str)
 {
-    fprintf(stderr, _("%s:\n%s\n"), progname, str);
+    fprintf(stderr, _("%s:\n%s%c"), progname, str, '\n');
 }
 
 /*
@@ -132,12 +144,12 @@ replace_string(char *orig, const size_t len, const char *oldstr,
     char *tmp = NULL;
 
     if ((pos = strstr(orig, oldstr)) == NULL) {
-        vah_error(NULL, 0, "could not find replacement string");
+        vah_error(NULL, 0, _("could not find replacement string"));
         return -1;
     }
 
     if (VIR_ALLOC_N(tmp, len) < 0) {
-        vah_error(NULL, 0, "could not allocate memory for string");
+        vah_error(NULL, 0, _("could not allocate memory for string"));
         return -1;
     }
     tmp[0] = '\0';
@@ -149,7 +161,7 @@ replace_string(char *orig, const size_t len, const char *oldstr,
 
     /* add the replacement string */
     if (strlen(tmp) + strlen(repstr) > len - 1) {
-        vah_error(NULL, 0, "not enough space in target buffer");
+        vah_error(NULL, 0, _("not enough space in target buffer"));
         VIR_FREE(tmp);
         return -1;
     }
@@ -157,7 +169,7 @@ replace_string(char *orig, const size_t len, const char *oldstr,
 
     /* add everything after oldstr */
     if (strlen(tmp) + strlen(orig) - (idx + strlen(oldstr)) > len - 1) {
-        vah_error(NULL, 0, "not enough space in target buffer");
+        vah_error(NULL, 0, _("not enough space in target buffer"));
         VIR_FREE(tmp);
         return -1;
     }
@@ -165,7 +177,7 @@ replace_string(char *orig, const size_t len, const char *oldstr,
             strlen(orig) - (idx + strlen(oldstr)));
 
     if (virStrcpy(orig, tmp, len) == NULL) {
-        vah_error(NULL, 0, "error replacing string");
+        vah_error(NULL, 0, _("error replacing string"));
         VIR_FREE(tmp);
         return -1;
     }
@@ -180,27 +192,28 @@ replace_string(char *orig, const size_t len, const char *oldstr,
 static int
 parserCommand(const char *profile_name, const char cmd)
 {
+    int result = -1;
     char flag[3];
-    char profile[PATH_MAX];
+    char *profile;
     int status;
     int ret;
 
     if (strchr("arR", cmd) == NULL) {
-        vah_error(NULL, 0, "invalid flag");
+        vah_error(NULL, 0, _("invalid flag"));
         return -1;
     }
 
     snprintf(flag, 3, "-%c", cmd);
 
-    if (snprintf(profile, PATH_MAX, "%s/%s",
-                 APPARMOR_DIR "/libvirt", profile_name) > PATH_MAX - 1) {
-        vah_error(NULL, 0, "profile name exceeds maximum length");
+    if (virAsprintf(&profile, "%s/%s",
+                    APPARMOR_DIR "/libvirt", profile_name) < 0) {
+        vah_error(NULL, 0, _("profile name exceeds maximum length"));
         return -1;
     }
 
     if (!virFileExists(profile)) {
-        vah_error(NULL, 0, "profile does not exist");
-        return -1;
+        vah_error(NULL, 0, _("profile does not exist"));
+        goto cleanup;
     } else {
         const char * const argv[] = {
             "/sbin/apparmor_parser", flag, profile, NULL
@@ -208,81 +221,92 @@ parserCommand(const char *profile_name, const char cmd)
         if ((ret = virRun(argv, &status)) != 0 ||
             (WIFEXITED(status) && WEXITSTATUS(status) != 0)) {
             if (ret != 0) {
-                vah_error(NULL, 0, "failed to run apparmor_parser");
-                return -1;
-            } else if (cmd == 'R' && WIFEXITED(status) && WEXITSTATUS(status) == 234) {
-                vah_warning("unable to unload already unloaded profile (non-fatal)");
+                vah_error(NULL, 0, _("failed to run apparmor_parser"));
+                goto cleanup;
+            } else if (cmd == 'R' && WIFEXITED(status) &&
+                       WEXITSTATUS(status) == 234) {
+                vah_warning(_("unable to unload already unloaded profile"));
             } else {
-                vah_error(NULL, 0, "apparmor_parser exited with error");
-                return -1;
+                vah_error(NULL, 0, _("apparmor_parser exited with error"));
+                goto cleanup;
             }
         }
     }
 
-    return 0;
+    result = 0;
+
+cleanup:
+    VIR_FREE(profile);
+
+    return result;
 }
 
 /*
  * Update the dynamic files
  */
 static int
-update_include_file(const char *include_file, const char *included_files)
+update_include_file(const char *include_file, const char *included_files,
+                    bool append)
 {
     int rc = -1;
-    int plen;
+    int plen, flen = 0;
     int fd;
     char *pcontent = NULL;
+    char *existing = NULL;
     const char *warning =
          "# DO NOT EDIT THIS FILE DIRECTLY. IT IS MANAGED BY LIBVIRT.\n";
 
-    if (virAsprintf(&pcontent, "%s%s", warning, included_files) == -1) {
-        vah_error(NULL, 0, "could not allocate memory for profile");
-        return rc;
+    if (virFileExists(include_file)) {
+        flen = virFileReadAll(include_file, MAX_FILE_LEN, &existing);
+        if (flen < 0)
+            return rc;
+    }
+
+    if (append && virFileExists(include_file)) {
+        if (virAsprintf(&pcontent, "%s%s", existing, included_files) == -1) {
+            vah_error(NULL, 0, _("could not allocate memory for profile"));
+            goto clean;
+        }
+    } else {
+        if (virAsprintf(&pcontent, "%s%s", warning, included_files) == -1) {
+            vah_error(NULL, 0, _("could not allocate memory for profile"));
+            goto clean;
+        }
     }
 
     plen = strlen(pcontent);
     if (plen > MAX_FILE_LEN) {
-        vah_error(NULL, 0, "invalid length for new profile");
+        vah_error(NULL, 0, _("invalid length for new profile"));
         goto clean;
     }
 
     /* only update the disk profile if it is different */
-    if (virFileExists(include_file)) {
-        char *existing = NULL;
-        int flen = virFileReadAll(include_file, MAX_FILE_LEN, &existing);
-        if (flen < 0)
-            goto clean;
-
-        if (flen == plen) {
-            if (STREQLEN(existing, pcontent, plen)) {
-                rc = 0;
-                VIR_FREE(existing);
-                goto clean;
-            }
-        }
-        VIR_FREE(existing);
+    if (flen > 0 && flen == plen && STREQLEN(existing, pcontent, plen)) {
+        rc = 0;
+        goto clean;
     }
 
     /* write the file */
     if ((fd = open(include_file, O_CREAT | O_TRUNC | O_WRONLY, 0644)) == -1) {
-        vah_error(NULL, 0, "failed to create include file");
+        vah_error(NULL, 0, _("failed to create include file"));
         goto clean;
     }
 
     if (safewrite(fd, pcontent, plen) < 0) { /* don't write the '\0' */
-        close(fd);
-        vah_error(NULL, 0, "failed to write to profile");
+        VIR_FORCE_CLOSE(fd);
+        vah_error(NULL, 0, _("failed to write to profile"));
         goto clean;
     }
 
-    if (close(fd) != 0) {
-        vah_error(NULL, 0, "failed to close or write to profile");
+    if (VIR_CLOSE(fd) != 0) {
+        vah_error(NULL, 0, _("failed to close or write to profile"));
         goto clean;
     }
     rc = 0;
 
   clean:
     VIR_FREE(pcontent);
+    VIR_FREE(existing);
 
     return rc;
 }
@@ -294,7 +318,7 @@ static int
 create_profile(const char *profile, const char *profile_name,
                const char *profile_files)
 {
-    char template[PATH_MAX];
+    char *template;
     char *tcontent = NULL;
     char *pcontent = NULL;
     char *replace_name = NULL;
@@ -306,45 +330,44 @@ create_profile(const char *profile, const char *profile_name,
     int rc = -1;
 
     if (virFileExists(profile)) {
-        vah_error(NULL, 0, "profile exists");
+        vah_error(NULL, 0, _("profile exists"));
         goto end;
     }
 
-    if (snprintf(template, PATH_MAX, "%s/TEMPLATE",
-                 APPARMOR_DIR "/libvirt") > PATH_MAX - 1) {
-        vah_error(NULL, 0, "template name exceeds maximum length");
+    if (virAsprintf(&template, "%s/TEMPLATE", APPARMOR_DIR "/libvirt") < 0) {
+        vah_error(NULL, 0, _("template name exceeds maximum length"));
         goto end;
     }
 
     if (!virFileExists(template)) {
-        vah_error(NULL, 0, "template does not exist");
+        vah_error(NULL, 0, _("template does not exist"));
         goto end;
     }
 
     if ((tlen = virFileReadAll(template, MAX_FILE_LEN, &tcontent)) < 0) {
-        vah_error(NULL, 0, "failed to read AppArmor template");
+        vah_error(NULL, 0, _("failed to read AppArmor template"));
         goto end;
     }
 
     if (strstr(tcontent, template_name) == NULL) {
-        vah_error(NULL, 0, "no replacement string in template");
+        vah_error(NULL, 0, _("no replacement string in template"));
         goto clean_tcontent;
     }
 
     if (strstr(tcontent, template_end) == NULL) {
-        vah_error(NULL, 0, "no replacement string in template");
+        vah_error(NULL, 0, _("no replacement string in template"));
         goto clean_tcontent;
     }
 
     /* '\nprofile <profile_name>\0' */
     if (virAsprintf(&replace_name, "\nprofile %s", profile_name) == -1) {
-        vah_error(NULL, 0, "could not allocate memory for profile name");
+        vah_error(NULL, 0, _("could not allocate memory for profile name"));
         goto clean_tcontent;
     }
 
     /* '\n<profile_files>\n}\0' */
     if (virAsprintf(&replace_files, "\n%s\n}", profile_files) == -1) {
-        vah_error(NULL, 0, "could not allocate memory for profile files");
+        vah_error(NULL, 0, _("could not allocate memory for profile files"));
         VIR_FREE(replace_name);
         goto clean_tcontent;
     }
@@ -352,12 +375,12 @@ create_profile(const char *profile, const char *profile_name,
     plen = tlen + strlen(replace_name) - strlen(template_name) +
            strlen(replace_files) - strlen(template_end) + 1;
     if (plen > MAX_FILE_LEN || plen < tlen) {
-        vah_error(NULL, 0, "invalid length for new profile");
+        vah_error(NULL, 0, _("invalid length for new profile"));
         goto clean_replace;
     }
 
     if (VIR_ALLOC_N(pcontent, plen) < 0) {
-        vah_error(NULL, 0, "could not allocate memory for profile");
+        vah_error(NULL, 0, _("could not allocate memory for profile"));
         goto clean_replace;
     }
     pcontent[0] = '\0';
@@ -371,18 +394,18 @@ create_profile(const char *profile, const char *profile_name,
 
     /* write the file */
     if ((fd = open(profile, O_CREAT | O_EXCL | O_WRONLY, 0644)) == -1) {
-        vah_error(NULL, 0, "failed to create profile");
+        vah_error(NULL, 0, _("failed to create profile"));
         goto clean_all;
     }
 
     if (safewrite(fd, pcontent, plen - 1) < 0) { /* don't write the '\0' */
-        close(fd);
-        vah_error(NULL, 0, "failed to write to profile");
+        VIR_FORCE_CLOSE(fd);
+        vah_error(NULL, 0, _("failed to write to profile"));
         goto clean_all;
     }
 
-    if (close(fd) != 0) {
-        vah_error(NULL, 0, "failed to close or write to profile");
+    if (VIR_CLOSE(fd) != 0) {
+        vah_error(NULL, 0, _("failed to close or write to profile"));
         goto clean_all;
     }
     rc = 0;
@@ -395,6 +418,7 @@ create_profile(const char *profile, const char *profile_name,
   clean_tcontent:
     VIR_FREE(tcontent);
   end:
+    VIR_FREE(template);
     return rc;
 }
 
@@ -521,7 +545,7 @@ valid_path(const char *path, const bool readonly)
     };
 
     if (path == NULL || strlen(path) > PATH_MAX - 1) {
-        vah_error(NULL, 0, "bad pathname");
+        vah_error(NULL, 0, _("bad pathname"));
         return -1;
     }
 
@@ -536,16 +560,13 @@ valid_path(const char *path, const bool readonly)
         return 1;
 
     if (!virFileExists(path))
-        vah_warning("path does not exist, skipping file type checks");
+        vah_warning(_("path does not exist, skipping file type checks"));
     else {
         if (stat(path, &sb) == -1)
             return -1;
 
         switch (sb.st_mode & S_IFMT) {
             case S_IFDIR:
-                return 1;
-                break;
-            case S_IFIFO:
                 return 1;
                 break;
             case S_IFSOCK:
@@ -556,14 +577,14 @@ valid_path(const char *path, const bool readonly)
         }
     }
 
-    opaths = sizeof(override)/sizeof *(override);
+    opaths = sizeof(override)/sizeof(*(override));
 
-    npaths = sizeof(restricted)/sizeof *(restricted);
+    npaths = sizeof(restricted)/sizeof(*(restricted));
     if (array_starts_with(path, restricted, npaths) == 0 &&
         array_starts_with(path, override, opaths) != 0)
             return 1;
 
-    npaths = sizeof(restricted_rw)/sizeof *(restricted_rw);
+    npaths = sizeof(restricted_rw)/sizeof(*(restricted_rw));
     if (!readonly) {
         if (array_starts_with(path, restricted_rw, npaths) == 0)
             return 1;
@@ -572,27 +593,35 @@ valid_path(const char *path, const bool readonly)
     return 0;
 }
 
-/* Called from SAX on parsing errors in the XML. */
-static void
-catchXMLError (void *ctx, const char *msg ATTRIBUTE_UNUSED, ...)
+static int
+verify_xpath_context(xmlXPathContextPtr ctxt)
 {
-    xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) ctx;
+    int rc = -1;
+    char *tmp = NULL;
 
-    if (ctxt) {
-        if (virGetLastError() == NULL &&
-            ctxt->lastError.level == XML_ERR_FATAL &&
-            ctxt->lastError.message != NULL) {
-                char *err_str = NULL;
-                if (virAsprintf(&err_str, "XML error at line %d: %s",
-                                ctxt->lastError.line,
-                                ctxt->lastError.message) == -1)
-                    vah_error(NULL, 0, "Could not get XML error");
-                else {
-                    vah_error(NULL, 0, err_str);
-                    VIR_FREE(err_str);
-                }
-        }
+    if (!ctxt) {
+        vah_warning(_("Invalid context"));
+        goto error;
     }
+
+    /* check if have <name> */
+    if (!(tmp = virXPathString("string(./name[1])", ctxt))) {
+        vah_warning(_("Could not find <name>"));
+        goto error;
+    }
+    VIR_FREE(tmp);
+
+    /* check if have <uuid> */
+    if (!(tmp = virXPathString("string(./uuid[1])", ctxt))) {
+        vah_warning(_("Could not find <uuid>"));
+        goto error;
+    }
+    VIR_FREE(tmp);
+
+    rc = 0;
+
+  error:
+    return rc;
 }
 
 /*
@@ -607,45 +636,26 @@ static int
 caps_mockup(vahControl * ctl, const char *xmlStr)
 {
     int rc = -1;
-    xmlParserCtxtPtr pctxt = NULL;
     xmlDocPtr xml = NULL;
     xmlXPathContextPtr ctxt = NULL;
-    xmlNodePtr root;
 
-    /* Set up a parser context so we can catch the details of XML errors. */
-    pctxt = xmlNewParserCtxt ();
-    if (!pctxt || !pctxt->sax)
-        goto cleanup;
-    pctxt->sax->error = catchXMLError;
-
-    xml = xmlCtxtReadDoc (pctxt, BAD_CAST xmlStr, "domain.xml", NULL,
-                          XML_PARSE_NOENT | XML_PARSE_NONET |
-                          XML_PARSE_NOWARNING);
-    if (!xml) {
-        if (virGetLastError() == NULL)
-            vah_error(NULL, 0, "failed to parse xml document");
+    if (!(xml = virXMLParseStringCtxt(xmlStr, _("(domain_definition)"),
+                                      &ctxt))) {
         goto cleanup;
     }
 
-    if ((root = xmlDocGetRootElement(xml)) == NULL) {
-        vah_error(NULL, 0, "missing root element");
+    if (!xmlStrEqual(ctxt->node->name, BAD_CAST "domain")) {
+        vah_error(NULL, 0, _("unexpected root element, expecting <domain>"));
         goto cleanup;
     }
 
-    if (!xmlStrEqual(root->name, BAD_CAST "domain")) {
-        vah_error(NULL, 0, "incorrect root element");
+    /* Quick sanity check for some required elements */
+    if (verify_xpath_context(ctxt) != 0)
         goto cleanup;
-    }
-
-    if ((ctxt = xmlXPathNewContext(xml)) == NULL) {
-        vah_error(ctl, 0, "could not allocate memory");
-        goto cleanup;
-    }
-    ctxt->node = root;
 
     ctl->hvm = virXPathString("string(./os/type[1])", ctxt);
     if (!ctl->hvm || STRNEQ(ctl->hvm, "hvm")) {
-        vah_error(ctl, 0, "os.type is not 'hvm'");
+        vah_error(ctl, 0, _("os.type is not 'hvm'"));
         goto cleanup;
     }
     ctl->arch = virXPathString("string(./os/type[1]/@arch)", ctxt);
@@ -658,7 +668,7 @@ caps_mockup(vahControl * ctl, const char *xmlStr)
         /* Really, this never fails - look at the man-page. */
         uname (&utsname);
         if ((ctl->arch = strdup(utsname.machine)) == NULL) {
-            vah_error(ctl, 0, "could not allocate memory");
+            vah_error(ctl, 0, _("could not allocate memory"));
             goto cleanup;
         }
     }
@@ -670,11 +680,15 @@ caps_mockup(vahControl * ctl, const char *xmlStr)
     rc = 0;
 
   cleanup:
-    xmlFreeParserCtxt (pctxt);
     xmlFreeDoc (xml);
     xmlXPathFreeContext(ctxt);
 
     return rc;
+}
+
+static int aaDefaultConsoleType(const char *ostype ATTRIBUTE_UNUSED)
+{
+    return VIR_DOMAIN_CHR_CONSOLE_TARGET_TYPE_SERIAL;
 }
 
 static int
@@ -691,9 +705,11 @@ get_definition(vahControl * ctl, const char *xmlStr)
         goto exit;
 
     if ((ctl->caps = virCapabilitiesNew(ctl->arch, 1, 1)) == NULL) {
-        vah_error(ctl, 0, "could not allocate memory");
+        vah_error(ctl, 0, _("could not allocate memory"));
         goto exit;
     }
+
+    ctl->caps->defaultConsoleTargetType = aaDefaultConsoleType;
 
     if ((guest = virCapabilitiesAddGuest(ctl->caps,
                                          ctl->hvm,
@@ -703,24 +719,24 @@ get_definition(vahControl * ctl, const char *xmlStr)
                                          NULL,
                                          0,
                                          NULL)) == NULL) {
-        vah_error(ctl, 0, "could not allocate memory");
+        vah_error(ctl, 0, _("could not allocate memory"));
         goto exit;
     }
 
-    ctl->def = virDomainDefParseString(ctl->caps, xmlStr,
+    ctl->def = virDomainDefParseString(ctl->caps, xmlStr, -1,
                                        VIR_DOMAIN_XML_INACTIVE);
     if (ctl->def == NULL) {
-        vah_error(ctl, 0, "could not parse XML");
+        vah_error(ctl, 0, _("could not parse XML"));
         goto exit;
     }
 
     if (!ctl->def->name) {
-        vah_error(ctl, 0, "could not find name in XML");
+        vah_error(ctl, 0, _("could not find name in XML"));
         goto exit;
     }
 
     if (valid_name(ctl->def->name) != 0) {
-        vah_error(ctl, 0, "bad name");
+        vah_error(ctl, 0, _("bad name"));
         goto exit;
     }
 
@@ -746,14 +762,14 @@ vah_add_file(virBufferPtr buf, const char *path, const char *perms)
      */
     if (STRNEQLEN(path, "/", 1)) {
         vah_warning(path);
-        vah_warning("  skipped non-absolute path");
+        vah_warning(_("  skipped non-absolute path"));
         return 0;
     }
 
     if (virFileExists(path)) {
         if ((tmp = realpath(path, NULL)) == NULL) {
             vah_error(NULL, 0, path);
-            vah_error(NULL, 0, "  could not find realpath for disk");
+            vah_error(NULL, 0, _("  could not find realpath for disk"));
             return rc;
         }
     } else
@@ -767,20 +783,65 @@ vah_add_file(virBufferPtr buf, const char *path, const char *perms)
     if (rc != 0) {
         if (rc > 0) {
             vah_error(NULL, 0, path);
-            vah_error(NULL, 0, "  skipped restricted file");
+            vah_error(NULL, 0, _("  skipped restricted file"));
         }
         goto clean;
     }
 
-    virBufferVSprintf(buf, "  \"%s\" %s,\n", tmp, perms);
+    virBufferAsprintf(buf, "  \"%s\" %s,\n", tmp, perms);
     if (readonly) {
-        virBufferVSprintf(buf, "  # don't audit writes to readonly files\n");
-        virBufferVSprintf(buf, "  deny \"%s\" w,\n", tmp);
+        virBufferAsprintf(buf, "  # don't audit writes to readonly files\n");
+        virBufferAsprintf(buf, "  deny \"%s\" w,\n", tmp);
     }
 
   clean:
     VIR_FREE(tmp);
 
+    return rc;
+}
+
+static int
+vah_add_file_chardev(virBufferPtr buf,
+                     const char *path,
+                     const char *perms,
+                     const int type)
+{
+    char *pipe_in;
+    char *pipe_out;
+    int rc = -1;
+
+    if (type == VIR_DOMAIN_CHR_TYPE_PIPE) {
+        /* add the pipe input */
+        if (virAsprintf(&pipe_in, "%s.in", path) == -1) {
+            vah_error(NULL, 0, _("could not allocate memory"));
+            goto clean;
+        }
+
+        if (vah_add_file(buf, pipe_in, perms) != 0)
+            goto clean_pipe_in;
+
+        /* add the pipe output */
+        if (virAsprintf(&pipe_out, "%s.out", path) == -1) {
+            vah_error(NULL, 0, _("could not allocate memory"));
+            goto clean_pipe_in;
+        }
+
+        if (vah_add_file(buf, pipe_out, perms) != 0)
+            goto clean_pipe_out;
+
+        rc = 0;
+      clean_pipe_out:
+        VIR_FREE(pipe_out);
+      clean_pipe_in:
+        VIR_FREE(pipe_in);
+    } else {
+        /* add the file */
+        if (vah_add_file(buf, path, perms) != 0)
+            goto clean;
+        rc = 0;
+    }
+
+  clean:
     return rc;
 }
 
@@ -824,7 +885,6 @@ add_file_path(virDomainDiskDefPtr disk,
     return ret;
 }
 
-
 static int
 get_files(vahControl * ctl)
 {
@@ -837,12 +897,12 @@ get_files(vahControl * ctl)
     /* verify uuid is same as what we were given on the command line */
     virUUIDFormat(ctl->def->uuid, uuidstr);
     if (virAsprintf(&uuid, "%s%s", AA_PREFIX, uuidstr) == -1) {
-        vah_error(ctl, 0, "could not allocate memory");
+        vah_error(ctl, 0, _("could not allocate memory"));
         return rc;
     }
 
     if (STRNEQ(uuid, ctl->uuid)) {
-        vah_error(ctl, 0, "given uuid does not match XML uuid");
+        vah_error(ctl, 0, _("given uuid does not match XML uuid"));
         goto clean;
     }
 
@@ -850,10 +910,14 @@ get_files(vahControl * ctl)
         /* XXX passing ignoreOpenFailure = true to get back to the behavior
          * from before using virDomainDiskDefForeachPath. actually we should
          * be passing ignoreOpenFailure = false and handle open errors more
-         * careful than just ignoring them */
+         * careful than just ignoring them.
+         * XXX2 - if we knew the qemu user:group here we could send it in
+         *        so that the open could be re-tried as that user:group.
+         */
         int ret = virDomainDiskDefForeachPath(ctl->def->disks[i],
                                               ctl->allowDiskFormatProbing,
                                               true,
+                                              -1, -1, /* current uid:gid */
                                               add_file_path,
                                               &buf);
         if (ret != 0)
@@ -861,14 +925,54 @@ get_files(vahControl * ctl)
     }
 
     for (i = 0; i < ctl->def->nserials; i++)
-        if (ctl->def->serials[i] && ctl->def->serials[i]->data.file.path)
-            if (vah_add_file(&buf,
-                             ctl->def->serials[i]->data.file.path, "w") != 0)
+        if (ctl->def->serials[i] &&
+            (ctl->def->serials[i]->source.type == VIR_DOMAIN_CHR_TYPE_PTY ||
+             ctl->def->serials[i]->source.type == VIR_DOMAIN_CHR_TYPE_DEV ||
+             ctl->def->serials[i]->source.type == VIR_DOMAIN_CHR_TYPE_FILE ||
+             ctl->def->serials[i]->source.type == VIR_DOMAIN_CHR_TYPE_PIPE) &&
+            ctl->def->serials[i]->source.data.file.path)
+            if (vah_add_file_chardev(&buf,
+                                     ctl->def->serials[i]->source.data.file.path,
+                                     "rw",
+                                     ctl->def->serials[i]->source.type) != 0)
                 goto clean;
 
-    if (ctl->def->console && ctl->def->console->data.file.path)
-        if (vah_add_file(&buf, ctl->def->console->data.file.path, "w") != 0)
-            goto clean;
+    for (i = 0; i < ctl->def->nconsoles; i++)
+        if (ctl->def->consoles[i] &&
+            (ctl->def->consoles[i]->source.type == VIR_DOMAIN_CHR_TYPE_PTY ||
+             ctl->def->consoles[i]->source.type == VIR_DOMAIN_CHR_TYPE_DEV ||
+             ctl->def->consoles[i]->source.type == VIR_DOMAIN_CHR_TYPE_FILE ||
+             ctl->def->consoles[i]->source.type == VIR_DOMAIN_CHR_TYPE_PIPE) &&
+            ctl->def->consoles[i]->source.data.file.path)
+            if (vah_add_file(&buf,
+                             ctl->def->consoles[i]->source.data.file.path, "rw") != 0)
+                goto clean;
+
+    for (i = 0 ; i < ctl->def->nparallels; i++)
+        if (ctl->def->parallels[i] &&
+            (ctl->def->parallels[i]->source.type == VIR_DOMAIN_CHR_TYPE_PTY ||
+             ctl->def->parallels[i]->source.type == VIR_DOMAIN_CHR_TYPE_DEV ||
+             ctl->def->parallels[i]->source.type == VIR_DOMAIN_CHR_TYPE_FILE ||
+             ctl->def->parallels[i]->source.type == VIR_DOMAIN_CHR_TYPE_PIPE) &&
+            ctl->def->parallels[i]->source.data.file.path)
+            if (vah_add_file_chardev(&buf,
+                                     ctl->def->parallels[i]->source.data.file.path,
+                                     "rw",
+                                     ctl->def->parallels[i]->source.type) != 0)
+                goto clean;
+
+    for (i = 0 ; i < ctl->def->nchannels; i++)
+        if (ctl->def->channels[i] &&
+            (ctl->def->channels[i]->source.type == VIR_DOMAIN_CHR_TYPE_PTY ||
+             ctl->def->channels[i]->source.type == VIR_DOMAIN_CHR_TYPE_DEV ||
+             ctl->def->channels[i]->source.type == VIR_DOMAIN_CHR_TYPE_FILE ||
+             ctl->def->channels[i]->source.type == VIR_DOMAIN_CHR_TYPE_PIPE) &&
+            ctl->def->channels[i]->source.data.file.path)
+            if (vah_add_file_chardev(&buf,
+                                     ctl->def->channels[i]->source.data.file.path,
+                                     "rw",
+                                     ctl->def->channels[i]->source.type) != 0)
+                goto clean;
 
     if (ctl->def->os.kernel)
         if (vah_add_file(&buf, ctl->def->os.kernel, "r") != 0)
@@ -928,13 +1032,13 @@ get_files(vahControl * ctl)
             } /* switch */
         }
 
-    if (ctl->newdisk)
-        if (vah_add_file(&buf, ctl->newdisk, "rw") != 0)
+    if (ctl->newfile)
+        if (vah_add_file(&buf, ctl->newfile, "rw") != 0)
             goto clean;
 
     if (virBufferError(&buf)) {
         virBufferFreeAndReset(&buf);
-        vah_error(NULL, 0, "failed to allocate file buffer");
+        vah_error(NULL, 0, _("failed to allocate file buffer"));
         goto clean;
     }
 
@@ -957,6 +1061,7 @@ vahParseArgv(vahControl * ctl, int argc, char **argv)
         {"dryrun", 0, 0, 'd'},
         {"delete", 0, 0, 'D'},
         {"add-file", 0, 0, 'f'},
+        {"append-file", 0, 0, 'F'},
         {"help", 0, 0, 'h'},
         {"replace", 0, 0, 'r'},
         {"remove", 0, 0, 'R'},
@@ -964,7 +1069,7 @@ vahParseArgv(vahControl * ctl, int argc, char **argv)
         {0, 0, 0, 0}
     };
 
-    while ((arg = getopt_long(argc, argv, "acdDhrRH:b:u:p:f:", opt,
+    while ((arg = getopt_long(argc, argv, "acdDhrRH:b:u:p:f:F:", opt,
             &idx)) != -1) {
         switch (arg) {
             case 'a':
@@ -980,8 +1085,10 @@ vahParseArgv(vahControl * ctl, int argc, char **argv)
                 ctl->cmd = 'D';
                 break;
             case 'f':
-                if ((ctl->newdisk = strdup(optarg)) == NULL)
-                    vah_error(ctl, 1, "could not allocate memory for disk");
+            case 'F':
+                if ((ctl->newfile = strdup(optarg)) == NULL)
+                    vah_error(ctl, 1, _("could not allocate memory for disk"));
+                ctl->append = arg == 'F';
                 break;
             case 'h':
                 vah_usage();
@@ -995,10 +1102,10 @@ vahParseArgv(vahControl * ctl, int argc, char **argv)
                 break;
             case 'u':
                 if (strlen(optarg) > PROFILE_NAME_SIZE - 1)
-                    vah_error(ctl, 1, "invalid UUID");
+                    vah_error(ctl, 1, _("invalid UUID"));
                 if (virStrcpy((char *) ctl->uuid, optarg,
                     PROFILE_NAME_SIZE) == NULL)
-                    vah_error(ctl, 1, "error copying UUID");
+                    vah_error(ctl, 1, _("error copying UUID"));
                 break;
             case 'p':
                 if (STREQ(optarg, "1"))
@@ -1007,15 +1114,15 @@ vahParseArgv(vahControl * ctl, int argc, char **argv)
                     ctl->allowDiskFormatProbing = false;
                 break;
             default:
-                vah_error(ctl, 1, "unsupported option");
+                vah_error(ctl, 1, _("unsupported option"));
                 break;
         }
     }
     if (strchr("acDrR", ctl->cmd) == NULL)
-        vah_error(ctl, 1, "bad command");
+        vah_error(ctl, 1, _("bad command"));
 
     if (valid_uuid(ctl->uuid) != 0)
-        vah_error(ctl, 1, "invalid UUID");
+        vah_error(ctl, 1, _("invalid UUID"));
 
     if (!ctl->cmd) {
         vah_usage();
@@ -1025,16 +1132,16 @@ vahParseArgv(vahControl * ctl, int argc, char **argv)
     if (ctl->cmd == 'c' || ctl->cmd == 'r') {
         char *xmlStr = NULL;
         if (virFileReadLimFD(STDIN_FILENO, MAX_FILE_LEN, &xmlStr) < 0)
-            vah_error(ctl, 1, "could not read xml file");
+            vah_error(ctl, 1, _("could not read xml file"));
 
         if (get_definition(ctl, xmlStr) != 0 || ctl->def == NULL) {
             VIR_FREE(xmlStr);
-            vah_error(ctl, 1, "could not get VM definition");
+            vah_error(ctl, 1, _("could not get VM definition"));
         }
         VIR_FREE(xmlStr);
 
         if (get_files(ctl) != 0)
-            vah_error(ctl, 1, "invalid VM definition");
+            vah_error(ctl, 1, _("invalid VM definition"));
     }
     return 0;
 }
@@ -1053,16 +1160,24 @@ main(int argc, char **argv)
     vahControl _ctl, *ctl = &_ctl;
     virBuffer buf = VIR_BUFFER_INITIALIZER;
     int rc = -1;
-    char profile[PATH_MAX];
-    char include_file[PATH_MAX];
+    char *profile = NULL;
+    char *include_file = NULL;
+
+    if (setlocale(LC_ALL, "") == NULL ||
+        bindtextdomain(PACKAGE, LOCALEDIR) == NULL ||
+        textdomain(PACKAGE) == NULL) {
+        fprintf(stderr, _("%s: initialization failed\n"), argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
     /* clear the environment */
     environ = NULL;
     if (setenv("PATH", "/sbin:/usr/sbin", 1) != 0) {
-        vah_error(ctl, 1, "could not set PATH");
+        vah_error(ctl, 1, _("could not set PATH"));
     }
+
     if (setenv("IFS", " \t\n", 1) != 0) {
-        vah_error(ctl, 1, "could not set IFS");
+        vah_error(ctl, 1, _("could not set IFS"));
     }
 
     if (!(progname = strrchr(argv[0], '/')))
@@ -1072,16 +1187,19 @@ main(int argc, char **argv)
 
     memset(ctl, 0, sizeof(vahControl));
 
+    if (virRandomInitialize(time(NULL) ^ getpid()) < 0)
+        vah_error(ctl, 1, _("could not initialize random generator"));
+
     if (vahParseArgv(ctl, argc, argv) != 0)
-        vah_error(ctl, 1, "could not parse arguments");
+        vah_error(ctl, 1, _("could not parse arguments"));
 
-    if (snprintf(profile, PATH_MAX, "%s/%s",
-                 APPARMOR_DIR "/libvirt", ctl->uuid) > PATH_MAX - 1)
-        vah_error(ctl, 1, "profile name exceeds maximum length");
+    if (virAsprintf(&profile, "%s/%s",
+                    APPARMOR_DIR "/libvirt", ctl->uuid) < 0)
+        vah_error(ctl, 0, _("could not allocate memory"));
 
-    if (snprintf(include_file, PATH_MAX, "%s/%s.files",
-                 APPARMOR_DIR "/libvirt", ctl->uuid) > PATH_MAX - 1)
-        vah_error(ctl, 1, "disk profile name exceeds maximum length");
+    if (virAsprintf(&include_file, "%s/%s.files",
+                    APPARMOR_DIR "/libvirt", ctl->uuid) < 0)
+        vah_error(ctl, 0, _("could not allocate memory"));
 
     if (ctl->cmd == 'a')
         rc = parserLoad(ctl->uuid);
@@ -1094,21 +1212,33 @@ main(int argc, char **argv)
     } else if (ctl->cmd == 'c' || ctl->cmd == 'r') {
         char *included_files = NULL;
 
-        if (ctl->cmd == 'c' && virFileExists(profile))
-            vah_error(ctl, 1, "profile exists");
+        if (ctl->cmd == 'c' && virFileExists(profile)) {
+            vah_error(ctl, 1, _("profile exists"));
+        }
 
-        virBufferVSprintf(&buf, "  \"%s/log/libvirt/**/%s.log\" w,\n",
-                          LOCAL_STATE_DIR, ctl->def->name);
-        virBufferVSprintf(&buf, "  \"%s/lib/libvirt/**/%s.monitor\" rw,\n",
-                          LOCAL_STATE_DIR, ctl->def->name);
-        virBufferVSprintf(&buf, "  \"%s/run/libvirt/**/%s.pid\" rwk,\n",
-                          LOCAL_STATE_DIR, ctl->def->name);
-        if (ctl->files)
-            virBufferVSprintf(&buf, "%s", ctl->files);
+        if (ctl->append && ctl->newfile) {
+            if (vah_add_file(&buf, ctl->newfile, "rw") != 0)
+                goto clean;
+        } else {
+            virBufferAsprintf(&buf, "  \"%s/log/libvirt/**/%s.log\" w,\n",
+                              LOCALSTATEDIR, ctl->def->name);
+            virBufferAsprintf(&buf, "  \"%s/lib/libvirt/**/%s.monitor\" rw,\n",
+                              LOCALSTATEDIR, ctl->def->name);
+            virBufferAsprintf(&buf, "  \"%s/run/libvirt/**/%s.pid\" rwk,\n",
+                              LOCALSTATEDIR, ctl->def->name);
+            virBufferAsprintf(&buf, "  \"/run/libvirt/**/%s.pid\" rwk,\n",
+                              ctl->def->name);
+            virBufferAsprintf(&buf, "  \"%s/run/libvirt/**/*.tunnelmigrate.dest.%s\" rw,\n",
+                              LOCALSTATEDIR, ctl->def->name);
+            virBufferAsprintf(&buf, "  \"/run/libvirt/**/*.tunnelmigrate.dest.%s\" rw,\n",
+                              ctl->def->name);
+            if (ctl->files)
+                virBufferAdd(&buf, ctl->files, -1);
+        }
 
         if (virBufferError(&buf)) {
             virBufferFreeAndReset(&buf);
-            vah_error(ctl, 1, "failed to allocate buffer");
+            vah_error(ctl, 1, _("failed to allocate buffer"));
         }
 
         included_files = virBufferContentAndReset(&buf);
@@ -1119,7 +1249,8 @@ main(int argc, char **argv)
             vah_info(included_files);
             rc = 0;
         } else if ((rc = update_include_file(include_file,
-                                             included_files)) != 0)
+                                             included_files,
+                                             ctl->append)) != 0)
             goto clean;
 
 
@@ -1128,7 +1259,7 @@ main(int argc, char **argv)
             char *tmp = NULL;
             if (virAsprintf(&tmp, "  #include <libvirt/%s.files>\n",
                             ctl->uuid) == -1) {
-                vah_error(ctl, 0, "could not allocate memory");
+                vah_error(ctl, 0, _("could not allocate memory"));
                 goto clean;
             }
 
@@ -1138,7 +1269,7 @@ main(int argc, char **argv)
                 vah_info(tmp);
                 rc = 0;
             } else if ((rc = create_profile(profile, ctl->uuid, tmp)) != 0) {
-                vah_error(ctl, 0, "could not create profile");
+                vah_error(ctl, 0, _("could not create profile"));
                 unlink(include_file);
             }
             VIR_FREE(tmp);
@@ -1162,5 +1293,9 @@ main(int argc, char **argv)
     }
 
     vahDeinit(ctl);
+
+    VIR_FREE(profile);
+    VIR_FREE(include_file);
+
     exit(rc == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

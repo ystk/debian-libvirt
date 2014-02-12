@@ -9,22 +9,21 @@
 #include "datatypes.h"
 #include "xen/xen_driver.h"
 #include "xen/xend_internal.h"
+#include "xenxs/xen_sxpr.h"
 #include "testutils.h"
 #include "testutilsxen.h"
 
-static char *progname;
-static char *abs_srcdir;
 static virCapsPtr caps;
 
-#define MAX_FILE 4096
-
-static int testCompareFiles(const char *xml, const char *sexpr,
-                            int xendConfigVersion) {
-  char xmlData[MAX_FILE];
-  char sexprData[MAX_FILE];
+static int
+testCompareFiles(const char *xml, const char *sexpr, int xendConfigVersion)
+{
+  char *xmlData = NULL;
+  char *sexprData = NULL;
   char *gotxml = NULL;
-  char *xmlPtr = &(xmlData[0]);
-  char *sexprPtr = &(sexprData[0]);
+  int id;
+  char * tty;
+  int vncport;
   int ret = -1;
   virDomainDefPtr def = NULL;
   virConnectPtr conn;
@@ -34,13 +33,13 @@ static int testCompareFiles(const char *xml, const char *sexpr,
   conn = virGetConnect();
   if (!conn) goto fail;
 
-  if (virtTestLoadFile(xml, &xmlPtr, MAX_FILE) < 0)
+  if (virtTestLoadFile(xml, &xmlData) < 0)
       goto fail;
 
-  if (virtTestLoadFile(sexpr, &sexprPtr, MAX_FILE) < 0)
+  if (virtTestLoadFile(sexpr, &sexprData) < 0)
       goto fail;
 
-  memset(&priv, 0, sizeof priv);
+  memset(&priv, 0, sizeof(priv));
   /* Many puppies died to bring you this code. */
   priv.xendConfigVersion = xendConfigVersion;
   priv.caps = caps;
@@ -48,7 +47,13 @@ static int testCompareFiles(const char *xml, const char *sexpr,
   if (virMutexInit(&priv.lock) < 0)
       goto fail;
 
-  if (!(def = xenDaemonParseSxprString(conn, sexprData, xendConfigVersion)))
+  id = xenGetDomIdFromSxprString(sexprData, xendConfigVersion);
+  xenUnifiedLock(&priv);
+  tty = xenStoreDomainGetConsolePath(conn, id);
+  vncport = xenStoreDomainGetVNCPort(conn, id);
+  xenUnifiedUnlock(&priv);
+
+  if (!(def = xenParseSxprString(sexprData, xendConfigVersion, tty, vncport)))
       goto fail;
 
   if (!(gotxml = virDomainDefFormat(def, 0)))
@@ -62,7 +67,9 @@ static int testCompareFiles(const char *xml, const char *sexpr,
   ret = 0;
 
  fail:
-  free(gotxml);
+  VIR_FREE(xmlData);
+  VIR_FREE(sexprData);
+  VIR_FREE(gotxml);
   virDomainDefFree(def);
   if (conn)
     virUnrefConnect(conn);
@@ -76,42 +83,37 @@ struct testInfo {
     int version;
 };
 
-static int testCompareHelper(const void *data) {
+static int
+testCompareHelper(const void *data)
+{
+    int result = -1;
     const struct testInfo *info = data;
-    char xml[PATH_MAX];
-    char args[PATH_MAX];
-    snprintf(xml, PATH_MAX, "%s/sexpr2xmldata/sexpr2xml-%s.xml",
-             abs_srcdir, info->input);
-    snprintf(args, PATH_MAX, "%s/sexpr2xmldata/sexpr2xml-%s.sexpr",
-             abs_srcdir, info->output);
-    return testCompareFiles(xml, args, info->version);
+    char *xml = NULL;
+    char *args = NULL;
+
+    if (virAsprintf(&xml, "%s/sexpr2xmldata/sexpr2xml-%s.xml",
+                    abs_srcdir, info->input) < 0 ||
+        virAsprintf(&args, "%s/sexpr2xmldata/sexpr2xml-%s.sexpr",
+                    abs_srcdir, info->output) < 0) {
+        goto cleanup;
+    }
+
+    result = testCompareFiles(xml, args, info->version);
+
+cleanup:
+    VIR_FREE(xml);
+    VIR_FREE(args);
+
+    return result;
 }
 
-
 static int
-mymain(int argc, char **argv)
+mymain(void)
 {
     int ret = 0;
-    char cwd[PATH_MAX];
-
-    progname = argv[0];
-
-    if (argc > 1) {
-        fprintf(stderr, "Usage: %s\n", progname);
-        return(EXIT_FAILURE);
-    }
-
-    abs_srcdir = getenv("abs_srcdir");
-    if (!abs_srcdir)
-        abs_srcdir = getcwd(cwd, sizeof(cwd));
-
-    if (argc > 1) {
-        fprintf(stderr, "Usage: %s\n", progname);
-        return(EXIT_FAILURE);
-    }
 
     if (!(caps = testXenCapsInit()))
-        return(EXIT_FAILURE);
+        return EXIT_FAILURE;
 
 #define DO_TEST(in, out, version)                                      \
     do {                                                               \
@@ -132,12 +134,15 @@ mymain(int argc, char **argv)
     DO_TEST("pv-vfb-type-crash", "pv-vfb-type-crash", 3);
     DO_TEST("fv-autoport", "fv-autoport", 3);
     DO_TEST("pv-bootloader", "pv-bootloader", 1);
+    DO_TEST("pv-bootloader-cmdline", "pv-bootloader-cmdline", 1);
+    DO_TEST("pv-vcpus", "pv-vcpus", 1);
 
     DO_TEST("disk-file", "disk-file", 2);
     DO_TEST("disk-block", "disk-block", 2);
     DO_TEST("disk-block-shareable", "disk-block-shareable", 2);
     DO_TEST("disk-drv-blktap-raw", "disk-drv-blktap-raw", 2);
     DO_TEST("disk-drv-blktap-qcow", "disk-drv-blktap-qcow", 2);
+    DO_TEST("disk-drv-blktap2-raw", "disk-drv-blktap2-raw", 2);
 
     DO_TEST("curmem", "curmem", 2);
     DO_TEST("net-routed", "net-routed", 2);
@@ -153,9 +158,13 @@ mymain(int argc, char **argv)
     DO_TEST("fv-usbmouse", "fv-usbmouse", 1);
     DO_TEST("fv-usbtablet", "fv-usbtablet", 1);
     DO_TEST("fv-kernel", "fv-kernel", 1);
+    DO_TEST("fv-force-hpet", "fv-force-hpet", 1);
+    DO_TEST("fv-force-nohpet", "fv-force-nohpet", 1);
 
     DO_TEST("fv-serial-null", "fv-serial-null", 1);
     DO_TEST("fv-serial-file", "fv-serial-file", 1);
+    DO_TEST("fv-serial-dev-2-ports", "fv-serial-dev-2-ports", 1);
+    DO_TEST("fv-serial-dev-2nd-port", "fv-serial-dev-2nd-port", 1);
     DO_TEST("fv-serial-stdio", "fv-serial-stdio", 1);
     DO_TEST("fv-serial-pty", "fv-serial-pty", 1);
     DO_TEST("fv-serial-pipe", "fv-serial-pipe", 1);
@@ -171,9 +180,13 @@ mymain(int argc, char **argv)
     DO_TEST("fv-net-ioemu", "fv-net-ioemu", 1);
     DO_TEST("fv-net-netfront", "fv-net-netfront", 1);
 
+    DO_TEST("fv-empty-kernel", "fv-empty-kernel", 1);
+
+    DO_TEST("boot-grub", "boot-grub", 1);
+
     virCapabilitiesFree(caps);
 
-    return(ret==0 ? EXIT_SUCCESS : EXIT_FAILURE);
+    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

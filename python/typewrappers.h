@@ -1,12 +1,13 @@
 /*
  * libvirt_wrap.h: type wrappers for libvir python bindings
  *
- * Copyright (C) 2005 Red Hat, Inc.
+ * Copyright (C) 2005, 2011-2012 Red Hat, Inc.
  *
  * Daniel Veillard <veillard@redhat.com>
  */
 
 #include <Python.h>
+#include <stdbool.h>
 #include "libvirt/libvirt.h"
 #include "libvirt/virterror.h"
 
@@ -19,6 +20,11 @@
 # endif /* ATTRIBUTE_UNUSED */
 #else
 # define ATTRIBUTE_UNUSED
+#endif
+
+/* Work around really old python.  */
+#if PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION < 5
+typedef ssize_t Py_ssize_t;
 #endif
 
 #define PyvirConnect_Get(v) (((v) == Py_None) ? NULL : \
@@ -150,15 +156,22 @@ typedef struct {
     void* obj;
 } PyvirVoidPtr_Object;
 
-
 PyObject * libvirt_intWrap(int val);
 PyObject * libvirt_longWrap(long val);
 PyObject * libvirt_ulongWrap(unsigned long val);
 PyObject * libvirt_longlongWrap(long long val);
 PyObject * libvirt_ulonglongWrap(unsigned long long val);
 PyObject * libvirt_charPtrWrap(char *str);
+PyObject * libvirt_charPtrSizeWrap(char *str, Py_ssize_t size);
 PyObject * libvirt_constcharPtrWrap(const char *str);
-PyObject * libvirt_charPtrConstWrap(const char *str);
+int libvirt_intUnwrap(PyObject *obj, int *val);
+int libvirt_uintUnwrap(PyObject *obj, unsigned int *val);
+int libvirt_longUnwrap(PyObject *obj, long *val);
+int libvirt_ulongUnwrap(PyObject *obj, unsigned long *val);
+int libvirt_longlongUnwrap(PyObject *obj, long long *val);
+int libvirt_ulonglongUnwrap(PyObject *obj, unsigned long long *val);
+int libvirt_doubleUnwrap(PyObject *obj, double *val);
+int libvirt_boolUnwrap(PyObject *obj, bool *val);
 PyObject * libvirt_virConnectPtrWrap(virConnectPtr node);
 PyObject * libvirt_virDomainPtrWrap(virDomainPtr node);
 PyObject * libvirt_virNetworkPtrWrap(virNetworkPtr node);

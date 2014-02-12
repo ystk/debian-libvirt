@@ -31,7 +31,7 @@
 
 
 # define virCPUReportError(code, ...)                              \
-    virReportErrorHelper(NULL, VIR_FROM_CPU, code, __FILE__,      \
+    virReportErrorHelper(VIR_FROM_CPU, code, __FILE__,             \
                          __FUNCTION__, __LINE__, __VA_ARGS__)
 
 
@@ -70,7 +70,8 @@ typedef union cpuData *
 typedef virCPUCompareResult
 (*cpuArchGuestData) (virCPUDefPtr host,
                      virCPUDefPtr guest,
-                     union cpuData **data);
+                     union cpuData **data,
+                     char **message);
 
 typedef virCPUDefPtr
 (*cpuArchBaseline)  (virCPUDefPtr *cpus,
@@ -81,6 +82,10 @@ typedef virCPUDefPtr
 typedef int
 (*cpuArchUpdate)    (virCPUDefPtr guest,
                      const virCPUDefPtr host);
+
+typedef int
+(*cpuArchHasFeature) (const union cpuData *data,
+                      const char *feature);
 
 
 struct cpuArchDriver {
@@ -95,6 +100,7 @@ struct cpuArchDriver {
     cpuArchGuestData    guestData;
     cpuArchBaseline     baseline;
     cpuArchUpdate       update;
+    cpuArchHasFeature    hasFeature;
 };
 
 
@@ -133,7 +139,8 @@ cpuNodeData (const char *arch);
 extern virCPUCompareResult
 cpuGuestData(virCPUDefPtr host,
              virCPUDefPtr guest,
-             union cpuData **data);
+             union cpuData **data,
+             char **msg);
 
 extern char *
 cpuBaselineXML(const char **xmlCPUs,
@@ -150,5 +157,11 @@ cpuBaseline (virCPUDefPtr *cpus,
 extern int
 cpuUpdate   (virCPUDefPtr guest,
              const virCPUDefPtr host);
+
+extern int
+cpuHasFeature(const char *arch,
+              const union cpuData *data,
+              const char *feature);
+
 
 #endif /* __VIR_CPU_H__ */

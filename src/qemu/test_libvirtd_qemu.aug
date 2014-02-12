@@ -94,7 +94,13 @@ cgroup_device_acl = [ \"/dev/null\", \"/dev/full\", \"/dev/zero\" ]
 
 save_image_format = \"gzip\"
 
+dump_image_format = \"gzip\"
+
+auto_dump_path = \"/var/lib/libvirt/qemu/dump\"
+
 hugetlbfs_mount = \"/dev/hugepages\"
+
+set_process_name = 1
 
 relaxed_acs_check = 1
 
@@ -103,6 +109,17 @@ vnc_allow_host_audio = 1
 clear_emulator_capabilities = 0
 
 allow_disk_format_probing = 1
+
+vnc_auto_unix_socket = 1
+
+max_processes = 12345
+
+max_files = 67890
+
+lock_manager = \"fcntl\"
+
+keepalive_interval = 1
+keepalive_count = 42
 "
 
    test Libvirtd_qemu.lns get conf =
@@ -207,7 +224,13 @@ allow_disk_format_probing = 1
 { "#empty" }
 { "save_image_format" = "gzip" }
 { "#empty" }
+{ "dump_image_format" = "gzip" }
+{ "#empty" }
+{ "auto_dump_path" = "/var/lib/libvirt/qemu/dump" }
+{ "#empty" }
 { "hugetlbfs_mount" = "/dev/hugepages" }
+{ "#empty" }
+{ "set_process_name" = "1" }
 { "#empty" }
 { "relaxed_acs_check" = "1" }
 { "#empty" }
@@ -216,3 +239,14 @@ allow_disk_format_probing = 1
 { "clear_emulator_capabilities" = "0" }
 { "#empty" }
 { "allow_disk_format_probing" = "1" }
+{ "#empty" }
+{ "vnc_auto_unix_socket" = "1" }
+{ "#empty" }
+{ "max_processes" = "12345" }
+{ "#empty" }
+{ "max_files" = "67890" }
+{ "#empty" }
+{ "lock_manager" = "fcntl" }
+{ "#empty" }
+{ "keepalive_interval" = "1" }
+{ "keepalive_count" = "42" }

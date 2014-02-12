@@ -28,7 +28,7 @@ virNWFilterTechDriverPtr virNWFilterTechDriverForName(const char *name);
 int virNWFilterRuleInstAddData(virNWFilterRuleInstPtr res,
                                void *data);
 
-void virNWFilterTechDriversInit(void);
+void virNWFilterTechDriversInit(bool privileged);
 void virNWFilterTechDriversShutdown(void);
 
 enum instCase {
@@ -38,17 +38,14 @@ enum instCase {
 
 
 int virNWFilterInstantiateFilter(virConnectPtr conn,
+                                 const unsigned char *vmuuid,
                                  const virDomainNetDefPtr net);
 int virNWFilterUpdateInstantiateFilter(virConnectPtr conn,
+                                       const unsigned char *vmuuid,
                                        const virDomainNetDefPtr net,
                                        bool *skipIface);
-int virNWFilterRollbackUpdateFilter(virConnectPtr conn,
-                                    const virDomainNetDefPtr net);
 
-int virNWFilterTearOldFilter(virConnectPtr conn,
-                             const virDomainNetDefPtr net);
-
-int virNWFilterInstantiateFilterLate(virConnectPtr conn,
+int virNWFilterInstantiateFilterLate(const unsigned char *vmuuid,
                                      const char *ifname,
                                      int ifindex,
                                      const char *linkdev,
@@ -61,10 +58,10 @@ int virNWFilterInstantiateFilterLate(virConnectPtr conn,
 int virNWFilterTeardownFilter(const virDomainNetDefPtr net);
 
 virNWFilterHashTablePtr virNWFilterCreateVarHashmap(char *macaddr,
-                                                    char *ipaddr);
+                                       const virNWFilterVarValuePtr);
 
 void virNWFilterDomainFWUpdateCB(void *payload,
-                                 const char *name ATTRIBUTE_UNUSED,
+                                 const void *name,
                                  void *data);
 
 #endif

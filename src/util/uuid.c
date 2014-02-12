@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009, 2010 Red Hat, Inc.
+ * Copyright (C) 2007-2012 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -39,6 +39,8 @@
 #include "virterror_internal.h"
 #include "logging.h"
 #include "memory.h"
+#include "virfile.h"
+#include "virrandom.h"
 
 #ifndef ENODATA
 # define ENODATA EIO
@@ -61,7 +63,7 @@ virUUIDGenerateRandomBytes(unsigned char *buf,
         if ((n = read(fd, buf, buflen)) <= 0) {
             if (errno == EINTR)
                 continue;
-            close(fd);
+            VIR_FORCE_CLOSE(fd);
             return n < 0 ? errno : ENODATA;
         }
 
@@ -69,7 +71,7 @@ virUUIDGenerateRandomBytes(unsigned char *buf,
         buflen -= n;
     }
 
-    close(fd);
+    VIR_FORCE_CLOSE(fd);
 
     return 0;
 }
@@ -79,7 +81,7 @@ virUUIDGeneratePseudoRandomBytes(unsigned char *buf,
                                  int buflen)
 {
     while (buflen > 0) {
-        *buf = virRandom(256);
+        *buf++ = virRandomBits(8);
         buflen--;
     }
 
@@ -100,33 +102,17 @@ virUUIDGenerate(unsigned char *uuid)
     int err;
 
     if (uuid == NULL)
-        return(-1);
+        return -1;
 
     if ((err = virUUIDGenerateRandomBytes(uuid, VIR_UUID_BUFLEN))) {
         char ebuf[1024];
         VIR_WARN("Falling back to pseudorandom UUID,"
                  " failed to generate random bytes: %s",
-                 virStrerror(err, ebuf, sizeof ebuf));
+                 virStrerror(err, ebuf, sizeof(ebuf)));
         err = virUUIDGeneratePseudoRandomBytes(uuid, VIR_UUID_BUFLEN);
     }
 
-    return(err);
-}
-
-/* Convert C from hexadecimal character to integer.  */
-static int
-hextobin (unsigned char c)
-{
-  switch (c)
-    {
-    default: return c - '0';
-    case 'a': case 'A': return 10;
-    case 'b': case 'B': return 11;
-    case 'c': case 'C': return 12;
-    case 'd': case 'D': return 13;
-    case 'e': case 'E': return 14;
-    case 'f': case 'F': return 15;
-    }
+    return err;
 }
 
 /**
@@ -143,9 +129,6 @@ int
 virUUIDParse(const char *uuidstr, unsigned char *uuid) {
     const char *cur;
     int i;
-
-    if ((uuidstr == NULL) || (uuid == NULL))
-        return(-1);
 
     /*
      * do a liberal scan allowing '-' and ' ' anywhere between character
@@ -166,14 +149,14 @@ virUUIDParse(const char *uuidstr, unsigned char *uuid) {
         }
         if (!c_isxdigit(*cur))
             goto error;
-        uuid[i] = hextobin(*cur);
+        uuid[i] = virHexToBin(*cur);
         uuid[i] *= 16;
         cur++;
         if (*cur == 0)
             goto error;
         if (!c_isxdigit(*cur))
             goto error;
-        uuid[i] += hextobin(*cur);
+        uuid[i] += virHexToBin(*cur);
         i++;
         cur++;
     }
@@ -239,7 +222,7 @@ virUUIDIsValid(unsigned char *uuid)
         if (uuid[i] == c)
             ctr++;
 
-    return (ctr != VIR_UUID_BUFLEN);
+    return ctr != VIR_UUID_BUFLEN;
 }
 
 static int
@@ -254,12 +237,13 @@ getDMISystemUUID(char *uuid, int len)
 
     while (paths[i]) {
         int fd = open(paths[i], O_RDONLY);
-        if (fd > 0) {
-            if (saferead(fd, uuid, len) == len) {
-                close(fd);
+        if (fd >= 0) {
+            if (saferead(fd, uuid, len - 1) == len - 1) {
+                uuid[len - 1] = '\0';
+                VIR_FORCE_CLOSE(fd);
                 return 0;
             }
-            close(fd);
+            VIR_FORCE_CLOSE(fd);
         }
         i++;
     }
@@ -287,7 +271,7 @@ virSetHostUUIDStr(const char *uuid)
 
     if (!uuid) {
         memset(dmiuuid, 0, sizeof(dmiuuid));
-        if (!getDMISystemUUID(dmiuuid, sizeof(dmiuuid) - 1)) {
+        if (!getDMISystemUUID(dmiuuid, sizeof(dmiuuid))) {
             if (!virUUIDParse(dmiuuid, host_uuid))
                 return 0;
         }

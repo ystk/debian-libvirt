@@ -34,12 +34,20 @@
             </div>
           </li><li>
             <div>
+              <a title="Applications known to use libvirt" class="inactive" href="apps.html">Applications</a>
+            </div>
+          </li><li>
+            <div>
               <a title="Get the latest source releases, binary builds and get access to the source repository" class="inactive" href="downloads.html">Downloads</a>
             </div>
           </li><li>
             <div>
               <a title="Information for users, administrators and developers" class="active" href="docs.html">Documentation</a>
               <ul class="l1"><li>
+                  <div>
+                    <a title="How to compile libvirt" class="inactive" href="compiling.html">Compiling</a>
+                  </div>
+                </li><li>
                   <div>
                     <a title="Information about deploying and using libvirt" class="inactive" href="deployment.html">Deployment</a>
                   </div>
@@ -70,11 +78,27 @@
                         <div>
                           <a title="overview of the Java API bindings" class="inactive" href="java.html">Java</a>
                         </div>
+                      </li><li>
+                        <div>
+                          <a title="overview of the C# API bindings" class="inactive" href="csharp.html">C#</a>
+                        </div>
+                      </li><li>
+                        <div>
+                          <a title="overview of the PHP API bindings" class="inactive" href="php.html">PHP</a>
+                        </div>
                       </li></ul>
                   </div>
                 </li><li>
                   <div>
                     <a title="Working on the internals of libvirt API, driver and daemon code" class="inactive" href="internals.html">Internals</a>
+                  </div>
+                </li><li>
+                  <div>
+                    <a title="A guide and reference for developing with libvirt" class="inactive" href="devguide.html">Development Guide</a>
+                  </div>
+                </li><li>
+                  <div>
+                    <a title="Command reference for virsh" class="inactive" href="virshcmdref.html">Virsh Commands</a>
                   </div>
                 </li></ul>
             </div>
@@ -93,6 +117,10 @@
           </li><li>
             <div>
               <a title="How to contact the developers via email and IRC" class="inactive" href="contact.html">Contact</a>
+            </div>
+          </li><li>
+            <div>
+              <a title="Available test suites for libvirt" class="inactive" href="testsuites.html">Test suites</a>
             </div>
           </li><li>
             <div>
@@ -123,7 +151,7 @@ lower case, for example the C functions:</p>
     </p>
         <p>become</p>
         <p>
-      <code>virConn::numOfDomains(self)</code>
+      <code>virConnect::numOfDomains(self)</code>
     </p>
         <p>
       <code>virDomain::setMaxMemory(self, memory)</code>

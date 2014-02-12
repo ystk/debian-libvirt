@@ -1,7 +1,7 @@
 /*
  * datatypes.h: management of structs for public data types
  *
- * Copyright (C) 2006-2008 Red Hat, Inc.
+ * Copyright (C) 2006-2008, 2010-2011 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,7 +24,6 @@
 
 # include "internal.h"
 
-# include "hash.h"
 # include "driver.h"
 # include "threads.h"
 
@@ -32,9 +31,9 @@
  * VIR_CONNECT_MAGIC:
  *
  * magic value used to protect the API when pointers to connection structures
- * are passed down by the uers.
+ * are passed down by the users.
  */
-# define VIR_CONNECT_MAGIC 	0x4F23DEAD
+# define VIR_CONNECT_MAGIC	0x4F23DEAD
 # define VIR_IS_CONNECT(obj)	((obj) && (obj)->magic==VIR_CONNECT_MAGIC)
 
 
@@ -151,8 +150,8 @@ struct _virConnect {
      * since. Thus no need to lock when accessing them
      */
     unsigned int magic;     /* specific value to check */
-    int flags;              /* a set of connection flags */
-    xmlURIPtr uri;          /* connection URI */
+    unsigned int flags;     /* a set of connection flags */
+    virURIPtr uri;          /* connection URI */
 
     /* The underlying hypervisor driver and network driver. */
     virDriverPtr      driver;
@@ -188,14 +187,6 @@ struct _virConnect {
     virErrorFunc handler;   /* associated handlet */
     void *userData;         /* the user data */
 
-    virHashTablePtr domains;  /* hash table for known domains */
-    virHashTablePtr networks; /* hash table for known domains */
-    virHashTablePtr interfaces; /* hash table for known interfaces */
-    virHashTablePtr storagePools;/* hash table for known storage pools */
-    virHashTablePtr storageVols;/* hash table for known storage vols */
-    virHashTablePtr nodeDevices; /* hash table for known node devices */
-    virHashTablePtr secrets;  /* hash taboe for known secrets */
-    virHashTablePtr nwfilterPools; /* hash tables ofr known nw filter pools */
     int refs;                 /* reference count */
 };
 
@@ -211,7 +202,6 @@ struct _virDomain {
     char *name;                          /* the domain external name */
     int id;                              /* the domain ID */
     unsigned char uuid[VIR_UUID_BUFLEN]; /* the domain unique identifier */
-    virHashTablePtr snapshots; /* hash table for known snapshots */
 };
 
 /**
@@ -264,8 +254,7 @@ struct _virStorageVol {
     virConnectPtr conn;                  /* pointer back to the connection */
     char *pool;                          /* Pool name of owner */
     char *name;                          /* the storage vol external name */
-    /* XXX currently abusing path for this. Ought not to be so evil */
-    char key[PATH_MAX];                  /* unique key for storage vol */
+    char *key;                           /* unique key for storage vol */
 };
 
 /**
@@ -308,7 +297,7 @@ struct _virStream {
     unsigned int magic;
     virConnectPtr conn;
     int refs;
-    int flags;
+    unsigned int flags;
 
     virStreamDriverPtr driver;
     void *privateData;
@@ -387,10 +376,10 @@ struct _virNWFilter {
 virNWFilterPtr virGetNWFilter(virConnectPtr conn,
                                   const char *name,
                                   const unsigned char *uuid);
-int virUnrefNWFilter(virNWFilterPtr pool);
+int virUnrefNWFilter(virNWFilterPtr nwfilter);
 
 virDomainSnapshotPtr virGetDomainSnapshot(virDomainPtr domain,
                                           const char *name);
-int virUnrefDomainSnapshot(virDomainSnapshotPtr pool);
+int virUnrefDomainSnapshot(virDomainSnapshotPtr snapshot);
 
 #endif

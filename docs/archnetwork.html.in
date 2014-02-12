@@ -1,8 +1,11 @@
+<?xml version="1.0"?>
 <html>
   <body>
     <h1>Network management architecture</h1>
 
-    <h2>Architecture illustration</h2>
+    <ul id="toc"></ul>
+
+    <h2><a name="architecture">Architecture illustration</a></h2>
 
     <p>
       The diagrams below illustrate some of the network configurations
@@ -29,18 +32,18 @@
         </li>
       <li><strong>Guest C</strong>. The only network interface is connected
         to a virtual network <code>VLAN 2</code>. It has no direct connectivity
-        to a physical LAN, relying on <code>Guest B</codE> to route traffic
+        to a physical LAN, relying on <code>Guest B</code> to route traffic
         on its behalf.
       </li>
     </ul>
 
-    <h3>Logical diagram</h3>
+    <h3><a name="logical">Logical diagram</a></h3>
 
     <p class="image">
       <img src="libvirt-net-logical.png" alt="Logical network architecture"/>
     </p>
 
-    <h3>Physical diagram</h3>
+    <h3><a name="physical">Physical diagram</a></h3>
 
     <p class="image">
       <img src="libvirt-net-physical.png" alt="Physical network architecture"/>

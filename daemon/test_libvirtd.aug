@@ -54,8 +54,8 @@ listen_addr = \"192.168.0.1\"
 # Alternatively can disable for all services on a host by
 # stopping the Avahi daemon
 #
-# This is enabled by default, uncomment this to disable it
-mdns_adv = 0
+# This is disabled by default, uncomment this to enable it
+mdns_adv = 1
 
 # Override the default mDNS advertizement name. This must be
 # unique on the immediate broadcast network.
@@ -193,6 +193,7 @@ crl_file = \"/etc/pki/CA/crl.pem\"
 # Default is to always verify. Uncommenting this will disable
 # verification - make sure an IP whitelist is set
 tls_no_verify_certificate = 1
+tls_no_sanity_certificate = 1
 
 
 # A whitelist of allowed x509  Distinguished Names
@@ -268,6 +269,9 @@ log_outputs=\"4:stderr\"
 
 # Logging filters:
 log_filters=\"a\"
+
+# Auditing:
+audit_level = 2
 "
 
    test Libvirtd.lns get conf =
@@ -326,8 +330,8 @@ log_filters=\"a\"
         { "#comment" = "Alternatively can disable for all services on a host by" }
         { "#comment" = "stopping the Avahi daemon" }
         { "#comment" = "" }
-        { "#comment" = "This is enabled by default, uncomment this to disable it" }
-        { "mdns_adv" = "0" }
+        { "#comment" = "This is disabled by default, uncomment this to enable it" }
+        { "mdns_adv" = "1" }
         { "#empty" }
         { "#comment" = "Override the default mDNS advertizement name. This must be" }
         { "#comment" = "unique on the immediate broadcast network." }
@@ -465,6 +469,7 @@ log_filters=\"a\"
         { "#comment" = "Default is to always verify. Uncommenting this will disable" }
         { "#comment" = "verification - make sure an IP whitelist is set" }
         { "tls_no_verify_certificate" = "1" }
+        { "tls_no_sanity_certificate" = "1" }
         { "#empty" }
         { "#empty" }
         { "#comment" = "A whitelist of allowed x509  Distinguished Names" }
@@ -543,3 +548,6 @@ log_filters=\"a\"
 	{ "#empty" }
         { "#comment" = "Logging filters:" }
         { "log_filters" = "a" }
+	{ "#empty" }
+        { "#comment" = "Auditing:" }
+        { "audit_level" = "2" }

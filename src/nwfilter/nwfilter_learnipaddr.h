@@ -25,6 +25,8 @@
 #ifndef __NWFILTER_LEARNIPADDR_H
 # define __NWFILTER_LEARNIPADDR_H
 
+# include "conf/nwfilter_params.h"
+
 enum howDetect {
   DETECT_DHCP = 1,
   DETECT_STATIC = 2,
@@ -63,13 +65,14 @@ int virNWFilterLearnIPAddress(virNWFilterTechDriverPtr techdriver,
 virNWFilterIPAddrLearnReqPtr virNWFilterLookupLearnReq(int ifindex);
 int virNWFilterTerminateLearnReq(const char *ifname);
 
-void virNWFilterDelIpAddrForIfname(const char *ifname);
-const char *virNWFilterGetIpAddrForIfname(const char *ifname);
+int virNWFilterDelIpAddrForIfname(const char *ifname, const char *ipaddr);
+virNWFilterVarValuePtr virNWFilterGetIpAddrForIfname(const char *ifname);
 
 int virNWFilterLockIface(const char *ifname) ATTRIBUTE_RETURN_CHECK;
 void virNWFilterUnlockIface(const char *ifname);
 
 int virNWFilterLearnInit(void);
 void virNWFilterLearnShutdown(void);
+void virNWFilterLearnThreadsTerminate(bool allowNewThreads);
 
 #endif /* __NWFILTER_LEARNIPADDR_H */

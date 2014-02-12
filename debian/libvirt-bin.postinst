@@ -17,29 +17,82 @@ set -e
 # for details, see http://www.debian.org/doc/debian-policy/ or
 # the debian-policy package
 
+add_users_groups()
+{
+    if ! getent group libvirt >/dev/null; then
+        addgroup --system libvirt
+    fi
+
+    # user and group libvirt runs qemu/kvm instances with
+    if ! getent group kvm >/dev/null; then
+        addgroup --quiet --system kvm
+    fi
+    if ! getent group libvirt-qemu >/dev/null; then
+        addgroup --quiet --system libvirt-qemu
+    fi
+    if ! getent passwd libvirt-qemu >/dev/null; then
+        adduser --quiet \
+            --system \
+            --ingroup kvm \
+            --quiet \
+            --disabled-login \
+            --disabled-password \
+            --home /var/lib/libvirt \
+            --no-create-home \
+            -gecos "Libvirt Qemu" \
+            libvirt-qemu
+    fi
+    adduser libvirt-qemu libvirt-qemu
+}
+
+
+add_statoverrides()
+{
+    ROOT_DIRS="\
+        /var/lib/libvirt/images/ \
+        /var/lib/libvirt/boot/   \
+        /var/cache/libvirt/      \
+    "
+
+    QEMU_DIRS="\
+         /var/lib/libvirt/qemu/   \
+         /var/cache/libvirt/qemu/ \
+    "
+
+    SANLOCK_DIR="/var/lib/libvirt/sanlock"
+
+    QEMU_CONF="/etc/libvirt/qemu.conf"
+
+    for dir in ${ROOT_DIRS}; do
+        if ! dpkg-statoverride --list "${dir}" >/dev/null 2>&1; then
+            chown root:root "${dir}"
+            chmod 0711 "${dir}"
+        fi
+    done
+
+    for dir in ${QEMU_DIRS}; do
+        if ! dpkg-statoverride --list "${dir}" >/dev/null 2>&1; then
+            chown libvirt-qemu:kvm "${dir}"
+            chmod 0750 "${dir}"
+        fi
+    done
+
+    if ! dpkg-statoverride --list "${SANLOCK_DIR}" >/dev/null 2>&1; then
+        chown root:root "${SANLOCK_DIR}"
+        chmod 0700 "${SANLOCK_DIR}"
+    fi
+
+    if ! dpkg-statoverride --list "${QEMU_CONF}" >/dev/null 2>&1; then
+        chown root:root "${QEMU_CONF}"
+        chmod 0600 "${QEMU_CONF}"
+    fi
+}
+
 
 case "$1" in
     configure)
-    	if ! getent group libvirt >/dev/null; then
-    		addgroup --system libvirt
-	fi
-
-	# user and group libvirt runs qemu/kvm instances with
-	if ! getent group kvm >/dev/null; then
-		addgroup --quiet --system kvm
-	fi
-	if ! getent passwd libvirt-qemu >/dev/null; then
-		adduser --quiet \
-			--system \
-			--ingroup kvm \
-			--quiet \
-			--disabled-login \
-			--disabled-password \
-                        --home /var/lib/libvirt \
-                        --no-create-home \
-			-gecos "Libvirt Qemu" \
-			libvirt-qemu
-	fi
+        add_users_groups
+        add_statoverrides
 
 	# libvirt from 0.6.0 on is safe to restart with running vms:
 	if [ -n "$2" ] &&  dpkg --compare-versions "$2" ge 0.6.0; then
@@ -62,6 +115,12 @@ case "$1" in
 		update-rc.d -f libvirt-bin remove >/dev/null
 	    fi
 	fi
+
+	# Make sure the directories don't get removed on package removal since
+	# logrotate chokes otherwise.
+	for dir in qemu uml lxc; do
+	    touch /var/log/libvirt/"${dir}"/.placeholder
+	done
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

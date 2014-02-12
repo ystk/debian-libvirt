@@ -1,12 +1,15 @@
 ## Process this file with automake to produce Makefile.in
 
+## Copyright (C) 2005-2011 Red Hat, Inc.
+## See COPYING.LIB for the License of this software
+
 LCOV = lcov
 GENHTML = genhtml
 
-SUBDIRS = gnulib/lib include src daemon tools proxy docs gnulib/tests \
+SUBDIRS = gnulib/lib include src daemon tools docs gnulib/tests \
   python tests po examples/domain-events/events-c examples/hellolibvirt \
   examples/dominfo examples/domsuspend examples/python examples/apparmor \
-  examples/xml/nwfilter examples/openauth
+  examples/xml/nwfilter examples/openauth examples/systemtap
 
 ACLOCAL_AMFLAGS = -I m4 -I gnulib/m4
 
@@ -18,29 +21,11 @@ EXTRA_DIST = \
   ChangeLog-old \
   libvirt.spec libvirt.spec.in \
   mingw32-libvirt.spec.in \
-  libvirt.pc libvirt.pc.in \
+  libvirt.pc.in \
   autobuild.sh \
-  .x-sc_avoid_ctype_macros \
-  .x-sc_avoid_if_before_free \
-  .x-sc_avoid_write \
-  .x-sc_m4_quote_check \
-  .x-sc_prohibit_asprintf \
-  .x-sc_prohibit_gethostby \
-  .x-sc_prohibit_gethostname \
-  .x-sc_prohibit_gettext_noop \
-  .x-sc_prohibit_have_config_h \
-  .x-sc_prohibit_HAVE_MBRTOWC \
-  .x-sc_prohibit_nonreentrant \
-  .x-sc_prohibit_strcmp \
-  .x-sc_prohibit_strcmp_and_strncmp \
-  .x-sc_prohibit_strncpy \
-  .x-sc_prohibit_test_minus_ao \
-  .x-sc_prohibit_VIR_ERR_NO_MEMORY \
-  .x-sc_require_config_h \
-  .x-sc_require_config_h_first \
-  .x-sc_trailing_blank \
   Makefile.nonreentrant \
   autogen.sh \
+  cfg.mk \
   examples/domain-events/events-python \
   $(XML_EXAMPLES)
 
@@ -55,6 +40,13 @@ NEWS: $(top_srcdir)/docs/news.xsl $(top_srcdir)/docs/news.html.in
 	   | perl -pe 's/[ \t]+$$//'				\
 	   > $@-t && mv $@-t $@ ; fi );
 
+$(top_srcdir)/HACKING: $(top_srcdir)/docs/hacking1.xsl $(top_srcdir)/docs/hacking2.xsl \
+                       $(top_srcdir)/docs/wrapstring.xsl $(top_srcdir)/docs/hacking.html.in
+	-@(if [ -x $(XSLTPROC) ] ; then \
+	   $(XSLTPROC) --nonet $(top_srcdir)/docs/hacking1.xsl $(top_srcdir)/docs/hacking.html.in | \
+	   $(XSLTPROC) --nonet $(top_srcdir)/docs/hacking2.xsl - \
+	   | perl -0777 -pe 's/\n\n+$$/\n/' \
+	   > $@-t && mv $@-t $@ ; fi );
 
 rpm: clean
 	@(unset CDPATH ; $(MAKE) dist && rpmbuild -ta $(distdir).tar.gz)

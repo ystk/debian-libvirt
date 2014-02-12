@@ -1,7 +1,7 @@
 /*
  * console.c: A dumb serial console client
  *
- * Copyright (C) 2007, 2008, 2010 Red Hat, Inc.
+ * Copyright (C) 2007-2008, 2010-2011 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -34,14 +34,47 @@
 # include <errno.h>
 # include <unistd.h>
 # include <signal.h>
+# include <c-ctype.h>
 
-# include "console.h"
 # include "internal.h"
+# include "console.h"
 # include "logging.h"
 # include "util.h"
+# include "virfile.h"
+# include "memory.h"
+# include "threads.h"
+# include "virterror_internal.h"
 
-/* ie  Ctrl-]  as per telnet */
-# define CTRL_CLOSE_BRACKET '\35'
+/*
+ * Convert given character to control character.
+ * Basically, we assume ASCII, and take lower 6 bits.
+ */
+# define CONTROL(c) ((c) ^ 0x40)
+
+# define VIR_FROM_THIS VIR_FROM_NONE
+
+struct virConsoleBuffer {
+    size_t length;
+    size_t offset;
+    char *data;
+};
+
+typedef struct virConsole virConsole;
+typedef virConsole *virConsolePtr;
+struct virConsole {
+    virStreamPtr st;
+    bool quit;
+    virMutex lock;
+    virCond cond;
+
+    int stdinWatch;
+    int stdoutWatch;
+
+    struct virConsoleBuffer streamToTerminal;
+    struct virConsoleBuffer terminalToStream;
+
+    char escapeChar;
+};
 
 static int got_signal = 0;
 static void do_signal(int sig ATTRIBUTE_UNUSED) {
@@ -61,22 +94,223 @@ cfmakeraw (struct termios *attr)
 }
 # endif /* !HAVE_CFMAKERAW */
 
-int vshRunConsole(const char *tty) {
-    int ttyfd, ret = -1;
+static void
+virConsoleShutdown(virConsolePtr con)
+{
+    if (con->st) {
+        virStreamEventRemoveCallback(con->st);
+        virStreamAbort(con->st);
+        virStreamFree(con->st);
+    }
+    VIR_FREE(con->streamToTerminal.data);
+    VIR_FREE(con->terminalToStream.data);
+    if (con->stdinWatch != -1)
+        virEventRemoveHandle(con->stdinWatch);
+    if (con->stdoutWatch != -1)
+        virEventRemoveHandle(con->stdoutWatch);
+    con->stdinWatch = -1;
+    con->stdoutWatch = -1;
+    con->quit = true;
+    virCondSignal(&con->cond);
+}
+
+static void
+virConsoleEventOnStream(virStreamPtr st,
+                        int events, void *opaque)
+{
+    virConsolePtr con = opaque;
+
+    if (events & VIR_STREAM_EVENT_READABLE) {
+        size_t avail = con->streamToTerminal.length -
+            con->streamToTerminal.offset;
+        int got;
+
+        if (avail < 1024) {
+            if (VIR_REALLOC_N(con->streamToTerminal.data,
+                              con->streamToTerminal.length + 1024) < 0) {
+                virReportOOMError();
+                virConsoleShutdown(con);
+                return;
+            }
+            con->streamToTerminal.length += 1024;
+            avail += 1024;
+        }
+
+        got = virStreamRecv(st,
+                            con->streamToTerminal.data +
+                            con->streamToTerminal.offset,
+                            avail);
+        if (got == -2)
+            return; /* blocking */
+        if (got <= 0) {
+            virConsoleShutdown(con);
+            return;
+        }
+        con->streamToTerminal.offset += got;
+        if (con->streamToTerminal.offset)
+            virEventUpdateHandle(con->stdoutWatch,
+                                 VIR_EVENT_HANDLE_WRITABLE);
+    }
+
+    if (events & VIR_STREAM_EVENT_WRITABLE &&
+        con->terminalToStream.offset) {
+        ssize_t done;
+        size_t avail;
+        done = virStreamSend(con->st,
+                             con->terminalToStream.data,
+                             con->terminalToStream.offset);
+        if (done == -2)
+            return; /* blocking */
+        if (done < 0) {
+            virConsoleShutdown(con);
+            return;
+        }
+        memmove(con->terminalToStream.data,
+                con->terminalToStream.data + done,
+                con->terminalToStream.offset - done);
+        con->terminalToStream.offset -= done;
+
+        avail = con->terminalToStream.length - con->terminalToStream.offset;
+        if (avail > 1024) {
+            if (VIR_REALLOC_N(con->terminalToStream.data,
+                              con->terminalToStream.offset + 1024) < 0)
+            {}
+            con->terminalToStream.length = con->terminalToStream.offset + 1024;
+        }
+    }
+    if (!con->terminalToStream.offset)
+        virStreamEventUpdateCallback(con->st,
+                                     VIR_STREAM_EVENT_READABLE);
+
+    if (events & VIR_STREAM_EVENT_ERROR ||
+        events & VIR_STREAM_EVENT_HANGUP) {
+        virConsoleShutdown(con);
+    }
+}
+
+static void
+virConsoleEventOnStdin(int watch ATTRIBUTE_UNUSED,
+                       int fd ATTRIBUTE_UNUSED,
+                       int events,
+                       void *opaque)
+{
+    virConsolePtr con = opaque;
+
+    if (events & VIR_EVENT_HANDLE_READABLE) {
+        size_t avail = con->terminalToStream.length -
+            con->terminalToStream.offset;
+        int got;
+
+        if (avail < 1024) {
+            if (VIR_REALLOC_N(con->terminalToStream.data,
+                              con->terminalToStream.length + 1024) < 0) {
+                virReportOOMError();
+                virConsoleShutdown(con);
+                return;
+            }
+            con->terminalToStream.length += 1024;
+            avail += 1024;
+        }
+
+        got = read(fd,
+                   con->terminalToStream.data +
+                   con->terminalToStream.offset,
+                   avail);
+        if (got < 0) {
+            if (errno != EAGAIN) {
+                virConsoleShutdown(con);
+            }
+            return;
+        }
+        if (got == 0) {
+            virConsoleShutdown(con);
+            return;
+        }
+        if (con->terminalToStream.data[con->terminalToStream.offset] == con->escapeChar) {
+            virConsoleShutdown(con);
+            return;
+        }
+
+        con->terminalToStream.offset += got;
+        if (con->terminalToStream.offset)
+            virStreamEventUpdateCallback(con->st,
+                                         VIR_STREAM_EVENT_READABLE |
+                                         VIR_STREAM_EVENT_WRITABLE);
+    }
+
+    if (events & VIR_EVENT_HANDLE_ERROR ||
+        events & VIR_EVENT_HANDLE_HANGUP) {
+        virConsoleShutdown(con);
+    }
+}
+
+static void
+virConsoleEventOnStdout(int watch ATTRIBUTE_UNUSED,
+                        int fd,
+                        int events,
+                        void *opaque)
+{
+    virConsolePtr con = opaque;
+
+    if (events & VIR_EVENT_HANDLE_WRITABLE &&
+        con->streamToTerminal.offset) {
+        ssize_t done;
+        size_t avail;
+        done = write(fd,
+                     con->streamToTerminal.data,
+                     con->streamToTerminal.offset);
+        if (done < 0) {
+            if (errno != EAGAIN) {
+                virConsoleShutdown(con);
+            }
+            return;
+        }
+        memmove(con->streamToTerminal.data,
+                con->streamToTerminal.data + done,
+                con->streamToTerminal.offset - done);
+        con->streamToTerminal.offset -= done;
+
+        avail = con->streamToTerminal.length - con->streamToTerminal.offset;
+        if (avail > 1024) {
+            if (VIR_REALLOC_N(con->streamToTerminal.data,
+                              con->streamToTerminal.offset + 1024) < 0)
+            {}
+            con->streamToTerminal.length = con->streamToTerminal.offset + 1024;
+        }
+    }
+
+    if (!con->streamToTerminal.offset)
+        virEventUpdateHandle(con->stdoutWatch, 0);
+
+    if (events & VIR_EVENT_HANDLE_ERROR ||
+        events & VIR_EVENT_HANDLE_HANGUP) {
+        virConsoleShutdown(con);
+    }
+}
+
+
+static char
+vshGetEscapeChar(const char *s)
+{
+    if (*s == '^')
+        return CONTROL(c_toupper(s[1]));
+
+    return *s;
+}
+
+int vshRunConsole(virDomainPtr dom,
+                  const char *dev_name,
+                  const char *escape_seq,
+                  unsigned int flags)
+{
+    int ret = -1;
     struct termios ttyattr, rawattr;
     void (*old_sigquit)(int);
     void (*old_sigterm)(int);
     void (*old_sigint)(int);
     void (*old_sighup)(int);
     void (*old_sigpipe)(int);
-
-
-    /* We do not want this to become the controlling TTY */
-    if ((ttyfd = open(tty, O_NOCTTY | O_RDWR)) < 0) {
-        VIR_ERROR(_("unable to open tty %s: %s"),
-                  tty, strerror(errno));
-        return -1;
-    }
+    virConsolePtr con = NULL;
 
     /* Put STDIN into raw mode so that stuff typed
        does not echo to the screen (the TTY reads will
@@ -86,7 +320,7 @@ int vshRunConsole(const char *tty) {
     if (tcgetattr(STDIN_FILENO, &ttyattr) < 0) {
         VIR_ERROR(_("unable to get tty attributes: %s"),
                   strerror(errno));
-        goto closetty;
+        return -1;
     }
 
     rawattr = ttyattr;
@@ -95,7 +329,7 @@ int vshRunConsole(const char *tty) {
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &rawattr) < 0) {
         VIR_ERROR(_("unable to set tty attributes: %s"),
                   strerror(errno));
-        goto closetty;
+        goto resettty;
     }
 
 
@@ -110,89 +344,70 @@ int vshRunConsole(const char *tty) {
     old_sigpipe = signal(SIGPIPE, do_signal);
     got_signal = 0;
 
+    if (VIR_ALLOC(con) < 0) {
+        virReportOOMError();
+        goto cleanup;
+    }
 
-    /* Now lets process STDIN & tty forever.... */
-    for (; !got_signal ;) {
-        unsigned int i;
-        struct pollfd fds[] = {
-            { STDIN_FILENO, POLLIN, 0 },
-            { ttyfd, POLLIN, 0 },
-        };
+    con->escapeChar = vshGetEscapeChar(escape_seq);
+    con->st = virStreamNew(virDomainGetConnect(dom),
+                           VIR_STREAM_NONBLOCK);
+    if (!con->st)
+        goto cleanup;
 
-        /* Wait for data to be available for reading on
-           STDIN or the tty */
-        if (poll(fds, (sizeof(fds)/sizeof(struct pollfd)), -1) < 0) {
-            if (got_signal)
-                goto cleanup;
+    if (virDomainOpenConsole(dom, dev_name, con->st, flags) < 0)
+        goto cleanup;
 
-            if (errno == EINTR || errno == EAGAIN)
-                continue;
+    if (virCondInit(&con->cond) < 0 || virMutexInit(&con->lock) < 0)
+        goto cleanup;
 
-            VIR_ERROR(_("failure waiting for I/O: %s"), strerror(errno));
+    con->stdinWatch = virEventAddHandle(STDIN_FILENO,
+                                        VIR_EVENT_HANDLE_READABLE,
+                                        virConsoleEventOnStdin,
+                                        con,
+                                        NULL);
+    con->stdoutWatch = virEventAddHandle(STDOUT_FILENO,
+                                         0,
+                                         virConsoleEventOnStdout,
+                                         con,
+                                         NULL);
+
+    virStreamEventAddCallback(con->st,
+                              VIR_STREAM_EVENT_READABLE,
+                              virConsoleEventOnStream,
+                              con,
+                              NULL);
+
+    while (!con->quit) {
+        if (virCondWait(&con->cond, &con->lock) < 0) {
+            VIR_ERROR(_("unable to wait on console condition"));
             goto cleanup;
         }
-
-        for (i = 0 ; i < (sizeof(fds)/sizeof(struct pollfd)) ; i++) {
-            if (!fds[i].revents)
-                continue;
-
-            /* Process incoming data available for read */
-            if (fds[i].revents & POLLIN) {
-                char buf[4096];
-                int got, sent = 0, destfd;
-
-                if ((got = read(fds[i].fd, buf, sizeof(buf))) < 0) {
-                    VIR_ERROR(_("failure reading input: %s"),
-                              strerror(errno));
-                    goto cleanup;
-                }
-
-                /* Quit if end of file, or we got the Ctrl-] key */
-                if (!got ||
-                    (got == 1 &&
-                     buf[0] == CTRL_CLOSE_BRACKET))
-                    goto done;
-
-                /* Data from stdin goes to the TTY,
-                   data from the TTY goes to STDOUT */
-                if (fds[i].fd == STDIN_FILENO)
-                    destfd = ttyfd;
-                else
-                    destfd = STDOUT_FILENO;
-
-                while (sent < got) {
-                    int done;
-                    if ((done = safewrite(destfd, buf + sent, got - sent))
-                        <= 0) {
-                        VIR_ERROR(_("failure writing output: %s"),
-                                  strerror(errno));
-                        goto cleanup;
-                    }
-                    sent += done;
-                }
-            } else { /* Any other flag from poll is an error condition */
-                goto cleanup;
-            }
-        }
     }
- done:
+
     ret = 0;
 
  cleanup:
 
+    if (con) {
+        if (con->st)
+            virStreamFree(con->st);
+        virMutexDestroy(&con->lock);
+        ignore_value(virCondDestroy(&con->cond));
+        VIR_FREE(con);
+    }
+
     /* Restore original signal handlers */
-    signal(SIGQUIT, old_sigpipe);
-    signal(SIGQUIT, old_sighup);
-    signal(SIGQUIT, old_sigint);
-    signal(SIGQUIT, old_sigterm);
+    signal(SIGPIPE, old_sigpipe);
+    signal(SIGHUP, old_sighup);
+    signal(SIGINT, old_sigint);
+    signal(SIGTERM, old_sigterm);
     signal(SIGQUIT, old_sigquit);
 
+resettty:
     /* Put STDIN back into the (sane?) state we found
        it in before starting */
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &ttyattr);
-
- closetty:
-    close(ttyfd);
 
     return ret;
 }

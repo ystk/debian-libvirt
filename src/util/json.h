@@ -1,8 +1,8 @@
 /*
  * json.h: JSON object parsing/formatting
  *
+ * Copyright (C) 2009, 2012 Red Hat, Inc.
  * Copyright (C) 2009 Daniel P. Berrange
- * Copyright (C) 2009 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,14 +27,14 @@
 # include "internal.h"
 
 
-enum {
+typedef enum {
     VIR_JSON_TYPE_OBJECT,
     VIR_JSON_TYPE_ARRAY,
     VIR_JSON_TYPE_STRING,
     VIR_JSON_TYPE_NUMBER,
     VIR_JSON_TYPE_BOOLEAN,
     VIR_JSON_TYPE_NULL,
-};
+} virJSONType;
 
 typedef struct _virJSONValue virJSONValue;
 typedef virJSONValue *virJSONValuePtr;
@@ -65,7 +65,8 @@ struct _virJSONArray {
 };
 
 struct _virJSONValue {
-    int type;
+    int type; /* enum virJSONType */
+    bool protect; /* prevents deletion when embedded in another object */
 
     union {
         virJSONObject object;
@@ -99,13 +100,17 @@ virJSONValuePtr virJSONValueObjectGet(virJSONValuePtr object, const char *key);
 int virJSONValueArraySize(virJSONValuePtr object);
 virJSONValuePtr virJSONValueArrayGet(virJSONValuePtr object, unsigned int element);
 
+int virJSONValueObjectKeysNumber(virJSONValuePtr object);
+const char *virJSONValueObjectGetKey(virJSONValuePtr object, unsigned int n);
+virJSONValuePtr virJSONValueObjectGetValue(virJSONValuePtr object, unsigned int n);
+
 const char *virJSONValueGetString(virJSONValuePtr object);
 int virJSONValueGetNumberInt(virJSONValuePtr object, int *value);
 int virJSONValueGetNumberUint(virJSONValuePtr object, unsigned int *value);
 int virJSONValueGetNumberLong(virJSONValuePtr object, long long *value);
 int virJSONValueGetNumberUlong(virJSONValuePtr object, unsigned long long *value);
 int virJSONValueGetNumberDouble(virJSONValuePtr object, double *value);
-int virJSONValueGetBoolean(virJSONValuePtr object);
+int virJSONValueGetBoolean(virJSONValuePtr object, bool *value);
 int virJSONValueIsNull(virJSONValuePtr object);
 
 const char *virJSONValueObjectGetString(virJSONValuePtr object, const char *key);
@@ -114,7 +119,7 @@ int virJSONValueObjectGetNumberUint(virJSONValuePtr object, const char *key, uns
 int virJSONValueObjectGetNumberLong(virJSONValuePtr object, const char *key, long long *value);
 int virJSONValueObjectGetNumberUlong(virJSONValuePtr object, const char *key, unsigned long long *value);
 int virJSONValueObjectGetNumberDouble(virJSONValuePtr object, const char *key, double *value);
-int virJSONValueObjectGetBoolean(virJSONValuePtr object, const char *key);
+int virJSONValueObjectGetBoolean(virJSONValuePtr object, const char *key, bool *value);
 int virJSONValueObjectIsNull(virJSONValuePtr object, const char *key);
 
 int virJSONValueObjectAppendString(virJSONValuePtr object, const char *key, const char *value);

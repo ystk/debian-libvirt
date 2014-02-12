@@ -17,6 +17,7 @@
  *
  * Authors:
  *     Daniel P. Berrange <berrange@redhat.com>
+ *     Michal Privoznik <mprivozn@redhat.com>
  */
 
 #ifndef __VIR_USB_H__
@@ -25,15 +26,29 @@
 # include "internal.h"
 
 typedef struct _usbDevice usbDevice;
+typedef struct _usbDeviceList usbDeviceList;
 
-usbDevice *usbGetDevice(unsigned bus,
-                        unsigned devno);
-usbDevice *usbFindDevice(unsigned vendor,
-                         unsigned product);
+usbDevice *usbGetDevice(unsigned int bus,
+                        unsigned int devno);
+
+usbDevice *usbFindDeviceByBus(unsigned int bus,
+                              unsigned int devno);
+
+usbDeviceList *usbFindDeviceByVendor(unsigned int vendor,
+                                     unsigned int product);
+
+usbDevice *usbFindDevice(unsigned int vendor,
+                         unsigned int product,
+                         unsigned int bus,
+                         unsigned int devno);
+
 void       usbFreeDevice (usbDevice *dev);
+void       usbDeviceSetUsedBy(usbDevice *dev, const char *name);
+const char *usbDeviceGetUsedBy(usbDevice *dev);
+const char *usbDeviceGetName(usbDevice *dev);
 
-unsigned usbDeviceGetBus(usbDevice *dev);
-unsigned usbDeviceGetDevno(usbDevice *dev);
+unsigned int usbDeviceGetBus(usbDevice *dev);
+unsigned int usbDeviceGetDevno(usbDevice *dev);
 
 /*
  * Callback that will be invoked once for each file
@@ -49,5 +64,18 @@ int usbDeviceFileIterate(usbDevice *dev,
                          usbDeviceFileActor actor,
                          void *opaque);
 
+usbDeviceList *usbDeviceListNew(void);
+void           usbDeviceListFree(usbDeviceList *list);
+int            usbDeviceListAdd(usbDeviceList *list,
+                                usbDevice *dev);
+usbDevice *    usbDeviceListGet(usbDeviceList *list,
+                                int idx);
+int            usbDeviceListCount(usbDeviceList *list);
+usbDevice *    usbDeviceListSteal(usbDeviceList *list,
+                                  usbDevice *dev);
+void           usbDeviceListDel(usbDeviceList *list,
+                                usbDevice *dev);
+usbDevice *    usbDeviceListFind(usbDeviceList *list,
+                                 usbDevice *dev);
 
 #endif /* __VIR_USB_H__ */

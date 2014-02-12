@@ -1,7 +1,5 @@
-/* -*- buffer-read-only: t -*- vi: set ro: */
-/* DO NOT EDIT! GENERATED AUTOMATICALLY! */
 /* Tests of areadlink and friends.
-   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2009-2012 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -38,7 +36,7 @@ test_areadlink (char * (*func) (char const *, size_t), bool print)
   ASSERT (errno == ENOENT);
   errno = 0;
   ASSERT (func ("", 1) == NULL);
-  ASSERT (errno == ENOENT);
+  ASSERT (errno == ENOENT || errno == EINVAL);
   errno = 0;
   ASSERT (func (".", 1) == NULL);
   ASSERT (errno == EINVAL);
@@ -51,7 +49,7 @@ test_areadlink (char * (*func) (char const *, size_t), bool print)
   ASSERT (errno == EINVAL);
   errno = 0;
   ASSERT (func (BASE "file/", 1) == NULL);
-  ASSERT (errno == ENOTDIR);
+  ASSERT (errno == ENOTDIR || errno == EINVAL); /* AIX yields EINVAL */
   ASSERT (unlink (BASE "file") == 0);
 
   /* Now test actual symlinks.  */

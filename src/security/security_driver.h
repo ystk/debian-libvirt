@@ -16,6 +16,8 @@
 # include "internal.h"
 # include "domain_conf.h"
 
+# include "security_manager.h"
+
 /*
  * Return values for security driver probing: the driver will determine
  * whether it should be enabled or disabled.
@@ -29,104 +31,100 @@ typedef enum {
 typedef struct _virSecurityDriver virSecurityDriver;
 typedef virSecurityDriver *virSecurityDriverPtr;
 
-typedef struct _virSecurityDriverState virSecurityDriverState;
-typedef virSecurityDriverState *virSecurityDriverStatePtr;
-
 typedef virSecurityDriverStatus (*virSecurityDriverProbe) (void);
-typedef int (*virSecurityDriverOpen) (virSecurityDriverPtr drv,
-                                      bool allowDiskFormatProbing);
-typedef int (*virSecurityDomainRestoreImageLabel) (virSecurityDriverPtr drv,
-                                                   virDomainObjPtr vm,
+typedef int (*virSecurityDriverOpen) (virSecurityManagerPtr mgr);
+typedef int (*virSecurityDriverClose) (virSecurityManagerPtr mgr);
+
+typedef const char *(*virSecurityDriverGetModel) (virSecurityManagerPtr mgr);
+typedef const char *(*virSecurityDriverGetDOI) (virSecurityManagerPtr mgr);
+
+typedef int (*virSecurityDomainRestoreImageLabel) (virSecurityManagerPtr mgr,
+                                                   virDomainDefPtr def,
                                                    virDomainDiskDefPtr disk);
-typedef int (*virSecurityDomainSetSocketLabel) (virSecurityDriverPtr drv,
-                                                virDomainObjPtr vm);
-typedef int (*virSecurityDomainClearSocketLabel)(virSecurityDriverPtr drv,
-                                                virDomainObjPtr vm);
-typedef int (*virSecurityDomainSetImageLabel) (virSecurityDriverPtr drv,
-                                               virDomainObjPtr vm,
+typedef int (*virSecurityDomainSetDaemonSocketLabel)(virSecurityManagerPtr mgr,
+                                                     virDomainDefPtr vm);
+typedef int (*virSecurityDomainSetSocketLabel) (virSecurityManagerPtr mgr,
+                                                virDomainDefPtr def);
+typedef int (*virSecurityDomainClearSocketLabel)(virSecurityManagerPtr mgr,
+                                                virDomainDefPtr def);
+typedef int (*virSecurityDomainSetImageLabel) (virSecurityManagerPtr mgr,
+                                               virDomainDefPtr def,
                                                virDomainDiskDefPtr disk);
-typedef int (*virSecurityDomainRestoreHostdevLabel) (virSecurityDriverPtr drv,
-                                                     virDomainObjPtr vm,
+typedef int (*virSecurityDomainRestoreHostdevLabel) (virSecurityManagerPtr mgr,
+                                                     virDomainDefPtr def,
                                                      virDomainHostdevDefPtr dev);
-typedef int (*virSecurityDomainSetHostdevLabel) (virSecurityDriverPtr drv,
-                                                 virDomainObjPtr vm,
+typedef int (*virSecurityDomainSetHostdevLabel) (virSecurityManagerPtr mgr,
+                                                 virDomainDefPtr def,
                                                  virDomainHostdevDefPtr dev);
-typedef int (*virSecurityDomainSetSavedStateLabel) (virSecurityDriverPtr drv,
-                                                    virDomainObjPtr vm,
+typedef int (*virSecurityDomainSetSavedStateLabel) (virSecurityManagerPtr mgr,
+                                                    virDomainDefPtr def,
                                                     const char *savefile);
-typedef int (*virSecurityDomainRestoreSavedStateLabel) (virSecurityDriverPtr drv,
-                                                        virDomainObjPtr vm,
+typedef int (*virSecurityDomainRestoreSavedStateLabel) (virSecurityManagerPtr mgr,
+                                                        virDomainDefPtr def,
                                                         const char *savefile);
-typedef int (*virSecurityDomainGenLabel) (virSecurityDriverPtr drv,
-                                          virDomainObjPtr sec);
-typedef int (*virSecurityDomainReserveLabel) (virSecurityDriverPtr drv,
-                                              virDomainObjPtr sec);
-typedef int (*virSecurityDomainReleaseLabel) (virSecurityDriverPtr drv,
-                                              virDomainObjPtr sec);
-typedef int (*virSecurityDomainSetAllLabel) (virSecurityDriverPtr drv,
-                                             virDomainObjPtr sec,
+typedef int (*virSecurityDomainGenLabel) (virSecurityManagerPtr mgr,
+                                          virDomainDefPtr sec);
+typedef int (*virSecurityDomainReserveLabel) (virSecurityManagerPtr mgr,
+                                              virDomainDefPtr sec,
+                                              pid_t pid);
+typedef int (*virSecurityDomainReleaseLabel) (virSecurityManagerPtr mgr,
+                                              virDomainDefPtr sec);
+typedef int (*virSecurityDomainSetAllLabel) (virSecurityManagerPtr mgr,
+                                             virDomainDefPtr sec,
                                              const char *stdin_path);
-typedef int (*virSecurityDomainRestoreAllLabel) (virSecurityDriverPtr drv,
-                                                 virDomainObjPtr vm,
+typedef int (*virSecurityDomainRestoreAllLabel) (virSecurityManagerPtr mgr,
+                                                 virDomainDefPtr def,
                                                  int migrated);
-typedef int (*virSecurityDomainGetProcessLabel) (virSecurityDriverPtr drv,
-                                                 virDomainObjPtr vm,
+typedef int (*virSecurityDomainGetProcessLabel) (virSecurityManagerPtr mgr,
+                                                 virDomainDefPtr def,
+                                                 pid_t pid,
                                                  virSecurityLabelPtr sec);
-typedef int (*virSecurityDomainSetProcessLabel) (virSecurityDriverPtr drv,
-                                                 virDomainObjPtr vm);
-typedef int (*virSecurityDomainSecurityVerify) (virDomainDefPtr def);
+typedef int (*virSecurityDomainSetProcessLabel) (virSecurityManagerPtr mgr,
+                                                 virDomainDefPtr def);
+typedef int (*virSecurityDomainSecurityVerify) (virSecurityManagerPtr mgr,
+                                                virDomainDefPtr def);
+typedef int (*virSecurityDomainSetImageFDLabel) (virSecurityManagerPtr mgr,
+                                                 virDomainDefPtr def,
+                                                 int fd);
 
 struct _virSecurityDriver {
+    size_t privateDataLen;
     const char *name;
     virSecurityDriverProbe probe;
     virSecurityDriverOpen open;
+    virSecurityDriverClose close;
+
+    virSecurityDriverGetModel getModel;
+    virSecurityDriverGetDOI getDOI;
+
     virSecurityDomainSecurityVerify domainSecurityVerify;
+
+    virSecurityDomainSetImageLabel domainSetSecurityImageLabel;
     virSecurityDomainRestoreImageLabel domainRestoreSecurityImageLabel;
+
+    virSecurityDomainSetDaemonSocketLabel domainSetSecurityDaemonSocketLabel;
     virSecurityDomainSetSocketLabel domainSetSecuritySocketLabel;
     virSecurityDomainClearSocketLabel domainClearSecuritySocketLabel;
-    virSecurityDomainSetImageLabel domainSetSecurityImageLabel;
+
     virSecurityDomainGenLabel domainGenSecurityLabel;
     virSecurityDomainReserveLabel domainReserveSecurityLabel;
     virSecurityDomainReleaseLabel domainReleaseSecurityLabel;
+
     virSecurityDomainGetProcessLabel domainGetSecurityProcessLabel;
     virSecurityDomainSetProcessLabel domainSetSecurityProcessLabel;
+
     virSecurityDomainSetAllLabel domainSetSecurityAllLabel;
     virSecurityDomainRestoreAllLabel domainRestoreSecurityAllLabel;
-    virSecurityDomainRestoreHostdevLabel domainRestoreSecurityHostdevLabel;
+
     virSecurityDomainSetHostdevLabel domainSetSecurityHostdevLabel;
+    virSecurityDomainRestoreHostdevLabel domainRestoreSecurityHostdevLabel;
+
     virSecurityDomainSetSavedStateLabel domainSetSavedStateLabel;
     virSecurityDomainRestoreSavedStateLabel domainRestoreSavedStateLabel;
 
-    /*
-     * This is internally managed driver state and should only be accessed
-     * via helpers below.
-     */
-    struct {
-        char doi[VIR_SECURITY_DOI_BUFLEN];
-        bool allowDiskFormatProbing;
-    } _private;
+    virSecurityDomainSetImageFDLabel domainSetSecurityImageFDLabel;
 };
 
-/* Global methods */
-int virSecurityDriverStartup(virSecurityDriverPtr *drv,
-                             const char *name,
-                             bool allowDiskFormatProbing);
-
-int
-virSecurityDriverVerify(virDomainDefPtr def);
-
-# define virSecurityReportError(code, ...)                           \
-    virReportErrorHelper(NULL, VIR_FROM_SECURITY, code, __FILE__,   \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
-
-/* Helpers */
-void virSecurityDriverInit(virSecurityDriverPtr drv);
-int virSecurityDriverSetDOI(virSecurityDriverPtr drv,
-                            const char *doi);
-void virSecurityDriverSetAllowDiskFormatProbing(virSecurityDriverPtr drv,
-                                                bool allowDiskFormatProbing);
-const char *virSecurityDriverGetDOI(virSecurityDriverPtr drv);
-const char *virSecurityDriverGetModel(virSecurityDriverPtr drv);
-bool virSecurityDriverGetAllowDiskFormatProbing(virSecurityDriverPtr drv);
+virSecurityDriverPtr virSecurityDriverLookup(const char *name);
 
 #endif /* __VIR_SECURITY_H__ */

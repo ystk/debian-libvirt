@@ -34,12 +34,20 @@
             </div>
           </li><li>
             <div>
+              <a title="Applications known to use libvirt" class="inactive" href="apps.html">Applications</a>
+            </div>
+          </li><li>
+            <div>
               <a title="Get the latest source releases, binary builds and get access to the source repository" class="inactive" href="downloads.html">Downloads</a>
             </div>
           </li><li>
             <div>
               <a title="Information for users, administrators and developers" class="active" href="docs.html">Documentation</a>
               <ul class="l1"><li>
+                  <div>
+                    <a title="How to compile libvirt" class="inactive" href="compiling.html">Compiling</a>
+                  </div>
+                </li><li>
                   <div>
                     <a title="Information about deploying and using libvirt" class="inactive" href="deployment.html">Deployment</a>
                   </div>
@@ -92,6 +100,14 @@
                   <div>
                     <a title="Working on the internals of libvirt API, driver and daemon code" class="inactive" href="internals.html">Internals</a>
                   </div>
+                </li><li>
+                  <div>
+                    <a title="A guide and reference for developing with libvirt" class="inactive" href="devguide.html">Development Guide</a>
+                  </div>
+                </li><li>
+                  <div>
+                    <a title="Command reference for virsh" class="inactive" href="virshcmdref.html">Virsh Commands</a>
+                  </div>
                 </li></ul>
             </div>
           </li><li>
@@ -112,6 +128,10 @@
             </div>
           </li><li>
             <div>
+              <a title="Available test suites for libvirt" class="inactive" href="testsuites.html">Test suites</a>
+            </div>
+          </li><li>
+            <div>
               <a title="Miscellaneous links of interest related to libvirt" class="inactive" href="relatedlinks.html">Related Links</a>
             </div>
           </li><li>
@@ -123,17 +143,17 @@
       <div id="content">
         <h1>The libvirt API concepts</h1>
         <p> This page describes the main principles and architecture choices
-    behind the definition of the libvirt API:
-    </p>
+    behind the definition of the libvirt API:</p>
         <ul><li>
-        <a href="#Objects">Objects exposed</a>
-      </li><li>
-        <a href="#Functions">Functions and naming conventions</a>
-      </li><li>
-        <a href="#Driver">The drivers</a>
-      </li><li>
-        <a href="#Remote">Daemon and remote access</a>
-      </li></ul>
+            <a href="#Objects">Objects exposed</a>
+          </li><li>
+            <a href="#Functions">Functions and naming
+      conventions</a>
+          </li><li>
+            <a href="#Driver">The libvirt drivers</a>
+          </li><li>
+            <a href="#Remote">Daemon and remote access</a>
+          </li></ul>
         <h2>
           <a name="Objects" id="Objects">Objects exposed</a>
         </h2>
@@ -150,8 +170,6 @@
     name will default to a preselected hypervisor but it's probably not a
     wise thing to do in most cases. See the <a href="uri.html">connection
     URI</a> page for a full descriptions of the values allowed.</p>
-        <p>
-    </p>
         <p> Once the application obtained a <a href="html/libvirt-libvirt.html#virConnectPtr"><code>virConnectPtr</code></a>
     connection to the
     hypervisor it can then use it to manage domains and related resources
@@ -183,8 +201,6 @@
       a permanent definition available in the system for them. Based on this
       thay can be activated dynamically in order to be used.</p>
         <p> Most kind of object can also be named in various ways:</p>
-        <p>
-    </p>
         <ul><li>by their <code>name</code>, an user friendly identifier but
       whose unicity cannot be garanteed between two nodes.</li><li>by their <code>ID</code>, which is a runtime unique identifier
       provided by the hypervisor for one given activation of the object,
@@ -201,8 +217,7 @@
       and a verb describing the action on that object.</p>
         <p> For each first class object you will find apis
       for the following actions:</p>
-        <ul><li><b>Lookup</b>:...LookupByName,
-      </li><li><b>Enumeration</b>:virConnectList... and virConnectNumOf...:
+        <ul><li><b>Lookup</b>:...LookupByName,</li><li><b>Enumeration</b>:virConnectList... and virConnectNumOf...:
         those are used to enumerate a set of object available to an given
         hypervisor connection like:
         <a href="html/libvirt-libvirt.html#virConnectListDomains"><code>virConnectListDomains</code></a>,
@@ -222,7 +237,7 @@
         <a href="html/libvirt-libvirt.html#virStoragePoolSetAutostart"><code>virStoragePoolSetAutostart</code></a>,
         <a href="html/libvirt-libvirt.html#virNetworkGetBridgeName"><code>virNetworkGetBridgeName</code></a>, etc.</li><li><b>Creation</b>: </li><li><b>Destruction</b>: ... </li></ul>
         <p> For more in-depth details of the storage related APIs see
-      <a href="storage.html">the storage management page</a>,
+      <a href="storage.html">the storage management page</a>.
     </p>
         <h2>
           <a name="Driver" id="Driver">The libvirt drivers</a>

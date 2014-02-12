@@ -1,7 +1,7 @@
 /*
  * storage_backend_mpath.c: storage backend for multipath handling
  *
- * Copyright (C) 2009-2010 Red Hat, Inc.
+ * Copyright (C) 2009-2011 Red Hat, Inc.
  * Copyright (C) 2009-2008 Dave Allan
  *
  * This library is free software; you can redistribute it and/or
@@ -25,7 +25,6 @@
 
 #include <unistd.h>
 #include <stdio.h>
-#include <dirent.h>
 #include <fcntl.h>
 
 #include <libdevmapper.h>
@@ -35,6 +34,7 @@
 #include "storage_backend.h"
 #include "memory.h"
 #include "logging.h"
+#include "virfile.h"
 
 #define VIR_FROM_THIS VIR_FROM_STORAGE
 
@@ -61,9 +61,7 @@ virStorageBackendMpathUpdateVolTargetInfo(virStorageVolTargetPtr target,
 
     ret = 0;
 out:
-    if (fd != -1) {
-        close(fd);
-    }
+    VIR_FORCE_CLOSE(fd);
     return ret;
 }
 
@@ -126,7 +124,7 @@ cleanup:
 
 
 static int
-virStorageBackendIsMultipath(const char *devname)
+virStorageBackendIsMultipath(const char *dev_name)
 {
     int ret = 0;
     struct dm_task *dmt = NULL;
@@ -141,7 +139,7 @@ virStorageBackendIsMultipath(const char *devname)
         goto out;
     }
 
-    if (dm_task_set_name(dmt, devname) == 0) {
+    if (dm_task_set_name(dmt, dev_name) == 0) {
         ret = -1;
         goto out;
     }
@@ -173,7 +171,7 @@ out:
 
 
 static int
-virStorageBackendGetMinorNumber(const char *devname, uint32_t *minor)
+virStorageBackendGetMinorNumber(const char *dev_name, uint32_t *minor)
 {
     int ret = -1;
     struct dm_task *dmt;
@@ -183,7 +181,7 @@ virStorageBackendGetMinorNumber(const char *devname, uint32_t *minor)
         goto out;
     }
 
-    if (!dm_task_set_name(dmt, devname)) {
+    if (!dm_task_set_name(dmt, dev_name)) {
         goto out;
     }
 
@@ -213,6 +211,7 @@ virStorageBackendCreateVols(virStoragePoolObjPtr pool,
     int retval = -1, is_mpath = 0;
     char *map_device = NULL;
     uint32_t minor = -1;
+    uint32_t next;
 
     do {
         is_mpath = virStorageBackendIsMultipath(names->name);
@@ -244,9 +243,10 @@ virStorageBackendCreateVols(virStoragePoolObjPtr pool,
 
         /* Given the way libdevmapper returns its data, I don't see
          * any way to avoid this series of casts. */
-        names = (struct dm_names *)(((char *)names) + names->next);
+        next = names->next;
+        names = (struct dm_names *)(((char *)names) + next);
 
-    } while (names->next);
+    } while (next);
 
     retval = 0;
 out:
@@ -292,6 +292,22 @@ out:
     return retval;
 }
 
+static int
+virStorageBackendMpathCheckPool(virConnectPtr conn ATTRIBUTE_UNUSED,
+                                virStoragePoolObjPtr pool ATTRIBUTE_UNUSED,
+                                bool *isActive)
+{
+    const char *path = "/dev/mpath";
+
+    *isActive = false;
+
+    if (access(path, F_OK) == 0)
+        *isActive = true;
+
+    return 0;
+}
+
+
 
 static int
 virStorageBackendMpathRefreshPool(virConnectPtr conn ATTRIBUTE_UNUSED,
@@ -299,7 +315,7 @@ virStorageBackendMpathRefreshPool(virConnectPtr conn ATTRIBUTE_UNUSED,
 {
     int retval = 0;
 
-    VIR_DEBUG("in %s", __func__);
+    VIR_DEBUG("conn=%p, pool=%p", conn, pool);
 
     pool->def->allocation = pool->def->capacity = pool->def->available = 0;
 
@@ -314,5 +330,6 @@ virStorageBackendMpathRefreshPool(virConnectPtr conn ATTRIBUTE_UNUSED,
 virStorageBackend virStorageBackendMpath = {
     .type = VIR_STORAGE_POOL_MPATH,
 
+    .checkPool = virStorageBackendMpathCheckPool,
     .refreshPool = virStorageBackendMpathRefreshPool,
 };

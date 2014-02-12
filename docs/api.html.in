@@ -4,22 +4,11 @@
     <h1>The libvirt API concepts</h1>
 
     <p> This page describes the main principles and architecture choices
-    behind the definition of the libvirt API:
-    <ul>
-      <li>
-        <a href="#Objects">Objects exposed</a>
-      </li>
-      <li>
-        <a href="#Functions">Functions and naming conventions</a>
-      </li>
-      <li>
-        <a href="#Driver">The drivers</a>
-      </li>
-      <li>
-        <a href="#Remote">Daemon and remote access</a>
-      </li>
-    </ul>
-    <h2><a name="Objects" id="Objects">Objects exposed</a></h2>
+    behind the definition of the libvirt API:</p>
+
+    <ul id="toc"></ul>
+
+    <h2><a name="Objects">Objects exposed</a></h2>
     <p> As defined in the <a href="goals.html">goals section</a>, libvirt
     API need to expose all the resources needed to manage the virtualization
     support of recent operating systems. The first object manipulated though
@@ -33,7 +22,7 @@
     possible to use both KVM and LinuxContainers on the same node). A NULL
     name will default to a preselected hypervisor but it's probably not a
     wise thing to do in most cases. See the <a href="uri.html">connection
-    URI</a> page for a full descriptions of the values allowed.<p>
+    URI</a> page for a full descriptions of the values allowed.</p>
     <p> Once the application obtained a <code class='docref'>virConnectPtr</code>
     connection to the
     hypervisor it can then use it to manage domains and related resources
@@ -72,7 +61,7 @@
       <code>defined</code> in which case they are inactive but there is
       a permanent definition available in the system for them. Based on this
       thay can be activated dynamically in order to be used.</p>
-    <p> Most kind of object can also be named in various ways:<p>
+    <p> Most kind of object can also be named in various ways:</p>
     <ul>
       <li>by their <code>name</code>, an user friendly identifier but
       whose unicity cannot be garanteed between two nodes.</li>
@@ -85,7 +74,7 @@
       set of nodes.</li>
     </ul>
 
-    <h2><a name="Functions" id="Functions">Functions and naming
+    <h2><a name="Functions">Functions and naming
       conventions</a></h2>
     <p> The naming of the functions present in the library is usually
       made of a prefix describing the object associated to the function
@@ -93,7 +82,7 @@
     <p> For each first class object you will find apis
       for the following actions:</p>
     <ul>
-      <li><b>Lookup</b>:...LookupByName,
+      <li><b>Lookup</b>:...LookupByName,</li>
       <li><b>Enumeration</b>:virConnectList... and virConnectNumOf...:
         those are used to enumerate a set of object available to an given
         hypervisor connection like:
@@ -119,14 +108,15 @@
       <li><b>Destruction</b>: ... </li>
     </ul>
     <p> For more in-depth details of the storage related APIs see
-      <a href="storage.html">the storage management page</a>,
-    <h2><a name="Driver" id="Driver">The libvirt drivers</a></h2>
+      <a href="storage.html">the storage management page</a>.
+    </p>
+    <h2><a name="Driver">The libvirt drivers</a></h2>
     <p></p>
     <p class="image">
       <img alt="The libvirt driver architecture"
            src="libvirt-driver-arch.png"/>
     </p>
-    <h2><a name="Remote" id="Remote">Daemon and remote access</a></h2>
+    <h2><a name="Remote">Daemon and remote access</a></h2>
     <p></p>
     <p class="image">
       <img alt="The libvirt daemon and remote architecture"

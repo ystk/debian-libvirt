@@ -1,7 +1,7 @@
 /*
  * storage_conf.h: config handling for storage driver
  *
- * Copyright (C) 2006-2008, 2010 Red Hat, Inc.
+ * Copyright (C) 2006-2008, 2010-2012 Red Hat, Inc.
  * Copyright (C) 2006-2008 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -38,9 +38,9 @@
 typedef struct _virStoragePerms virStoragePerms;
 typedef virStoragePerms *virStoragePermsPtr;
 struct _virStoragePerms {
-    int mode;
-    int uid;
-    int gid;
+    mode_t mode;
+    uid_t uid;
+    gid_t gid;
     char *label;
 };
 
@@ -92,8 +92,8 @@ struct _virStorageVolDef {
 
     unsigned int building;
 
-    unsigned long long allocation;
-    unsigned long long capacity;
+    unsigned long long allocation; /* bytes */
+    unsigned long long capacity; /* bytes */
 
     virStorageVolSource source;
     virStorageVolTarget target;
@@ -155,7 +155,6 @@ typedef virStoragePoolSourceHost *virStoragePoolSourceHostPtr;
 struct _virStoragePoolSourceHost {
     char *name;
     int port;
-    int protocol;
 };
 
 
@@ -213,8 +212,9 @@ struct _virStoragePoolSourceDevice {
 typedef struct _virStoragePoolSource virStoragePoolSource;
 typedef virStoragePoolSource *virStoragePoolSourcePtr;
 struct _virStoragePoolSource {
-    /* An optional host */
-    virStoragePoolSourceHost host;
+    /* An optional (maybe multiple) host(s) */
+    size_t nhost;
+    virStoragePoolSourceHostPtr hosts;
 
     /* And either one or more devices ... */
     int ndevice;
@@ -237,6 +237,12 @@ struct _virStoragePoolSource {
         virStoragePoolAuthChap chap;
     } auth;
 
+    /* Vendor of the source */
+    char *vendor;
+
+    /* Product name of the source*/
+    char *product;
+
     int format; /* Pool type specific format such as filesystem type, or lvm version, etc */
 };
 
@@ -257,9 +263,9 @@ struct _virStoragePoolDef {
     unsigned char uuid[VIR_UUID_BUFLEN];
     int type; /* virStoragePoolType */
 
-    unsigned long long allocation;
-    unsigned long long capacity;
-    unsigned long long available;
+    unsigned long long allocation; /* bytes */
+    unsigned long long capacity; /* bytes */
+    unsigned long long available; /* bytes */
 
     virStoragePoolSource source;
     virStoragePoolTarget target;
@@ -319,7 +325,7 @@ static inline int virStoragePoolObjIsActive(virStoragePoolObjPtr pool) {
 }
 
 # define virStorageReportError(code, ...)                                \
-    virReportErrorHelper(NULL, VIR_FROM_STORAGE, code, __FILE__,        \
+    virReportErrorHelper(VIR_FROM_STORAGE, code, __FILE__,               \
                          __FUNCTION__, __LINE__, __VA_ARGS__)
 
 int virStoragePoolLoadAllConfigs(virStoragePoolObjListPtr pools,
@@ -330,6 +336,8 @@ virStoragePoolObjPtr virStoragePoolObjFindByUUID(virStoragePoolObjListPtr pools,
                                                  const unsigned char *uuid);
 virStoragePoolObjPtr virStoragePoolObjFindByName(virStoragePoolObjListPtr pools,
                                                  const char *name);
+virStoragePoolObjPtr virStoragePoolSourceFindDuplicateDevices(virStoragePoolObjPtr pool,
+                                                              virStoragePoolDefPtr def);
 
 virStorageVolDefPtr virStorageVolDefFindByKey(virStoragePoolObjPtr pool,
                                               const char *key);
@@ -365,6 +373,7 @@ int virStoragePoolObjSaveDef(virStorageDriverStatePtr driver,
 int virStoragePoolObjDeleteDef(virStoragePoolObjPtr pool);
 
 void virStorageVolDefFree(virStorageVolDefPtr def);
+void virStoragePoolSourceClear(virStoragePoolSourcePtr source);
 void virStoragePoolSourceFree(virStoragePoolSourcePtr source);
 void virStoragePoolDefFree(virStoragePoolDefPtr def);
 void virStoragePoolObjFree(virStoragePoolObjPtr pool);
@@ -382,6 +391,9 @@ char *virStoragePoolSourceListFormat(virStoragePoolSourceListPtr def);
 int virStoragePoolObjIsDuplicate(virStoragePoolObjListPtr pools,
                                  virStoragePoolDefPtr def,
                                  unsigned int check_active);
+
+int virStoragePoolSourceFindDuplicate(virStoragePoolObjListPtr pools,
+                                      virStoragePoolDefPtr def);
 
 void virStoragePoolObjLock(virStoragePoolObjPtr obj);
 void virStoragePoolObjUnlock(virStoragePoolObjPtr obj);

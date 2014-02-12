@@ -1,7 +1,7 @@
 /*
  * xm_internal.h: helper routines for dealing with inactive domains
  *
- * Copyright (C) 2006-2007, 2010 Red Hat, Inc.
+ * Copyright (C) 2006-2007, 2010-2012 Red Hat, Inc.
  * Copyright (C) 2006 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -36,15 +36,23 @@ int xenXMConfigCacheRefresh (virConnectPtr conn);
 int xenXMConfigCacheAddFile(virConnectPtr conn, const char *filename);
 int xenXMConfigCacheRemoveFile(virConnectPtr conn, const char *filename);
 
-virDrvOpenStatus xenXMOpen(virConnectPtr conn, virConnectAuthPtr auth, int flags);
+virDrvOpenStatus xenXMOpen(virConnectPtr conn, virConnectAuthPtr auth,
+                           unsigned int flags);
 int xenXMClose(virConnectPtr conn);
 const char *xenXMGetType(virConnectPtr conn);
 int xenXMDomainGetInfo(virDomainPtr domain, virDomainInfoPtr info);
-char *xenXMDomainDumpXML(virDomainPtr domain, int flags);
+int xenXMDomainGetState(virDomainPtr domain,
+                        int *state,
+                        int *reason,
+                        unsigned int flags);
+char *xenXMDomainGetXMLDesc(virDomainPtr domain, unsigned int flags);
 int xenXMDomainSetMemory(virDomainPtr domain, unsigned long memory);
 int xenXMDomainSetMaxMemory(virDomainPtr domain, unsigned long memory);
-unsigned long xenXMDomainGetMaxMemory(virDomainPtr domain);
+unsigned long long xenXMDomainGetMaxMemory(virDomainPtr domain);
 int xenXMDomainSetVcpus(virDomainPtr domain, unsigned int vcpus);
+int xenXMDomainSetVcpusFlags(virDomainPtr domain, unsigned int vcpus,
+                             unsigned int flags);
+int xenXMDomainGetVcpusFlags(virDomainPtr domain, unsigned int flags);
 int xenXMDomainPinVcpu(virDomainPtr domain, unsigned int vcpu,
                        unsigned char *cpumap, int maplen);
 virDomainPtr xenXMDomainLookupByName(virConnectPtr conn, const char *domname);
@@ -57,9 +65,6 @@ int xenXMNumOfDefinedDomains(virConnectPtr conn);
 int xenXMDomainCreate(virDomainPtr domain);
 virDomainPtr xenXMDomainDefineXML(virConnectPtr con, const char *xml);
 int xenXMDomainUndefine(virDomainPtr domain);
-
-virConfPtr xenXMDomainConfigFormat(virConnectPtr conn, virDomainDefPtr def);
-virDomainDefPtr xenXMDomainConfigParse(virConnectPtr conn, virConfPtr conf);
 
 int xenXMDomainBlockPeek (virDomainPtr dom, const char *path, unsigned long long offset, size_t size, void *buffer);
 
