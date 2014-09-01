@@ -51,10 +51,13 @@ module Libvirtd =
                            | bool_entry "tls_no_sanity_certificate"
                            | str_array_entry "tls_allowed_dn_list"
                            | str_array_entry "sasl_allowed_username_list"
+                           | str_array_entry "access_drivers"
 
    let processing_entry = int_entry "min_workers"
                         | int_entry "max_workers"
                         | int_entry "max_clients"
+                        | int_entry "max_queued_clients"
+                        | int_entry "max_anonymous_clients"
                         | int_entry "max_requests"
                         | int_entry "max_client_requests"
                         | int_entry "prio_workers"
@@ -62,6 +65,7 @@ module Libvirtd =
    let logging_entry = int_entry "log_level"
                      | str_entry "log_filters"
                      | str_entry "log_outputs"
+                     | int_entry "log_buffer_size"
 
    let auditing_entry = int_entry "audit_level"
                       | bool_entry "audit_logging"
@@ -69,6 +73,8 @@ module Libvirtd =
    let keepalive_entry = int_entry "keepalive_interval"
                        | int_entry "keepalive_count"
                        | bool_entry "keepalive_required"
+
+   let misc_entry = str_entry "host_uuid"
 
    (* Each enty in the config is one of the following three ... *)
    let entry = network_entry
@@ -80,6 +86,7 @@ module Libvirtd =
              | logging_entry
              | auditing_entry
              | keepalive_entry
+             | misc_entry
    let comment = [ label "#comment" . del /#[ \t]*/ "# " .  store /([^ \t\n][^\n]*)?/ . del /\n/ "\n" ]
    let empty = [ label "#empty" . eol ]
 

@@ -1,5 +1,6 @@
-<?xml version="1.0"?>
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <h1>The virtualization API</h1>
 
@@ -28,6 +29,11 @@
       </li>
       <li>
         A <a href="/qpid/">QMF agent</a> for the AMQP/QPid messaging system
+      </li>
+      <li>
+        A <a href="governance.html">technical meritocracy</a>, in which
+        participants gain influence over a project through recognition
+        of their contributions.
       </li>
     </ul>
 
@@ -61,6 +67,15 @@
       </li>
       <li>
         The <a href="http://libvirt.org/drvhyperv.html">Microsoft Hyper-V</a> hypervisor
+      </li>
+      <li>
+        The <a href="http://libvirt.org/drvphyp.html">IBM PowerVM</a> hypervisor
+      </li>
+      <li>
+        The <a href="http://libvirt.org/drvparallels.html">Parallels</a> hypervisor
+      </li>
+      <li>
+        The <a href="http://libvirt.org/drvbhyve.html">Bhyve</a> hypervisor
       </li>
       <li>
         Virtual networks using bridging, NAT, VEPA and VN-LINK.

@@ -6,20 +6,15 @@
 
 #include "internal.h"
 #include "testutils.h"
-#include "command.h"
-
-static void errorHandler(void *userData ATTRIBUTE_UNUSED,
-                         virErrorPtr error ATTRIBUTE_UNUSED) {
-}
+#include "vircommand.h"
 
 static int
 mymain(void)
 {
     int id = 0;
-    int ro = 0;
+    bool ro = false;
     virConnectPtr conn;
     virDomainPtr dom;
-    int status;
     virCommandPtr cmd;
     struct utsname ut;
 
@@ -30,17 +25,17 @@ mymain(void)
     if (strstr(ut.release, "xen") == NULL)
         return EXIT_AM_SKIP;
     cmd = virCommandNewArgList("/usr/sbin/xend", "status", NULL);
-    if (virCommandRun(cmd, &status) != 0 || status != 0) {
+    if (virCommandRun(cmd, NULL) < 0) {
         virCommandFree(cmd);
         return EXIT_AM_SKIP;
     }
     virCommandFree(cmd);
 
-    virSetErrorFunc(NULL, errorHandler);
+    virtTestQuiesceLibvirtErrors(true);
 
     conn = virConnectOpen(NULL);
     if (conn == NULL) {
-        ro = 1;
+        ro = true;
         conn = virConnectOpenReadOnly(NULL);
     }
     if (conn == NULL) {
@@ -54,7 +49,7 @@ mymain(void)
     }
     virDomainFree(dom);
     virConnectClose(conn);
-    if (ro == 1)
+    if (ro)
         conn = virConnectOpenReadOnly(NULL);
     else
         conn = virConnectOpen(NULL);

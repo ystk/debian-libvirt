@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *      Jiri Denemark <jdenemar@redhat.com>
@@ -23,16 +23,17 @@
 
 #include <config.h>
 
-#include "memory.h"
+#include "viralloc.h"
+#include "virfile.h"
 #include "cpu.h"
 #include "cpu_map.h"
 #include "configmake.h"
+#include "virstring.h"
+#include "virlog.h"
 
 #define VIR_FROM_THIS VIR_FROM_CPU
 
-#define CPUMAPFILE PKGDATADIR "/cpu_map.xml"
-
-static char *cpumap;
+VIR_LOG_INIT("cpu.cpu_map");
 
 VIR_ENUM_IMPL(cpuMapElement, CPU_MAP_ELEMENT_LAST,
     "vendor",
@@ -41,7 +42,7 @@ VIR_ENUM_IMPL(cpuMapElement, CPU_MAP_ELEMENT_LAST,
 
 
 static int load(xmlXPathContextPtr ctxt,
-                enum cpuMapElement element,
+                cpuMapElement element,
                 cpuMapLoadCallback callback,
                 void *data)
 {
@@ -66,7 +67,7 @@ static int load(xmlXPathContextPtr ctxt,
 
     ret = 0;
 
-cleanup:
+ cleanup:
     ctxt->node = ctxt_node;
 
     return ret;
@@ -83,76 +84,68 @@ int cpuMapLoad(const char *arch,
     char *xpath = NULL;
     int ret = -1;
     int element;
-    const char *mapfile = (cpumap ? cpumap : CPUMAPFILE);
+    char *mapfile;
+
+    if (!(mapfile = virFileFindResource("cpu_map.xml",
+                                        "src/cpu",
+                                        PKGDATADIR)))
+        return -1;
+
+    VIR_DEBUG("Loading CPU map from %s", mapfile);
 
     if (arch == NULL) {
-        virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                          "%s", _("undefined hardware architecture"));
-        return -1;
-    }
-
-    if (cb == NULL) {
-        virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                          "%s", _("no callback provided"));
-        return -1;
-    }
-
-    if ((xml = xmlParseFile(mapfile)) == NULL) {
-        virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                _("cannot parse CPU map file: %s"),
-                mapfile);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       "%s", _("undefined hardware architecture"));
         goto cleanup;
     }
 
-    if ((ctxt = xmlXPathNewContext(xml)) == NULL)
-        goto no_memory;
+    if (cb == NULL) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       "%s", _("no callback provided"));
+        goto cleanup;
+    }
+
+    if ((xml = xmlParseFile(mapfile)) == NULL) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("cannot parse CPU map file: %s"),
+                       mapfile);
+        goto cleanup;
+    }
+
+    if ((ctxt = xmlXPathNewContext(xml)) == NULL) {
+        virReportOOMError();
+        goto cleanup;
+    }
 
     virBufferAsprintf(&buf, "./arch[@name='%s']", arch);
-    if (virBufferError(&buf))
-        goto no_memory;
+    if (virBufferCheckError(&buf) < 0)
+        goto cleanup;
 
     xpath = virBufferContentAndReset(&buf);
 
     ctxt->node = xmlDocGetRootElement(xml);
 
     if ((ctxt->node = virXPathNode(xpath, ctxt)) == NULL) {
-        virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                _("cannot find CPU map for %s architecture"), arch);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("cannot find CPU map for %s architecture"), arch);
         goto cleanup;
     }
 
     for (element = 0; element < CPU_MAP_ELEMENT_LAST; element++) {
         if (load(ctxt, element, cb, data) < 0) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    _("cannot parse CPU map for %s architecture"), arch);
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("cannot parse CPU map for %s architecture"), arch);
             goto cleanup;
         }
     }
 
     ret = 0;
 
-cleanup:
+ cleanup:
     xmlXPathFreeContext(ctxt);
     xmlFreeDoc(xml);
     VIR_FREE(xpath);
+    VIR_FREE(mapfile);
 
     return ret;
-
-no_memory:
-    virReportOOMError();
-    goto cleanup;
-}
-
-
-int
-cpuMapOverride(const char *path)
-{
-    char *map;
-
-    if (!(map = strdup(path)))
-        return -1;
-
-    VIR_FREE(cpumap);
-    cpumap = map;
-    return 0;
 }

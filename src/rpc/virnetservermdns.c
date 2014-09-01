@@ -1,7 +1,7 @@
 /*
  * virnetservermdns.c: advertise server sockets
  *
- * Copyright (C) 2011 Red Hat, Inc.
+ * Copyright (C) 2011-2012 Red Hat, Inc.
  * Copyright (C) 2007 Daniel P. Berrange
  *
  * Derived from Avahi example service provider code.
@@ -17,8 +17,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -29,26 +29,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <avahi-client/client.h>
-#include <avahi-client/publish.h>
+#if WITH_AVAHI
+# include <avahi-client/client.h>
+# include <avahi-client/publish.h>
 
-#include <avahi-common/alternative.h>
-#include <avahi-common/simple-watch.h>
-#include <avahi-common/malloc.h>
-#include <avahi-common/error.h>
-#include <avahi-common/timeval.h>
+# include <avahi-common/alternative.h>
+# include <avahi-common/simple-watch.h>
+# include <avahi-common/malloc.h>
+# include <avahi-common/error.h>
+# include <avahi-common/timeval.h>
+#endif
 
 #include "virnetservermdns.h"
-#include "event.h"
-#include "event_poll.h"
-#include "memory.h"
-#include "virterror_internal.h"
-#include "logging.h"
+#include "vireventpoll.h"
+#include "viralloc.h"
+#include "virerror.h"
+#include "virlog.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_RPC
-#define virNetError(code, ...)                                    \
-    virReportErrorHelper(VIR_FROM_THIS, code, __FILE__,           \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
+
+VIR_LOG_INIT("rpc.netservermdns");
 
 struct _virNetServerMDNSEntry {
     char *type;
@@ -58,18 +59,23 @@ struct _virNetServerMDNSEntry {
 
 struct _virNetServerMDNSGroup {
     virNetServerMDNSPtr mdns;
+#if WITH_AVAHI
     AvahiEntryGroup *handle;
+#endif
     char *name;
     virNetServerMDNSEntryPtr entry;
     virNetServerMDNSGroupPtr next;
 };
 
 struct _virNetServerMDNS {
+#if WITH_AVAHI
     AvahiClient *client;
     AvahiPoll *poller;
+#endif
     virNetServerMDNSGroupPtr group;
 };
 
+#if WITH_AVAHI
 /* Avahi API requires this struct name in the app :-( */
 struct AvahiWatch {
     int watch;
@@ -269,10 +275,8 @@ static AvahiWatch *virNetServerMDNSWatchNew(const AvahiPoll *api ATTRIBUTE_UNUSE
 {
     AvahiWatch *w;
     virEventHandleType hEvents;
-    if (VIR_ALLOC(w) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(w) < 0)
         return NULL;
-    }
 
     w->fd = fd;
     w->revents = 0;
@@ -285,8 +289,8 @@ static AvahiWatch *virNetServerMDNSWatchNew(const AvahiPoll *api ATTRIBUTE_UNUSE
                                       virNetServerMDNSWatchDispatch,
                                       w,
                                       virNetServerMDNSWatchDofree)) < 0) {
-        virNetError(VIR_ERR_INTERNAL_ERROR,
-                    _("Failed to add watch for fd %d events %d"), fd, hEvents);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Failed to add watch for fd %d events %d"), fd, hEvents);
         VIR_FREE(w);
         return NULL;
     }
@@ -334,10 +338,8 @@ static AvahiTimeout *virNetServerMDNSTimeoutNew(const AvahiPoll *api ATTRIBUTE_U
     struct timeval now;
     long long nowms, thenms, timeout;
     VIR_DEBUG("Add timeout TV %p", tv);
-    if (VIR_ALLOC(t) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(t) < 0)
         return NULL;
-    }
 
     if (gettimeofday(&now, NULL) < 0) {
         virReportSystemError(errno, "%s",
@@ -367,8 +369,8 @@ static AvahiTimeout *virNetServerMDNSTimeoutNew(const AvahiPoll *api ATTRIBUTE_U
     t->userdata = userdata;
 
     if (t->timer < 0) {
-        virNetError(VIR_ERR_INTERNAL_ERROR,
-                    _("Failed to add timer with timeout %d"), (int)timeout);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Failed to add timer with timeout %lld"), timeout);
         VIR_FREE(t);
         return NULL;
     }
@@ -409,10 +411,8 @@ static void virNetServerMDNSTimeoutFree(AvahiTimeout *t)
 static AvahiPoll *virNetServerMDNSCreatePoll(void)
 {
     AvahiPoll *p;
-    if (VIR_ALLOC(p) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(p) < 0)
         return NULL;
-    }
 
     p->userdata = NULL;
 
@@ -455,9 +455,9 @@ int virNetServerMDNSStart(virNetServerMDNS *mdns)
                                     mdns, &error);
 
     if (!mdns->client) {
-        virNetError(VIR_ERR_INTERNAL_ERROR,
-                    _("Failed to create mDNS client: %s"),
-                    avahi_strerror(error));
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Failed to create mDNS client: %s"),
+                       avahi_strerror(error));
         return -1;
     }
 
@@ -471,14 +471,11 @@ virNetServerMDNSGroupPtr virNetServerMDNSAddGroup(virNetServerMDNS *mdns,
     virNetServerMDNSGroupPtr group;
 
     VIR_DEBUG("Adding group '%s'", name);
-    if (VIR_ALLOC(group) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(group) < 0)
         return NULL;
-    }
 
-    if (!(group->name = strdup(name))) {
+    if (VIR_STRDUP(group->name, name) < 0) {
         VIR_FREE(group);
-        virReportOOMError();
         return NULL;
     }
     group->mdns = mdns;
@@ -516,15 +513,12 @@ virNetServerMDNSEntryPtr virNetServerMDNSAddEntry(virNetServerMDNSGroupPtr group
     virNetServerMDNSEntryPtr entry;
 
     VIR_DEBUG("Adding entry %s %d to group %s", type, port, group->name);
-    if (VIR_ALLOC(entry) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(entry) < 0)
         return NULL;
-    }
 
     entry->port = port;
-    if (!(entry->type = strdup(type))) {
+    if (VIR_STRDUP(entry->type, type) < 0) {
         VIR_FREE(entry);
-        virReportOOMError();
         return NULL;
     }
     entry->next = group->entry;
@@ -615,3 +609,78 @@ void virNetServerMDNSEntryFree(virNetServerMDNSEntryPtr entry)
     VIR_FREE(entry->type);
     VIR_FREE(entry);
 }
+
+#else /* ! WITH_AVAHI */
+
+static const char *unsupported = N_("avahi not available at build time");
+
+virNetServerMDNS *
+virNetServerMDNSNew(void)
+{
+    VIR_DEBUG("%s", _(unsupported));
+    return NULL;
+}
+
+int
+virNetServerMDNSStart(virNetServerMDNS *mdns ATTRIBUTE_UNUSED)
+{
+    VIR_DEBUG("%s", _(unsupported));
+    return -1;
+}
+
+virNetServerMDNSGroupPtr
+virNetServerMDNSAddGroup(virNetServerMDNS *mdns ATTRIBUTE_UNUSED,
+                         const char *name ATTRIBUTE_UNUSED)
+{
+    VIR_DEBUG("%s", _(unsupported));
+    return NULL;
+}
+
+void
+virNetServerMDNSRemoveGroup(virNetServerMDNSPtr mdns ATTRIBUTE_UNUSED,
+                            virNetServerMDNSGroupPtr group ATTRIBUTE_UNUSED)
+{
+    VIR_DEBUG("%s", _(unsupported));
+}
+
+virNetServerMDNSEntryPtr
+virNetServerMDNSAddEntry(virNetServerMDNSGroupPtr group ATTRIBUTE_UNUSED,
+                         const char *type ATTRIBUTE_UNUSED,
+                         int port ATTRIBUTE_UNUSED)
+{
+    VIR_DEBUG("%s", _(unsupported));
+    return NULL;
+}
+
+void
+virNetServerMDNSRemoveEntry(virNetServerMDNSGroupPtr group ATTRIBUTE_UNUSED,
+                            virNetServerMDNSEntryPtr entry ATTRIBUTE_UNUSED)
+{
+    VIR_DEBUG("%s", _(unsupported));
+}
+
+void
+virNetServerMDNSStop(virNetServerMDNSPtr mdns ATTRIBUTE_UNUSED)
+{
+    VIR_DEBUG("%s", _(unsupported));
+}
+
+void
+virNetServerMDNSFree(virNetServerMDNSPtr mdns ATTRIBUTE_UNUSED)
+{
+    VIR_DEBUG("%s", _(unsupported));
+}
+
+void
+virNetServerMDNSGroupFree(virNetServerMDNSGroupPtr grp ATTRIBUTE_UNUSED)
+{
+    VIR_DEBUG("%s", _(unsupported));
+}
+
+void
+virNetServerMDNSEntryFree(virNetServerMDNSEntryPtr entry ATTRIBUTE_UNUSED)
+{
+    VIR_DEBUG("%s", _(unsupported));
+}
+
+#endif /* ! WITH_AVAHI */

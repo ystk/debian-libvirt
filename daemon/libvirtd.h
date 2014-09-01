@@ -1,7 +1,7 @@
 /*
  * libvirtd.h: daemon data structure definitions
  *
- * Copyright (C) 2006-2012 Red Hat, Inc.
+ * Copyright (C) 2006-2014 Red Hat, Inc.
  * Copyright (C) 2006 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -27,15 +27,13 @@
 
 # define VIR_ENUM_SENTINELS
 
-# include <config.h>
-
 # include <rpc/types.h>
 # include <rpc/xdr.h>
 # include "remote_protocol.h"
+# include "lxc_protocol.h"
 # include "qemu_protocol.h"
-# include "logging.h"
-# include "threads.h"
-# if HAVE_SASL
+# include "virthread.h"
+# if WITH_SASL
 #  include "virnetsaslcontext.h"
 # endif
 # include "virnetserverprogram.h"
@@ -44,15 +42,22 @@ typedef struct daemonClientStream daemonClientStream;
 typedef daemonClientStream *daemonClientStreamPtr;
 typedef struct daemonClientPrivate daemonClientPrivate;
 typedef daemonClientPrivate *daemonClientPrivatePtr;
+typedef struct daemonClientEventCallback daemonClientEventCallback;
+typedef daemonClientEventCallback *daemonClientEventCallbackPtr;
 
 /* Stores the per-client connection state */
 struct daemonClientPrivate {
     /* Hold while accessing any data except conn */
     virMutex lock;
 
-    int domainEventCallbackID[VIR_DOMAIN_EVENT_ID_LAST];
+    daemonClientEventCallbackPtr *domainEventCallbacks;
+    size_t ndomainEventCallbacks;
+    daemonClientEventCallbackPtr *networkEventCallbacks;
+    size_t nnetworkEventCallbacks;
+    daemonClientEventCallbackPtr *qemuEventCallbacks;
+    size_t nqemuEventCallbacks;
 
-# if HAVE_SASL
+# if WITH_SASL
     virNetSASLSessionPtr sasl;
 # endif
 
@@ -66,7 +71,7 @@ struct daemonClientPrivate {
     bool keepalive_supported;
 };
 
-# if HAVE_SASL
+# if WITH_SASL
 extern virNetSASLContextPtr saslCtxt;
 # endif
 extern virNetServerProgramPtr remoteProgram;

@@ -3,24 +3,31 @@
  *
  * Copyright (C) 2012 Red Hat, Inc.
  *
- * See COPYING.LIB for the License of this software
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  */
 
 #include <config.h>
 
 #include "viruri.h"
 
-#include "memory.h"
-#include "util.h"
-#include "virterror_internal.h"
-#include "buf.h"
+#include "viralloc.h"
+#include "virerror.h"
+#include "virbuffer.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_URI
-
-#define virURIReportError(code, ...)                                    \
-    virReportErrorHelper(VIR_FROM_THIS, code, __FILE__,                 \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
-
 
 static int
 virURIParamAppend(virURIPtr uri,
@@ -30,13 +37,11 @@ virURIParamAppend(virURIPtr uri,
     char *pname = NULL;
     char *pvalue = NULL;
 
-    if (!(pname = strdup(name)))
-        goto no_memory;
-    if (!(pvalue = strdup (value)))
-        goto no_memory;
+    if (VIR_STRDUP(pname, name) < 0 || VIR_STRDUP(pvalue, value) < 0)
+        goto error;
 
     if (VIR_RESIZE_N(uri->params, uri->paramsAlloc, uri->paramsCount, 1) < 0)
-        goto no_memory;
+        goto error;
 
     uri->params[uri->paramsCount].name = pname;
     uri->params[uri->paramsCount].value = pvalue;
@@ -45,10 +50,9 @@ virURIParamAppend(virURIPtr uri,
 
     return 0;
 
-no_memory:
+ error:
     VIR_FREE(pname);
     VIR_FREE(pvalue);
-    virReportOOMError();
     return -1;
 }
 
@@ -66,14 +70,14 @@ virURIParseParams(virURIPtr uri)
         char *name = NULL, *value = NULL;
 
         /* Find the next separator, or end of the string. */
-        end = strchr (query, '&');
+        end = strchr(query, '&');
         if (!end)
-            end = strchr (query, ';');
+            end = strchr(query, ';');
         if (!end)
-            end = query + strlen (query);
+            end = query + strlen(query);
 
         /* Find the first '=' character between here and end. */
-        eq = strchr (query, '=');
+        eq = strchr(query, '=');
         if (eq && eq >= end) eq = NULL;
 
         /* Empty section (eg. "&&"). */
@@ -84,14 +88,14 @@ virURIParseParams(virURIPtr uri)
          * and consistent with CGI.pm we assume value is "".
          */
         else if (!eq) {
-            name = xmlURIUnescapeString (query, end - query, NULL);
+            name = xmlURIUnescapeString(query, end - query, NULL);
             if (!name) goto no_memory;
         }
         /* Or if we have "name=" here (works around annoying
          * problem when calling xmlURIUnescapeString with len = 0).
          */
         else if (eq+1 == end) {
-            name = xmlURIUnescapeString (query, eq - query, NULL);
+            name = xmlURIUnescapeString(query, eq - query, NULL);
             if (!name) goto no_memory;
         }
         /* If the '=' character is at the beginning then we have
@@ -102,10 +106,10 @@ virURIParseParams(virURIPtr uri)
 
         /* Otherwise it's "name=value". */
         else {
-            name = xmlURIUnescapeString (query, eq - query, NULL);
+            name = xmlURIUnescapeString(query, eq - query, NULL);
             if (!name)
                 goto no_memory;
-            value = xmlURIUnescapeString (eq+1, end - (eq+1), NULL);
+            value = xmlURIUnescapeString(eq+1, end - (eq+1), NULL);
             if (!value) {
                 VIR_FREE(name);
                 goto no_memory;
@@ -116,7 +120,7 @@ virURIParseParams(virURIPtr uri)
         if (virURIParamAppend(uri, name, value ? value : "") < 0) {
             VIR_FREE(name);
             VIR_FREE(value);
-            goto no_memory;
+            return -1;
         }
         VIR_FREE(name);
         VIR_FREE(value);
@@ -155,39 +159,32 @@ virURIParse(const char *uri)
 
     if (!xmluri) {
         /* libxml2 does not tell us what failed. Grr :-( */
-        virURIReportError(VIR_ERR_INTERNAL_ERROR,
-                          "Unable to parse URI %s", uri);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unable to parse URI %s"), uri);
         return NULL;
     }
 
     if (VIR_ALLOC(ret) < 0)
-        goto no_memory;
+        goto error;
 
-    if (xmluri->scheme &&
-        !(ret->scheme = strdup(xmluri->scheme)))
-        goto no_memory;
-    if (xmluri->server &&
-        !(ret->server = strdup(xmluri->server)))
-        goto no_memory;
+    if (VIR_STRDUP(ret->scheme, xmluri->scheme) < 0)
+        goto error;
+    if (VIR_STRDUP(ret->server, xmluri->server) < 0)
+        goto error;
     ret->port = xmluri->port;
-    if (xmluri->path &&
-        !(ret->path = strdup(xmluri->path)))
-        goto no_memory;
+    if (VIR_STRDUP(ret->path, xmluri->path) < 0)
+        goto error;
 #ifdef HAVE_XMLURI_QUERY_RAW
-    if (xmluri->query_raw &&
-        !(ret->query = strdup(xmluri->query_raw)))
-        goto no_memory;
+    if (VIR_STRDUP(ret->query, xmluri->query_raw) < 0)
+        goto error;
 #else
-    if (xmluri->query &&
-        !(ret->query = strdup(xmluri->query)))
-        goto no_memory;
+    if (VIR_STRDUP(ret->query, xmluri->query) < 0)
+        goto error;
 #endif
-    if (xmluri->fragment &&
-        !(ret->fragment = strdup(xmluri->fragment)))
-        goto no_memory;
-    if (xmluri->user &&
-        !(ret->user = strdup(xmluri->user)))
-        goto no_memory;
+    if (VIR_STRDUP(ret->fragment, xmluri->fragment) < 0)
+        goto error;
+    if (VIR_STRDUP(ret->user, xmluri->user) < 0)
+        goto error;
 
     /* First check: does it even make sense to jump inside */
     if (ret->server != NULL &&
@@ -213,9 +210,7 @@ virURIParse(const char *uri)
 
     return ret;
 
-no_memory:
-    virReportOOMError();
-error:
+ error:
     xmlFreeURI(xmluri);
     virURIFree(ret);
     return NULL;
@@ -257,10 +252,8 @@ virURIFormat(virURIPtr uri)
     if (xmluri.server != NULL &&
         strchr(xmluri.server, ':') != NULL) {
 
-        if (virAsprintf(&tmpserver, "[%s]", xmluri.server) < 0) {
-            virReportOOMError();
+        if (virAsprintf(&tmpserver, "[%s]", xmluri.server) < 0)
             return NULL;
-        }
 
         xmluri.server = tmpserver;
     }
@@ -271,7 +264,7 @@ virURIFormat(virURIPtr uri)
         goto cleanup;
     }
 
-cleanup:
+ cleanup:
     VIR_FREE(tmpserver);
 
     return ret;
@@ -281,22 +274,20 @@ cleanup:
 char *virURIFormatParams(virURIPtr uri)
 {
     virBuffer buf = VIR_BUFFER_INITIALIZER;
-    int i, amp = 0;
+    size_t i;
+    bool amp = false;
 
     for (i = 0; i < uri->paramsCount; ++i) {
         if (!uri->params[i].ignore) {
-            if (amp) virBufferAddChar (&buf, '&');
-            virBufferStrcat (&buf, uri->params[i].name, "=", NULL);
-            virBufferURIEncodeString (&buf, uri->params[i].value);
-            amp = 1;
+            if (amp) virBufferAddChar(&buf, '&');
+            virBufferStrcat(&buf, uri->params[i].name, "=", NULL);
+            virBufferURIEncodeString(&buf, uri->params[i].value);
+            amp = true;
         }
     }
 
-    if (virBufferError(&buf)) {
-        virBufferFreeAndReset(&buf);
-        virReportOOMError();
+    if (virBufferCheckError(&buf) < 0)
         return NULL;
-    }
 
     return virBufferContentAndReset(&buf);
 }
@@ -321,7 +312,7 @@ void virURIFree(virURIPtr uri)
     VIR_FREE(uri->query);
     VIR_FREE(uri->fragment);
 
-    for (i = 0 ; i < uri->paramsCount ; i++) {
+    for (i = 0; i < uri->paramsCount; i++) {
         VIR_FREE(uri->params[i].name);
         VIR_FREE(uri->params[i].value);
     }

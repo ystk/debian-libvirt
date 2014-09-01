@@ -3,7 +3,8 @@
 #
 # esx_vi_generator.py: generates most of the SOAP type mapping code
 #
-# Copyright (C) 2010-2011 Matthias Bolte <matthias.bolte@googlemail.com>
+# Copyright (C) 2010-2012 Matthias Bolte <matthias.bolte@googlemail.com>
+# Copyright (C) 2013 Ata E Husain Bohra <ata.husain@hotmail.com>
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -16,8 +17,8 @@
 # Lesser General Public License for more details.
 #
 # You should have received a copy of the GNU Lesser General Public
-# License along with this library; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+# License along with this library.  If not, see
+# <http://www.gnu.org/licenses/>.
 #
 
 import sys
@@ -439,8 +440,7 @@ class Type:
         return string
 
 
-
-class Object(Type):
+class GenericObject(Type):
     FEATURE__DYNAMIC_CAST = (1 << 1)
     FEATURE__LIST         = (1 << 2)
     FEATURE__DEEP_COPY    = (1 << 3)
@@ -449,16 +449,36 @@ class Object(Type):
     FEATURE__DESERIALIZE  = (1 << 6)
 
 
-    def __init__(self, name, extends, properties, features=0, extended_by=None):
+    def __init__(self, name, category, managed, generic_objects_by_name):
         Type.__init__(self, "struct", name)
-        self.extends = extends
-        self.features = features
-        self.properties = properties
-        self.extended_by = extended_by
-        self.candidate_for_dynamic_cast = False
+        self.category = category
+        self.managed = managed
+        self.generic_objects_by_name = generic_objects_by_name
+
+
+    def generate_comment(self):
+        comment = separator
+        comment += " * %s: %s\n" % (self.category, self.name)
+
+        if self.extends is not None:
+            comment += " * %s  extends %s\n" \
+                       % (' ' * len(self.category), self.extends)
+
+        first = True
 
         if self.extended_by is not None:
-            self.extended_by.sort()
+            for extended_by in self.extended_by:
+                if first:
+                    comment += " * %s  extended by %s\n" \
+                               % (' ' * len(self.category), extended_by)
+                    first = False
+                else:
+                    comment += " * %s              %s\n" \
+                               % (' ' * len(self.category), extended_by)
+
+        comment += " */\n\n"
+
+        return comment
 
 
     def generate_struct_members(self, add_banner=False, struct_gap=False):
@@ -468,7 +488,7 @@ class Object(Type):
             members += "\n"
 
         if self.extends is not None:
-            members += objects_by_name[self.extends] \
+            members += self.generic_objects_by_name[self.extends] \
                        .generate_struct_members(add_banner=True,
                                                 struct_gap=False) + "\n"
 
@@ -484,11 +504,31 @@ class Object(Type):
         return members
 
 
+    def generate_dispatch(self, suffix, is_first=True):
+        source = ""
+
+        if self.extended_by is not None:
+            if not is_first:
+                source += "\n"
+
+            source += "    /* %s */\n" % self.name
+
+            for extended_by in self.extended_by:
+                source += "    ESX_VI__TEMPLATE__DISPATCH__%s(%s)\n" \
+                          % (suffix, extended_by)
+
+            for extended_by in self.extended_by:
+                source += self.generic_objects_by_name[extended_by] \
+                          .generate_dispatch(suffix, False)
+
+        return source
+
+
     def generate_free_code(self, add_banner=False):
         source = ""
 
         if self.extends is not None:
-            source += objects_by_name[self.extends] \
+            source += self.generic_objects_by_name[self.extends] \
                       .generate_free_code(add_banner=True) + "\n"
 
         if self.extends is not None or add_banner:
@@ -514,7 +554,7 @@ class Object(Type):
         source = ""
 
         if self.extends is not None:
-            source += objects_by_name[self.extends] \
+            source += self.generic_objects_by_name[self.extends] \
                       .generate_validate_code(add_banner=True) + "\n"
 
         if self.extends is not None or add_banner:
@@ -526,7 +566,7 @@ class Object(Type):
             string = ""
 
             for property in self.properties:
-                string += property.generate_validate_code()
+                string += property.generate_validate_code(self.managed)
 
             if len(string) < 1:
                 source += "    /* no required properties */\n"
@@ -534,6 +574,20 @@ class Object(Type):
                 source += string
 
         return source
+
+
+
+class Object(GenericObject):
+    def __init__(self, name, extends, properties, features=0, extended_by=None):
+        GenericObject.__init__(self, name, 'VI Object', False, objects_by_name)
+        self.extends = extends
+        self.features = features
+        self.properties = properties
+        self.extended_by = extended_by
+        self.candidate_for_dynamic_cast = False
+
+        if self.extended_by is not None:
+            self.extended_by.sort()
 
 
     def generate_dynamic_cast_code(self, is_first=True):
@@ -621,23 +675,7 @@ class Object(Type):
 
 
     def generate_header(self):
-        header = separator
-        header += " * VI Object: %s\n" % self.name
-
-        if self.extends is not None:
-            header += " *            extends %s\n" % self.extends
-
-        first = True
-
-        if self.extended_by is not None:
-            for extended_by in self.extended_by:
-                if first:
-                    header += " *            extended by %s\n" % extended_by
-                    first = False
-                else:
-                    header += " *                        %s\n" % extended_by
-
-        header += " */\n\n"
+        header = self.generate_comment()
 
         # struct
         header += "struct _esxVI_%s {\n" % self.name
@@ -741,59 +779,37 @@ class Object(Type):
         source += "ESX_VI__TEMPLATE__ALLOC(%s)\n\n" % self.name
 
         # free
+        source += "/* esxVI_%s_Free */\n" % self.name
+
         if self.extended_by is None:
-            source += "/* esxVI_%s_Free */\n" % self.name
             source += "ESX_VI__TEMPLATE__FREE(%s,\n" % self.name
-            source += "{\n"
-
-            if self.features & Object.FEATURE__LIST:
-                if self.extends is not None:
-                    # avoid "dereferencing type-punned pointer will break
-                    # strict-aliasing rules" warnings
-                    source += "    esxVI_%s *next = (esxVI_%s *)item->_next;\n\n" \
-                              % (self.extends, self.extends)
-                    source += "    esxVI_%s_Free(&next);\n" % self.extends
-                    source += "    item->_next = (esxVI_%s *)next;\n\n" % self.name
-                else:
-                    source += "    esxVI_%s_Free(&item->_next);\n\n" % self.name
-
-            source += self.generate_free_code()
-
-            source += "})\n\n"
         else:
-            source += "/* esxVI_%s_Free */\n" % self.name
             source += "ESX_VI__TEMPLATE__DYNAMIC_FREE(%s,\n" % self.name
             source += "{\n"
-
-            for extended_by in self.extended_by:
-                source += "    ESX_VI__TEMPLATE__DISPATCH__FREE(%s)\n" \
-                          % extended_by
-
+            source += self.generate_dispatch('FREE')
             source += "},\n"
-            source += "{\n"
 
-            if self.features & Object.FEATURE__LIST:
-                if self.extends is not None:
-                    # avoid "dereferencing type-punned pointer will brea
-                    # strict-aliasing rules" warnings
-                    source += "    esxVI_%s *next = (esxVI_%s *)item->_next;\n\n" \
-                              % (self.extends, self.extends)
-                    source += "    esxVI_%s_Free(&next);\n" % self.extends
-                    source += "    item->_next = (esxVI_%s *)next;\n\n" % self.name
-                else:
-                    source += "    esxVI_%s_Free(&item->_next);\n\n" % self.name
+        source += "{\n"
 
-            source += self.generate_free_code()
+        if self.features & Object.FEATURE__LIST:
+            if self.extends is not None:
+                # avoid "dereferencing type-punned pointer will break
+                # strict-aliasing rules" warnings
+                source += "    esxVI_%s *next = (esxVI_%s *)item->_next;\n\n" \
+                          % (self.extends, self.extends)
+                source += "    esxVI_%s_Free(&next);\n" % self.extends
+                source += "    item->_next = (esxVI_%s *)next;\n\n" % self.name
+            else:
+                source += "    esxVI_%s_Free(&item->_next);\n\n" % self.name
 
-            source += "})\n\n"
+        source += self.generate_free_code()
+        source += "})\n\n"
 
         # validate
         source += "/* esxVI_%s_Validate */\n" % self.name
         source += "ESX_VI__TEMPLATE__VALIDATE(%s,\n" % self.name
         source += "{\n"
-
         source += self.generate_validate_code()
-
         source += "})\n\n"
 
         # dynamic cast
@@ -802,9 +818,7 @@ class Object(Type):
                 source += "/* esxVI_%s_DynamicCast */\n" % self.name
                 source += "ESX_VI__TEMPLATE__DYNAMIC_CAST(%s,\n" % self.name
                 source += "{\n"
-
                 source += self.generate_dynamic_cast_code()
-
                 source += "})\n\n"
             else:
                 report_error("cannot add dynamic cast support for an untyped object")
@@ -815,41 +829,25 @@ class Object(Type):
             source += "ESX_VI__TEMPLATE__LIST__APPEND(%s)\n\n" % self.name
 
         # deep copy
-        if self.extended_by is None:
-            if self.features & Object.FEATURE__DEEP_COPY:
-                source += "/* esxVI_%s_DeepCopy */\n" % self.name
+        if self.features & Object.FEATURE__DEEP_COPY:
+            source += "/* esxVI_%s_DeepCopy */\n" % self.name
+
+            if self.extended_by is None:
                 source += "ESX_VI__TEMPLATE__DEEP_COPY(%s,\n" % self.name
+            else:
+                source += "ESX_VI__TEMPLATE__DYNAMIC_DEEP_COPY(%s,\n" % self.name
                 source += "{\n"
-
-                source += self.generate_deep_copy_code()
-
-                source += "})\n\n"
-
-                if self.features & Object.FEATURE__LIST:
-                    source += "/* esxVI_%s_DeepCopyList */\n" % self.name
-                    source += "ESX_VI__TEMPLATE__LIST__DEEP_COPY(%s)\n\n" \
-                              % self.name
-        else:
-            if self.features & Object.FEATURE__DEEP_COPY:
-                source += "/* esxVI_%s_DeepCopy */\n" % self.name
-                source += "ESX_VI__TEMPLATE__DYNAMIC_DEEP_COPY(%s)\n" % self.name
-                source += "{\n"
-
-                for extended_by in self.extended_by:
-                    source += "    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(%s)\n" \
-                              % extended_by
-
+                source += self.generate_dispatch('DEEP_COPY')
                 source += "},\n"
-                source += "{\n"
 
-                source += self.generate_deep_copy_code()
+            source += "{\n"
+            source += self.generate_deep_copy_code()
+            source += "})\n\n"
 
-                source += "})\n\n"
-
-                if self.features & Object.FEATURE__LIST:
-                    source += "/* esxVI_%s_DeepCopyList */\n" % self.name
-                    source += "ESX_VI__TEMPLATE__LIST__DEEP_COPY(%s)\n\n" \
-                              % self.name
+            if self.features & Object.FEATURE__LIST:
+                source += "/* esxVI_%s_DeepCopyList */\n" % self.name
+                source += "ESX_VI__TEMPLATE__LIST__DEEP_COPY(%s)\n\n" \
+                          % self.name
 
         # cast from any type
         if self.features & Object.FEATURE__ANY_TYPE:
@@ -862,11 +860,7 @@ class Object(Type):
                 source += "ESX_VI__TEMPLATE__DYNAMIC_CAST_FROM_ANY_TYPE(%s,\n" \
                           % self.name
                 source += "{\n"
-
-                for extended_by in self.extended_by:
-                    source += "    ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(%s)\n" \
-                              % extended_by
-
+                source += self.generate_dispatch('CAST_FROM_ANY_TYPE')
                 source += "})\n\n"
 
             if self.features & Object.FEATURE__LIST:
@@ -875,79 +869,47 @@ class Object(Type):
                           % self.name
 
         # serialize
-        if self.extended_by is None:
-            if self.features & Object.FEATURE__SERIALIZE:
-                source += "/* esxVI_%s_Serialize */\n" % self.name
+        if self.features & Object.FEATURE__SERIALIZE:
+            source += "/* esxVI_%s_Serialize */\n" % self.name
+
+            if self.extended_by is None:
                 source += "ESX_VI__TEMPLATE__SERIALIZE(%s,\n" % self.name
-                source += "{\n"
-
-                source += self.generate_serialize_code()
-
-                source += "})\n\n"
-
-                if self.features & Object.FEATURE__LIST:
-                    source += "/* esxVI_%s_SerializeList */\n" % self.name
-                    source += "ESX_VI__TEMPLATE__LIST__SERIALIZE(%s)\n\n" \
-                              % self.name
-        else:
-            if self.features & Object.FEATURE__SERIALIZE:
-                source += "/* esxVI_%s_Serialize */\n" % self.name
+            else:
                 source += "ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(%s,\n" % self.name
                 source += "{\n"
-
-                for extended_by in self.extended_by:
-                    source += "    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(%s)\n" \
-                              % extended_by
-
+                source += self.generate_dispatch('SERIALIZE')
                 source += "},\n"
-                source += "{\n"
 
-                source += self.generate_serialize_code()
+            source += "{\n"
+            source += self.generate_serialize_code()
+            source += "})\n\n"
 
-                source += "})\n\n"
-
-                if self.features & Object.FEATURE__LIST:
-                    source += "/* esxVI_%s_SerializeList */\n" % self.name
-                    source += "ESX_VI__TEMPLATE__LIST__SERIALIZE(%s)\n\n" \
-                              % self.name
+            if self.features & Object.FEATURE__LIST:
+                source += "/* esxVI_%s_SerializeList */\n" % self.name
+                source += "ESX_VI__TEMPLATE__LIST__SERIALIZE(%s)\n\n" \
+                          % self.name
 
         # deserialize
-        if self.extended_by is None:
-            if self.features & Object.FEATURE__DESERIALIZE:
-                source += "/* esxVI_%s_Deserialize */\n" % self.name
+        if self.features & Object.FEATURE__DESERIALIZE:
+            source += "/* esxVI_%s_Deserialize */\n" % self.name
+
+            if self.extended_by is None:
                 source += "ESX_VI__TEMPLATE__DESERIALIZE(%s,\n" % self.name
-                source += "{\n"
-
-                source += self.generate_deserialize_code()
-
-                source += "})\n\n"
-
-                if self.features & Object.FEATURE__LIST:
-                    source += "/* esxVI_%s_DeserializeList */\n" % self.name
-                    source += "ESX_VI__TEMPLATE__LIST__DESERIALIZE(%s)\n\n" \
-                              % self.name
-        else:
-            if self.features & Object.FEATURE__DESERIALIZE:
-                source += "/* esxVI_%s_Deserialize */\n" % self.name
+            else:
                 source += "ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(%s,\n" \
                           % self.name
                 source += "{\n"
-
-                for extended_by in self.extended_by:
-                    source += "    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(%s)\n" \
-                              % extended_by
-
+                source += self.generate_dispatch('DESERIALIZE')
                 source += "},\n"
-                source += "{\n"
 
-                source += self.generate_deserialize_code()
+            source += "{\n"
+            source += self.generate_deserialize_code()
+            source += "})\n\n"
 
-                source += "})\n\n"
-
-                if self.features & Object.FEATURE__LIST:
-                    source += "/* esxVI_%s_DeserializeList */\n" % self.name
-                    source += "ESX_VI__TEMPLATE__LIST__DESERIALIZE(%s)\n\n" \
-                              % self.name
+            if self.features & Object.FEATURE__LIST:
+                source += "/* esxVI_%s_DeserializeList */\n" % self.name
+                source += "ESX_VI__TEMPLATE__LIST__DESERIALIZE(%s)\n\n" \
+                          % self.name
 
         source += "\n\n"
 
@@ -955,12 +917,10 @@ class Object(Type):
 
 
 
-class ManagedObject(Type):
-    FEATURE__LIST = (1 << 2)
-
-
+class ManagedObject(GenericObject):
     def __init__(self, name, extends, properties, features=0, extended_by=None):
-        Type.__init__(self, "struct", name)
+        GenericObject.__init__(self, name, 'VI Managed Object', True,
+                               managed_objects_by_name)
         self.extends = extends
         self.features = features
         self.properties = properties
@@ -968,80 +928,6 @@ class ManagedObject(Type):
 
         if self.extended_by is not None:
             self.extended_by.sort()
-
-
-    def generate_struct_members(self, add_banner=False, struct_gap=False):
-        members = ""
-
-        if struct_gap:
-            members += "\n"
-
-        if self.extends is not None:
-            members += managed_objects_by_name[self.extends] \
-                       .generate_struct_members(add_banner=True) + "\n"
-
-        if self.extends is not None or add_banner:
-            members += "    /* %s */\n" % self.name
-
-        for property in self.properties:
-            members += property.generate_struct_member()
-
-        if len(self.properties) < 1:
-            members += "    /* no properties */\n"
-
-        return members
-
-
-    def generate_free_code(self, add_banner=False):
-        source = ""
-
-        if self.extends is not None:
-            source += managed_objects_by_name[self.extends] \
-                      .generate_free_code(add_banner=True) + "\n"
-
-        if self.extends is not None or add_banner:
-            source += "    /* %s */\n" % self.name
-
-        if len(self.properties) < 1:
-            source += "    /* no properties */\n"
-        else:
-            string = ""
-
-            for property in self.properties:
-                string += property.generate_free_code()
-
-            if len(string) < 1:
-                source += "    /* no properties to be freed */\n"
-            else:
-                source += string
-
-        return source
-
-
-    def generate_validate_code(self, add_banner=False):
-        source = ""
-
-        if self.extends is not None:
-            source += managed_objects_by_name[self.extends] \
-                      .generate_validate_code(add_banner=True) + "\n"
-
-        if self.extends is not None or add_banner:
-            source += "    /* %s */\n" % self.name
-
-        if len(self.properties) < 1:
-            source += "    /* no properties */\n"
-        else:
-            string = ""
-
-            for property in self.properties:
-                string += property.generate_validate_code(managed=True)
-
-            if len(string) < 1:
-                source += "    /* no required properties */\n"
-            else:
-                source += string
-
-        return source
 
 
     def generate_lookup_code1(self, add_banner=False):
@@ -1096,30 +982,6 @@ class ManagedObject(Type):
         return source
 
 
-    def generate_comment(self):
-        comment = separator
-        comment += " * VI Managed Object: %s\n" % self.name
-
-        if self.extends is not None:
-            comment += " *                    extends %s\n" % self.extends
-
-        first = True
-
-        if self.extended_by is not None:
-            for extended_by in self.extended_by:
-                if first:
-                    comment += " *                    extended by %s\n" \
-                               % extended_by
-                    first = False
-                else:
-                    comment += " *                                %s\n" \
-                               % extended_by
-
-        comment += " */\n\n"
-
-        return comment
-
-
     def generate_header(self):
         header = self.generate_comment()
 
@@ -1138,7 +1000,6 @@ class ManagedObject(Type):
                           "/* required */\n")
         header += "\n"
         header += self.generate_struct_members()
-
         header += "};\n\n"
 
         # functions
@@ -1182,54 +1043,32 @@ class ManagedObject(Type):
         source += "ESX_VI__TEMPLATE__ALLOC(%s)\n\n" % self.name
 
         # free
+        source += "/* esxVI_%s_Free */\n" % self.name
+
         if self.extended_by is None:
-            source += "/* esxVI_%s_Free */\n" % self.name
             source += "ESX_VI__TEMPLATE__FREE(%s,\n" % self.name
-            source += "{\n"
-
-            if self.features & ManagedObject.FEATURE__LIST:
-                if self.extends is not None:
-                    # avoid "dereferencing type-punned pointer will break
-                    # strict-aliasing rules" warnings
-                    source += "    esxVI_%s *next = (esxVI_%s *)item->_next;\n\n" \
-                              % (self.extends, self.extends)
-                    source += "    esxVI_%s_Free(&next);\n" % self.extends
-                    source += "    item->_next = (esxVI_%s *)next;\n\n" % self.name
-                else:
-                    source += "    esxVI_%s_Free(&item->_next);\n" % self.name
-
-            source += "    esxVI_ManagedObjectReference_Free(&item->_reference);\n\n"
-
-            source += self.generate_free_code()
-
-            source += "})\n\n"
         else:
-            source += "/* esxVI_%s_Free */\n" % self.name
             source += "ESX_VI__TEMPLATE__DYNAMIC_FREE(%s,\n" % self.name
             source += "{\n"
-
-            for extended_by in self.extended_by:
-                source += "    ESX_VI__TEMPLATE__DISPATCH__FREE(%s)\n" % extended_by
-
+            source += self.generate_dispatch('FREE')
             source += "},\n"
-            source += "{\n"
 
-            if self.features & Object.FEATURE__LIST:
-                if self.extends is not None:
-                    # avoid "dereferencing type-punned pointer will break
-                    # strict-aliasing rules" warnings
-                    source += "    esxVI_%s *next = (esxVI_%s *)item->_next;\n\n" \
-                              % (self.extends, self.extends)
-                    source += "    esxVI_%s_Free(&next);\n" % self.extends
-                    source += "    item->_next = (esxVI_%s *)next;\n\n" % self.name
-                else:
-                    source += "    esxVI_%s_Free(&item->_next);\n" % self.name
+        source += "{\n"
 
-            source += "    esxVI_ManagedObjectReference_Free(&item->_reference);\n\n"
+        if self.features & ManagedObject.FEATURE__LIST:
+            if self.extends is not None:
+                # avoid "dereferencing type-punned pointer will break
+                # strict-aliasing rules" warnings
+                source += "    esxVI_%s *next = (esxVI_%s *)item->_next;\n\n" \
+                          % (self.extends, self.extends)
+                source += "    esxVI_%s_Free(&next);\n" % self.extends
+                source += "    item->_next = (esxVI_%s *)next;\n\n" % self.name
+            else:
+                source += "    esxVI_%s_Free(&item->_next);\n" % self.name
 
-            source += self.generate_free_code()
-
-            source += "})\n\n"
+        source += "    esxVI_ManagedObjectReference_Free(&item->_reference);\n\n"
+        source += self.generate_free_code()
+        source += "})\n\n"
 
         # validate
         source += "/* esxVI_%s_Validate */\n" % self.name
@@ -1289,8 +1128,6 @@ class Enum(Type):
         header = separator
         header += " * VI Enum: %s\n" % self.name
         header += " */\n\n"
-
-        # enum
         header += "enum _esxVI_%s {\n" % self.name
         header += "    esxVI_%s_Undefined = 0,\n" % self.name
 
@@ -1324,7 +1161,6 @@ class Enum(Type):
         source = separator
         source += " * VI Enum: %s\n" % self.name
         source += " */\n\n"
-
         source += "static const esxVI_Enumeration _esxVI_%s_Enumeration = {\n" \
                   % self.name
         source += "    esxVI_Type_%s, {\n" % self.name
@@ -1485,9 +1321,9 @@ def is_known_type(type):
 
 def open_and_print(filename):
     if filename.startswith("./"):
-        print "  GEN    " + filename[2:]
+        print "  GEN      " + filename[2:]
     else:
-        print "  GEN    " + filename
+        print "  GEN      " + filename
 
     return open(filename, "wb")
 
@@ -1496,6 +1332,7 @@ def open_and_print(filename):
 predefined_enums = ["Boolean"]
 
 predefined_objects = ["AnyType",
+                      "Byte",
                       "Int",
                       "Long",
                       "String",
@@ -1519,9 +1356,36 @@ additional_object_features = { "AutoStartDefaults"          : Object.FEATURE__AN
                                                               Object.FEATURE__ANY_TYPE,
                                "HostDatastoreBrowserSearchResults" : Object.FEATURE__LIST |
                                                               Object.FEATURE__ANY_TYPE,
+                               "HostHostBusAdapter"         : Object.FEATURE__LIST |
+                                                              Object.FEATURE__ANY_TYPE,
+                               "HostInternetScsiHba"        : Object.FEATURE__DYNAMIC_CAST |
+                                                              Object.FEATURE__DEEP_COPY,
+                               "HostInternetScsiTargetTransport"  : Object.FEATURE__DYNAMIC_CAST,
+                               "HostScsiDisk"               : Object.FEATURE__LIST |
+                                                              Object.FEATURE__ANY_TYPE |
+                                                              Object.FEATURE__DYNAMIC_CAST,
+                               "HostScsiTopologyInterface"  : Object.FEATURE__LIST |
+                                                              Object.FEATURE__ANY_TYPE,
+                               "HostScsiTopologyLun"        : Object.FEATURE__ANY_TYPE |
+                                                              Object.FEATURE__LIST |
+                                                              Object.FEATURE__DEEP_COPY,
+                               "HostScsiTopologyTarget"     : Object.FEATURE__ANY_TYPE |
+                                                              Object.FEATURE__LIST,
+                               "HostPortGroup"              : Object.FEATURE__LIST |
+                                                              Object.FEATURE__ANY_TYPE,
+                               "HostVirtualSwitch"          : Object.FEATURE__DEEP_COPY |
+                                                              Object.FEATURE__LIST |
+                                                              Object.FEATURE__ANY_TYPE,
                                "ManagedObjectReference"     : Object.FEATURE__ANY_TYPE,
                                "ObjectContent"              : Object.FEATURE__DEEP_COPY,
+                               "PhysicalNic"                : Object.FEATURE__DEEP_COPY |
+                                                              Object.FEATURE__LIST |
+                                                              Object.FEATURE__ANY_TYPE,
                                "ResourcePoolResourceUsage"  : Object.FEATURE__ANY_TYPE,
+                               "ScsiLun"                    : Object.FEATURE__LIST |
+                                                              Object.FEATURE__ANY_TYPE |
+                                                              Object.FEATURE__DEEP_COPY,
+                               "ScsiLunDurableName"         : Object.FEATURE__LIST,
                                "ServiceContent"             : Object.FEATURE__DESERIALIZE,
                                "SharesInfo"                 : Object.FEATURE__ANY_TYPE,
                                "TaskInfo"                   : Object.FEATURE__LIST |

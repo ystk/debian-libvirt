@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Red Hat, Inc.
+ * Copyright (C) 2012, 2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -12,8 +12,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -24,14 +24,15 @@
 #include <signal.h>
 
 #include "testutils.h"
-#include "util.h"
-#include "virterror_internal.h"
-#include "memory.h"
-#include "logging.h"
+#include "virerror.h"
+#include "viralloc.h"
+#include "virlog.h"
 
 #include "virauthconfig.h"
 
 #define VIR_FROM_THIS VIR_FROM_RPC
+
+VIR_LOG_INIT("tests.authconfigtest");
 
 struct ConfigLookupData {
     virAuthConfigPtr config;
@@ -77,7 +78,7 @@ static int testAuthLookup(const void *args)
     }
 
     ret = 0;
-cleanup:
+ cleanup:
     return ret;
 }
 
@@ -97,7 +98,7 @@ mymain(void)
             config, hostname, service, credname, expect                 \
         };                                                              \
         if (virtTestRun("Test Lookup " hostname "-" service "-" credname, \
-                        1, testAuthLookup, &data) < 0)                   \
+                        testAuthLookup, &data) < 0)                     \
             ret = -1;                                                   \
     } while (0)
 
@@ -134,7 +135,7 @@ mymain(void)
 
     virAuthConfigFree(config);
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

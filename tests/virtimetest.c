@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Red Hat, Inc.
+ * Copyright (C) 2011, 2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -12,8 +12,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -24,14 +24,15 @@
 #include <signal.h>
 
 #include "testutils.h"
-#include "util.h"
-#include "virterror_internal.h"
-#include "memory.h"
-#include "logging.h"
+#include "virerror.h"
+#include "viralloc.h"
+#include "virlog.h"
 
 #include "virtime.h"
 
 #define VIR_FROM_THIS VIR_FROM_RPC
+
+VIR_LOG_INIT("tests.timetest");
 
 struct testTimeFieldsData {
     unsigned long long when;
@@ -43,8 +44,7 @@ static int testTimeFields(const void *args)
     const struct testTimeFieldsData *data = args;
     struct tm actual;
 
-    if (virTimeFieldsThen(data->when, &actual) < 0)
-        return -1;
+    virTimeFieldsThen(data->when, &actual);
 
 #define COMPARE(field)                                          \
     do {                                                        \
@@ -71,6 +71,57 @@ static int testTimeFields(const void *args)
 }
 
 
+typedef struct {
+    const char *zone;
+    long offset;
+} testTimeLocalOffsetData;
+
+static int
+testTimeLocalOffset(const void *args)
+{
+    const testTimeLocalOffsetData *data = args;
+    long actual;
+
+    if (setenv("TZ", data->zone, 1) < 0) {
+        perror("setenv");
+        return -1;
+    }
+    tzset();
+
+    if (virTimeLocalOffsetFromUTC(&actual) < 0) {
+        return -1;
+    }
+
+    if (data->offset != actual) {
+        VIR_DEBUG("Expect Offset %ld got %ld\n",
+                  data->offset, actual);
+        return -1;
+    }
+    return 0;
+}
+
+
+/* return true if the date is Jan 1 or Dec 31 (localtime) */
+static bool
+isNearYearEnd(void)
+{
+    time_t current = time(NULL);
+    struct tm timeinfo;
+
+    if (current == (time_t)-1) {
+        VIR_DEBUG("time() failed");
+        return false;
+    }
+    if (!localtime_r(&current, &timeinfo)) {
+        VIR_DEBUG("localtime_r() failed");
+        return false;
+    }
+
+    return (timeinfo.tm_mon == 0 && timeinfo.tm_mday == 1) ||
+            (timeinfo.tm_mon == 11 && timeinfo.tm_mday == 31);
+}
+
+
 static int
 mymain(void)
 {
@@ -94,22 +145,22 @@ mymain(void)
                 .tm_isdst = 0,                                       \
             },                                                       \
         };                                                           \
-        if (virtTestRun("Test fields " #ts " " #year " ", 1, testTimeFields, &data) < 0) \
+        if (virtTestRun("Test fields " #ts " " #year " ", testTimeFields, &data) < 0) \
             ret = -1;                                                \
     } while (0)
 
-    TEST_FIELDS(            0ull, 1970,  1,  1,  0,  0,  0);
-    TEST_FIELDS(         5000ull, 1970,  1,  1,  0,  0,  5);
-    TEST_FIELDS(      3605000ull, 1970,  1,  1,  1,  0,  5);
-    TEST_FIELDS(     86405000ull, 1970,  1,  2,  0,  0,  5);
-    TEST_FIELDS(  31536000000ull, 1971,  1,  1,  0,  0,  0);
+    TEST_FIELDS(0ull,           1970,  1,  1,  0,  0,  0);
+    TEST_FIELDS(5000ull,        1970,  1,  1,  0,  0,  5);
+    TEST_FIELDS(3605000ull,     1970,  1,  1,  1,  0,  5);
+    TEST_FIELDS(86405000ull,    1970,  1,  2,  0,  0,  5);
+    TEST_FIELDS(31536000000ull, 1971,  1,  1,  0,  0,  0);
 
-    TEST_FIELDS(  30866399000ull, 1970, 12, 24,  5, 59, 59);
-    TEST_FIELDS( 123465599000ull, 1973, 11, 29, 23, 59, 59);
-    TEST_FIELDS( 155001599000ull, 1974, 11, 29, 23, 59, 59);
+    TEST_FIELDS(30866399000ull,  1970, 12, 24,  5, 59, 59);
+    TEST_FIELDS(123465599000ull, 1973, 11, 29, 23, 59, 59);
+    TEST_FIELDS(155001599000ull, 1974, 11, 29, 23, 59, 59);
 
-    TEST_FIELDS( 186537599000ull, 1975, 11, 29, 23, 59, 59);
-    TEST_FIELDS( 344390399000ull, 1980, 11, 29, 23, 59, 59);
+    TEST_FIELDS(186537599000ull,  1975, 11, 29, 23, 59, 59);
+    TEST_FIELDS(344390399000ull,  1980, 11, 29, 23, 59, 59);
     TEST_FIELDS(1203161493000ull, 2008,  2, 16, 11, 31, 33);
     TEST_FIELDS(1234567890000ull, 2009,  2, 13, 23, 31, 30);
 
@@ -118,7 +169,59 @@ mymain(void)
 
     TEST_FIELDS(2147483648000ull, 2038,  1, 19,  3, 14,  8);
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+#define TEST_LOCALOFFSET(tz, off)       \
+    do {                                \
+       testTimeLocalOffsetData data = { \
+           .zone =  tz,                 \
+           .offset = off,               \
+        };                              \
+        if (virtTestRun("Test localtime offset for " #tz, \
+                         testTimeLocalOffset, &data) < 0) \
+            ret = -1;                   \
+    } while (0)
+
+    TEST_LOCALOFFSET("VIR00:30", -30 * 60);
+    TEST_LOCALOFFSET("VIR01:30", -90 * 60);
+    TEST_LOCALOFFSET("VIR05:00", (-5 * 60) * 60);
+    TEST_LOCALOFFSET("UTC", 0);
+    TEST_LOCALOFFSET("VIR-00:30", 30 * 60);
+    TEST_LOCALOFFSET("VIR-01:30", 90 * 60);
+
+    /* test DST processing with timezones that always
+     * have DST in effect; what's more, cover a zone with
+     * with an unusual DST different than a usual one hour
+     */
+    TEST_LOCALOFFSET("VIR-00:30VID,0/00:00:00,365/23:59:59",
+                     ((1 * 60) + 30) * 60);
+    TEST_LOCALOFFSET("VIR-02:30VID,0/00:00:00,365/23:59:59",
+                     ((3 * 60) + 30) * 60);
+    TEST_LOCALOFFSET("VIR-02:30VID-04:30,0/00:00:00,365/23:59:59",
+                     ((4 * 60) + 30) * 60);
+    TEST_LOCALOFFSET("VIR-12:00VID-13:00,0/00:00:00,365/23:59:59",
+                     ((13 * 60) +  0) * 60);
+
+    if (!isNearYearEnd()) {
+        /* experiments have shown that the following tests will fail
+         * during certain hours of Dec 31 or Jan 1 (depending on the
+         * TZ setting in the shell running the test, but in general
+         * for a period that apparently starts at 00:00:00 UTC Jan 1
+         * and continues for 1 - 2 hours). We've determined this is
+         * due to our inability to specify a timezone with DST on/off
+         * settings that make it truly *always* on DST - i.e. it is a
+         * failing of the test data, *not* of the function we are
+         * testing. So to test as much as possible, we still run these
+         * tests, except on Dec 31 and Jan 1.
+         */
+
+        TEST_LOCALOFFSET("VIR02:45VID00:45,0/00:00:00,365/23:59:59",
+                         -45 * 60);
+        TEST_LOCALOFFSET("VIR05:00VID04:00,0/00:00:00,365/23:59:59",
+                         ((-4 * 60) +  0) * 60);
+        TEST_LOCALOFFSET("VIR11:00VID10:00,0/00:00:00,365/23:59:59",
+                         ((-10 * 60) +  0) * 60);
+    }
+
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

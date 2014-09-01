@@ -8,21 +8,25 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
+#include "testutils.h"
+
 #ifdef WITH_QEMU
 
 # include "internal.h"
-# include "testutils.h"
 # include "qemu/qemu_command.h"
-
 # include "testutilsqemu.h"
+# include "virstring.h"
 
-static struct qemud_driver driver;
+# define VIR_FROM_THIS VIR_FROM_NONE
+
+static virQEMUDriver driver;
 
 static int blankProblemElements(char *data)
 {
     if (virtTestClearLineRegex("<name>[[:alnum:]]+</name>", data) < 0 ||
         virtTestClearLineRegex("<uuid>([[:alnum:]]|-)+</uuid>", data) < 0 ||
         virtTestClearLineRegex("<memory.*>[[:digit:]]+</memory>", data) < 0 ||
+        virtTestClearLineRegex("<secret.*>", data) < 0 ||
         virtTestClearLineRegex("<currentMemory.*>[[:digit:]]+</currentMemory>",
                                data) < 0 ||
         virtTestClearLineRegex("<readonly/>", data) < 0 ||
@@ -31,32 +35,62 @@ static int blankProblemElements(char *data)
     return 0;
 }
 
+typedef enum {
+    FLAG_EXPECT_WARNING     = 1 << 0,
+} virQemuXML2ArgvTestFlags;
+
 static int testCompareXMLToArgvFiles(const char *xml,
                                      const char *cmdfile,
-                                     bool expect_warning) {
+                                     virQemuXML2ArgvTestFlags flags)
+{
     char *expectxml = NULL;
     char *actualxml = NULL;
     char *cmd = NULL;
+    char *log = NULL;
     int ret = -1;
     virDomainDefPtr vmdef = NULL;
-    char *log;
 
     if (virtTestLoadFile(cmdfile, &cmd) < 0)
         goto fail;
     if (virtTestLoadFile(xml, &expectxml) < 0)
         goto fail;
 
-    if (!(vmdef = qemuParseCommandLineString(driver.caps, cmd,
-                                             NULL, NULL, NULL)))
+    if (!(vmdef = qemuParseCommandLineString(driver.caps, driver.xmlopt,
+                                             cmd, NULL, NULL, NULL)))
         goto fail;
 
-    if ((log = virtTestLogContentAndReset()) == NULL)
-        goto fail;
-    if ((*log != '\0') != expect_warning) {
-        VIR_FREE(log);
+    if (!virtTestOOMActive()) {
+        if ((log = virtTestLogContentAndReset()) == NULL)
+            goto fail;
+        if (flags & FLAG_EXPECT_WARNING) {
+            if (*log) {
+                if (virTestGetDebug() > 1)
+                    fprintf(stderr,
+                            "Got expected warning from "
+                            "qemuParseCommandLineString:\n%s",
+                            log);
+            } else {
+                if (virTestGetDebug())
+                    fprintf(stderr, "qemuParseCommandLineString "
+                            "should have logged a warning\n");
+                goto fail;
+            }
+        } else { /* didn't expect a warning */
+            if (*log) {
+                if (virTestGetDebug())
+                    fprintf(stderr,
+                            "Got unexpected warning from "
+                            "qemuParseCommandLineString:\n%s",
+                            log);
+                goto fail;
+            }
+        }
+    }
+
+    if (!virDomainDefCheckABIStability(vmdef, vmdef)) {
+        fprintf(stderr, "ABI stability check failed on %s", xml);
         goto fail;
     }
-    VIR_FREE(log);
 
     if (!(actualxml = virDomainDefFormat(vmdef, 0)))
         goto fail;
@@ -76,6 +110,7 @@ static int testCompareXMLToArgvFiles(const char *xml,
     VIR_FREE(expectxml);
     VIR_FREE(actualxml);
     VIR_FREE(cmd);
+    VIR_FREE(log);
     virDomainDefFree(vmdef);
     return ret;
 }
@@ -83,8 +118,7 @@ static int testCompareXMLToArgvFiles(const char *xml,
 
 struct testInfo {
     const char *name;
-    unsigned long long extraFlags;
-    const char *migrateFrom;
+    unsigned int flags;
 };
 
 static int
@@ -101,9 +135,9 @@ testCompareXMLToArgvHelper(const void *data)
                     abs_srcdir, info->name) < 0)
         goto cleanup;
 
-    result = testCompareXMLToArgvFiles(xml, args, !!info->extraFlags);
+    result = testCompareXMLToArgvFiles(xml, args, info->flags);
 
-cleanup:
+ cleanup:
     VIR_FREE(xml);
     VIR_FREE(args);
     return result;
@@ -116,21 +150,26 @@ mymain(void)
 {
     int ret = 0;
 
-    if ((driver.caps = testQemuCapsInit()) == NULL)
-        return EXIT_FAILURE;
-    if((driver.stateDir = strdup("/nowhere")) == NULL)
+    driver.config = virQEMUDriverConfigNew(false);
+    if (driver.config == NULL)
         return EXIT_FAILURE;
 
-# define DO_TEST_FULL(name, extraFlags, migrateFrom)                     \
+    if ((driver.caps = testQemuCapsInit()) == NULL)
+        return EXIT_FAILURE;
+
+    if (!(driver.xmlopt = virQEMUDriverCreateXMLConf(&driver)))
+        return EXIT_FAILURE;
+
+# define DO_TEST_FULL(name, flags)                                      \
     do {                                                                \
-        const struct testInfo info = { name, extraFlags, migrateFrom }; \
+        const struct testInfo info = { name, (flags) };                 \
         if (virtTestRun("QEMU ARGV-2-XML " name,                        \
-                        1, testCompareXMLToArgvHelper, &info) < 0)      \
+                        testCompareXMLToArgvHelper, &info) < 0)         \
             ret = -1;                                                   \
     } while (0)
 
 # define DO_TEST(name)                                                  \
-        DO_TEST_FULL(name, 0, NULL)
+        DO_TEST_FULL(name, 0)
 
     setenv("PATH", "/bin", 1);
     setenv("USER", "test", 1);
@@ -142,6 +181,8 @@ mymain(void)
 
     /* Can't roundtrip vcpu  cpuset attribute */
     /*DO_TEST("minimal", QEMU_CAPS_NAME);*/
+    DO_TEST("machine-core-on");
+    DO_TEST("machine-core-off");
     DO_TEST("boot-cdrom");
     DO_TEST("boot-network");
     DO_TEST("boot-floppy");
@@ -151,6 +192,10 @@ mymain(void)
 
     /* Can't roundtrip xenner arch */
     /*DO_TEST("bootloader");*/
+
+    DO_TEST("reboot-timeout-enabled");
+    DO_TEST("reboot-timeout-disabled");
+
     DO_TEST("clock-utc");
     DO_TEST("clock-localtime");
     DO_TEST("disk-cdrom");
@@ -177,25 +222,27 @@ mymain(void)
     DO_TEST("disk-drive-cache-directsync");
     DO_TEST("disk-drive-cache-unsafe");
     DO_TEST("disk-drive-network-nbd");
+    DO_TEST("disk-drive-network-nbd-export");
+    DO_TEST("disk-drive-network-nbd-ipv6");
+    DO_TEST("disk-drive-network-nbd-ipv6-export");
+    DO_TEST("disk-drive-network-nbd-unix");
+    DO_TEST("disk-drive-network-iscsi");
+    DO_TEST("disk-drive-network-iscsi-auth");
+    DO_TEST("disk-drive-network-gluster");
     DO_TEST("disk-drive-network-rbd");
+    DO_TEST("disk-drive-network-rbd-auth");
+    DO_TEST("disk-drive-network-rbd-ipv6");
     /* older format using CEPH_ARGS env var */
     DO_TEST("disk-drive-network-rbd-ceph-env");
     DO_TEST("disk-drive-network-sheepdog");
     DO_TEST("disk-usb");
     DO_TEST("graphics-vnc");
     DO_TEST("graphics-vnc-socket");
+    DO_TEST("graphics-vnc-websocket");
+    DO_TEST("graphics-vnc-policy");
 
-    driver.vncSASL = 1;
-    driver.vncSASLdir = strdup("/root/.sasl2");
     DO_TEST("graphics-vnc-sasl");
-    driver.vncTLS = 1;
-    driver.vncTLSx509verify = 1;
-    driver.vncTLSx509certdir = strdup("/etc/pki/tls/qemu");
     DO_TEST("graphics-vnc-tls");
-    driver.vncSASL = driver.vncTLSx509verify = driver.vncTLS = 0;
-    VIR_FREE(driver.vncSASLdir);
-    VIR_FREE(driver.vncTLSx509certdir);
-    driver.vncSASLdir = driver.vncTLSx509certdir = NULL;
 
     DO_TEST("graphics-sdl");
     DO_TEST("graphics-sdl-fullscreen");
@@ -205,6 +252,9 @@ mymain(void)
     /* Can't rountrip xenner arch */
     /*DO_TEST("input-xen");*/
     DO_TEST("misc-acpi");
+    DO_TEST("misc-disable-s3");
+    DO_TEST("misc-disable-suspends");
+    DO_TEST("misc-enable-s4");
     DO_TEST("misc-no-reboot");
     DO_TEST("misc-uuid");
     DO_TEST("net-user");
@@ -232,23 +282,29 @@ mymain(void)
 
     DO_TEST("smp");
 
-    DO_TEST_FULL("restore-v1", 0, "stdio");
-    DO_TEST_FULL("restore-v2", 0, "stdio");
-    DO_TEST_FULL("restore-v2", 0, "exec:cat");
-    DO_TEST_FULL("migrate", 0, "tcp:10.0.0.1:5000");
+    DO_TEST("hyperv");
 
-    DO_TEST_FULL("qemu-ns-no-env", 1, NULL);
+    DO_TEST("pseries-nvram");
+    DO_TEST("pseries-disk");
 
-    VIR_FREE(driver.stateDir);
-    virCapabilitiesFree(driver.caps);
+    DO_TEST("nosharepages");
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    DO_TEST("restore-v1");
+    DO_TEST("restore-v2");
+    DO_TEST("migrate");
+
+    DO_TEST_FULL("qemu-ns-no-env", FLAG_EXPECT_WARNING);
+
+    virObjectUnref(driver.config);
+    virObjectUnref(driver.caps);
+    virObjectUnref(driver.xmlopt);
+
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)
 
 #else
-# include "testutils.h"
 
 int
 main(void)

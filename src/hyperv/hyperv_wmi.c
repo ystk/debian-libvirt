@@ -1,6 +1,5 @@
-
 /*
- * hyperv_wmi.h: general WMI over WSMAN related functions and structures for
+ * hyperv_wmi.c: general WMI over WSMAN related functions and structures for
  *               managing Microsoft Hyper-V hosts
  *
  * Copyright (C) 2011 Matthias Bolte <matthias.bolte@googlemail.com>
@@ -17,23 +16,22 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
 #include <config.h>
 
 #include "internal.h"
-#include "virterror_internal.h"
+#include "virerror.h"
 #include "datatypes.h"
-#include "logging.h"
-#include "memory.h"
-#include "util.h"
-#include "uuid.h"
-#include "buf.h"
+#include "viralloc.h"
+#include "viruuid.h"
+#include "virbuffer.h"
 #include "hyperv_private.h"
 #include "hyperv_wmi.h"
+#include "virstring.h"
 
 #define WS_SERIALIZER_FREE_MEM_WORKS 0
 
@@ -56,25 +54,25 @@ hyperyVerifyResponse(WsManClient *client, WsXmlDocH response,
     WsManFault *fault;
 
     if (lastError != WS_LASTERR_OK) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("Transport error during %s: %s (%d)"),
-                     detail, wsman_transport_get_last_error_string(lastError),
-                     lastError);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Transport error during %s: %s (%d)"),
+                       detail, wsman_transport_get_last_error_string(lastError),
+                       lastError);
         return -1;
     }
 
     /* Check the HTTP response code and report an error if it's not 200 (OK),
      * 400 (Bad Request) or 500 (Internal Server Error) */
     if (responseCode != 200 && responseCode != 400 && responseCode != 500) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("Unexpected HTTP response during %s: %d"),
-                     detail, responseCode);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unexpected HTTP response during %s: %d"),
+                       detail, responseCode);
         return -1;
     }
 
     if (response == NULL) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("Empty response during %s"), detail);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Empty response during %s"), detail);
         return -1;
     }
 
@@ -88,11 +86,11 @@ hyperyVerifyResponse(WsManClient *client, WsXmlDocH response,
 
         wsmc_get_fault_data(response, fault);
 
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("SOAP fault during %s: code '%s', subcode '%s', "
-                       "reason '%s', detail '%s'"),
-                     detail, NULLSTR(fault->code), NULLSTR(fault->subcode),
-                     NULLSTR(fault->reason), NULLSTR(fault->fault_detail));
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("SOAP fault during %s: code '%s', subcode '%s', "
+                         "reason '%s', detail '%s'"),
+                       detail, NULLSTR(fault->code), NULLSTR(fault->subcode),
+                       NULLSTR(fault->reason), NULLSTR(fault->fault_detail));
 
         wsmc_fault_destroy(fault);
         return -1;
@@ -126,22 +124,20 @@ hypervEnumAndPull(hypervPrivate *priv, virBufferPtr query, const char *root,
     hypervObject *object;
 
     if (list == NULL || *list != NULL) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (virBufferError(query)) {
-        virReportOOMError();
+    if (virBufferCheckError(query) < 0)
         return -1;
-    }
 
     serializerContext = wsmc_get_serialization_context(priv->client);
 
     options = wsmc_options_init();
 
     if (options == NULL) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                     _("Could not initialize options"));
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("Could not initialize options"));
         goto cleanup;
     }
 
@@ -149,8 +145,8 @@ hypervEnumAndPull(hypervPrivate *priv, virBufferPtr query, const char *root,
     filter = filter_create_simple(WSM_WQL_FILTER_DIALECT, query_string);
 
     if (filter == NULL) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                     _("Could not create filter"));
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("Could not create filter"));
         goto cleanup;
     }
 
@@ -165,7 +161,7 @@ hypervEnumAndPull(hypervPrivate *priv, virBufferPtr query, const char *root,
     ws_xml_destroy_doc(response);
     response = NULL;
 
-    while (enumContext != NULL && *enumContext != '\0' ) {
+    while (enumContext != NULL && *enumContext != '\0') {
         response = wsmc_action_pull(priv->client, resourceUri, options,
                                     filter, enumContext);
 
@@ -176,24 +172,24 @@ hypervEnumAndPull(hypervPrivate *priv, virBufferPtr query, const char *root,
         node = ws_xml_get_soap_body(response);
 
         if (node == NULL) {
-            HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                         _("Could not lookup SOAP body"));
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("Could not lookup SOAP body"));
             goto cleanup;
         }
 
         node = ws_xml_get_child(node, 0, XML_NS_ENUMERATION, WSENUM_PULL_RESP);
 
         if (node == NULL) {
-            HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                         _("Could not lookup pull response"));
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("Could not lookup pull response"));
             goto cleanup;
         }
 
         node = ws_xml_get_child(node, 0, XML_NS_ENUMERATION, WSENUM_ITEMS);
 
         if (node == NULL) {
-            HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                         _("Could not lookup pull response items"));
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("Could not lookup pull response items"));
             goto cleanup;
         }
 
@@ -205,15 +201,13 @@ hypervEnumAndPull(hypervPrivate *priv, virBufferPtr query, const char *root,
                               className, resourceUri, NULL, 0, 0);
 
         if (data == NULL) {
-            HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                         _("Could not deserialize pull response item"));
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("Could not deserialize pull response item"));
             goto cleanup;
         }
 
-        if (VIR_ALLOC(object) < 0) {
-            virReportOOMError();
+        if (VIR_ALLOC(object) < 0)
             goto cleanup;
-        }
 
         object->serializerInfo = serializerInfo;
         object->data = data;
@@ -240,7 +234,7 @@ hypervEnumAndPull(hypervPrivate *priv, virBufferPtr query, const char *root,
 
     result = 0;
 
-  cleanup:
+ cleanup:
     if (options != NULL) {
         wsmc_options_destroy(options);
     }
@@ -414,16 +408,14 @@ hypervInvokeMsvmComputerSystemRequestStateChange(virDomainPtr domain,
 
     if (virAsprintf(&selector, "Name=%s&CreationClassName=Msvm_ComputerSystem",
                     uuid_string) < 0 ||
-        virAsprintf(&properties, "RequestedState=%d", requestedState) < 0) {
-        virReportOOMError();
+        virAsprintf(&properties, "RequestedState=%d", requestedState) < 0)
         goto cleanup;
-    }
 
     options = wsmc_options_init();
 
     if (options == NULL) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                     _("Could not initialize options"));
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("Could not initialize options"));
         goto cleanup;
     }
 
@@ -442,15 +434,15 @@ hypervInvokeMsvmComputerSystemRequestStateChange(virDomainPtr domain,
     returnValue = ws_xml_get_xpath_value(response, (char *)"/s:Envelope/s:Body/p:RequestStateChange_OUTPUT/p:ReturnValue");
 
     if (returnValue == NULL) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("Could not lookup %s for %s invocation"),
-                     "ReturnValue", "RequestStateChange");
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Could not lookup %s for %s invocation"),
+                       "ReturnValue", "RequestStateChange");
         goto cleanup;
     }
 
     if (virStrToLong_i(returnValue, NULL, 10, &returnCode) < 0) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("Could not parse return code from '%s'"), returnValue);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Could not parse return code from '%s'"), returnValue);
         goto cleanup;
     }
 
@@ -459,9 +451,9 @@ hypervInvokeMsvmComputerSystemRequestStateChange(virDomainPtr domain,
         instanceID = ws_xml_get_xpath_value(response, (char *)"/s:Envelope/s:Body/p:RequestStateChange_OUTPUT/p:Job/a:ReferenceParameters/w:SelectorSet/w:Selector[@Name='InstanceID']");
 
         if (instanceID == NULL) {
-            HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                         _("Could not lookup %s for %s invocation"),
-                         "InstanceID", "RequestStateChange");
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("Could not lookup %s for %s invocation"),
+                           "InstanceID", "RequestStateChange");
             goto cleanup;
         }
 
@@ -476,9 +468,9 @@ hypervInvokeMsvmComputerSystemRequestStateChange(virDomainPtr domain,
             }
 
             if (concreteJob == NULL) {
-                HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                             _("Could not lookup %s for %s invocation"),
-                             "Msvm_ConcreteJob", "RequestStateChange");
+                virReportError(VIR_ERR_INTERNAL_ERROR,
+                               _("Could not lookup %s for %s invocation"),
+                               "Msvm_ConcreteJob", "RequestStateChange");
                 goto cleanup;
             }
 
@@ -501,29 +493,29 @@ hypervInvokeMsvmComputerSystemRequestStateChange(virDomainPtr domain,
               case MSVM_CONCRETEJOB_JOBSTATE_KILLED:
               case MSVM_CONCRETEJOB_JOBSTATE_EXCEPTION:
               case MSVM_CONCRETEJOB_JOBSTATE_SERVICE:
-                HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                             _("Concrete job for %s invocation is in error state"),
-                             "RequestStateChange");
+                virReportError(VIR_ERR_INTERNAL_ERROR,
+                               _("Concrete job for %s invocation is in error state"),
+                               "RequestStateChange");
                 goto cleanup;
 
               default:
-                HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                             _("Concrete job for %s invocation is in unknown state"),
-                             "RequestStateChange");
+                virReportError(VIR_ERR_INTERNAL_ERROR,
+                               _("Concrete job for %s invocation is in unknown state"),
+                               "RequestStateChange");
                 goto cleanup;
             }
         }
     } else if (returnCode != CIM_RETURNCODE_COMPLETED_WITH_NO_ERROR) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("Invocation of %s returned an error: %s (%d)"),
-                     "RequestStateChange", hypervReturnCodeToString(returnCode),
-                     returnCode);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Invocation of %s returned an error: %s (%d)"),
+                       "RequestStateChange", hypervReturnCodeToString(returnCode),
+                       returnCode);
         goto cleanup;
     }
 
     result = 0;
 
-  cleanup:
+ cleanup:
     if (options != NULL) {
         wsmc_options_destroy(options);
     }
@@ -624,14 +616,14 @@ hypervMsvmComputerSystemToDomain(virConnectPtr conn,
     unsigned char uuid[VIR_UUID_BUFLEN];
 
     if (domain == NULL || *domain != NULL) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
     if (virUUIDParse(computerSystem->data->Name, uuid) < 0) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("Could not parse UUID from string '%s'"),
-                     computerSystem->data->Name);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Could not parse UUID from string '%s'"),
+                       computerSystem->data->Name);
         return -1;
     }
 
@@ -659,7 +651,7 @@ hypervMsvmComputerSystemFromDomain(virDomainPtr domain,
     virBuffer query = VIR_BUFFER_INITIALIZER;
 
     if (computerSystem == NULL || *computerSystem != NULL) {
-        HYPERV_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
@@ -675,8 +667,8 @@ hypervMsvmComputerSystemFromDomain(virDomainPtr domain,
     }
 
     if (*computerSystem == NULL) {
-        HYPERV_ERROR(VIR_ERR_NO_DOMAIN,
-                     _("No domain with UUID %s"), uuid_string);
+        virReportError(VIR_ERR_NO_DOMAIN,
+                       _("No domain with UUID %s"), uuid_string);
         return -1;
     }
 

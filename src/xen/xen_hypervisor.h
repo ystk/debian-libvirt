@@ -1,9 +1,21 @@
 /*
- * xen_internal.h: internal API for direct access to Xen hypervisor level
+ * xen_hypervisor.h: internal API for direct access to Xen hypervisor level
  *
  * Copyright (C) 2005, 2010-2011 Red Hat, Inc.
  *
- * See COPYING.LIB for the License of this software
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Daniel Veillard <veillard@redhat.com>
  */
@@ -15,6 +27,7 @@
 # include "capabilities.h"
 # include "driver.h"
 # include "viruri.h"
+# include "domain_conf.h"
 
 /* See xenHypervisorInit() for details. */
 struct xenHypervisorVersions {
@@ -24,7 +37,6 @@ struct xenHypervisorVersions {
     int dom_interface; /* -1,3,4,5,6,7 */
 };
 
-extern struct xenUnifiedDriver xenHypervisorDriver;
 int xenHypervisorInit(struct xenHypervisorVersions *override_versions);
 
 virCapsPtr xenHypervisorMakeCapabilities (virConnectPtr conn);
@@ -32,16 +44,16 @@ virCapsPtr xenHypervisorMakeCapabilities (virConnectPtr conn);
 int
         xenHypervisorHasDomain(virConnectPtr conn,
                                int id);
-virDomainPtr
-        xenHypervisorLookupDomainByID   (virConnectPtr conn,
-                                         int id);
-virDomainPtr
+virDomainDefPtr
+        xenHypervisorLookupDomainByID   (virConnectPtr conn, int id);
+virDomainDefPtr
         xenHypervisorLookupDomainByUUID (virConnectPtr conn,
                                          const unsigned char *uuid);
 char *
-        xenHypervisorDomainGetOSType    (virDomainPtr dom);
+        xenHypervisorDomainGetOSType    (virConnectPtr conn,
+                                         virDomainDefPtr def);
 
-virDrvOpenStatus
+int
         xenHypervisorOpen               (virConnectPtr conn,
                                          virConnectAuthPtr auth,
                                          unsigned int flags);
@@ -50,83 +62,74 @@ int     xenHypervisorGetVersion         (virConnectPtr conn,
                                          unsigned long *hvVer);
 virCapsPtr
         xenHypervisorMakeCapabilitiesInternal(virConnectPtr conn,
-                                              const char *hostmachine,
+                                              virArch hostarch,
                                               FILE *cpuinfo,
                                               FILE *capabilities);
-char *
-        xenHypervisorGetCapabilities    (virConnectPtr conn);
+char * xenHypervisorGetCapabilities    (virConnectPtr conn);
 unsigned long
-        xenHypervisorGetDomMaxMemory    (virConnectPtr conn,
-                                         int id);
-int     xenHypervisorNumOfDomains       (virConnectPtr conn);
-int     xenHypervisorListDomains        (virConnectPtr conn,
-                                         int *ids,
-                                         int maxids);
+        xenHypervisorGetMaxMemory(virConnectPtr conn,
+                                  virDomainDefPtr def);
 int     xenHypervisorGetMaxVcpus        (virConnectPtr conn,
                                          const char *type);
-int     xenHypervisorDestroyDomain      (virDomainPtr domain)
-          ATTRIBUTE_NONNULL (1);
-int     xenHypervisorDestroyDomainFlags (virDomainPtr domain,
-                                         unsigned int flags)
-          ATTRIBUTE_NONNULL (1);
-int     xenHypervisorResumeDomain       (virDomainPtr domain)
-          ATTRIBUTE_NONNULL (1);
-int     xenHypervisorPauseDomain        (virDomainPtr domain)
-          ATTRIBUTE_NONNULL (1);
-int     xenHypervisorGetDomainInfo        (virDomainPtr domain,
+int     xenHypervisorGetDomainInfo        (virConnectPtr conn,
+                                           virDomainDefPtr def,
                                            virDomainInfoPtr info)
           ATTRIBUTE_NONNULL (1);
-int     xenHypervisorGetDomainState     (virDomainPtr domain,
+int     xenHypervisorGetDomainState     (virConnectPtr conn,
+                                         virDomainDefPtr def,
                                          int *state,
-                                         int *reason,
-                                         unsigned int flags)
+                                         int *reason)
           ATTRIBUTE_NONNULL (1);
 int     xenHypervisorGetDomInfo         (virConnectPtr conn,
                                          int id,
                                          virDomainInfoPtr info);
-int     xenHypervisorSetMaxMemory       (virDomainPtr domain,
+int     xenHypervisorSetMaxMemory       (virConnectPtr conn,
+                                         virDomainDefPtr def,
                                          unsigned long memory)
           ATTRIBUTE_NONNULL (1);
 int     xenHypervisorCheckID            (virConnectPtr conn,
                                          int id);
-int     xenHypervisorSetVcpus           (virDomainPtr domain,
-                                         unsigned int nvcpus)
-          ATTRIBUTE_NONNULL (1);
-int     xenHypervisorPinVcpu            (virDomainPtr domain,
+int     xenHypervisorPinVcpu            (virConnectPtr conn,
+                                         virDomainDefPtr def,
                                          unsigned int vcpu,
                                          unsigned char *cpumap,
                                          int maplen)
           ATTRIBUTE_NONNULL (1);
-int     xenHypervisorGetVcpus           (virDomainPtr domain,
+int     xenHypervisorGetVcpus           (virConnectPtr conn,
+                                         virDomainDefPtr def,
                                          virVcpuInfoPtr info,
                                          int maxinfo,
                                          unsigned char *cpumaps,
                                          int maplen)
           ATTRIBUTE_NONNULL (1);
-int     xenHypervisorGetVcpuMax         (virDomainPtr domain)
+int     xenHypervisorGetVcpuMax         (virConnectPtr conn,
+                                         virDomainDefPtr def)
           ATTRIBUTE_NONNULL (1);
 
-char *  xenHypervisorGetSchedulerType   (virDomainPtr domain,
+char *  xenHypervisorGetSchedulerType   (virConnectPtr conn,
                                          int *nparams)
           ATTRIBUTE_NONNULL (1);
 
-int     xenHypervisorGetSchedulerParameters(virDomainPtr domain,
-                                         virTypedParameterPtr params,
-                                         int *nparams)
+int     xenHypervisorGetSchedulerParameters(virConnectPtr conn,
+                                            virDomainDefPtr def,
+                                            virTypedParameterPtr params,
+                                            int *nparams)
           ATTRIBUTE_NONNULL (1);
 
-int     xenHypervisorSetSchedulerParameters(virDomainPtr domain,
-                                         virTypedParameterPtr params,
-                                         int nparams)
+int     xenHypervisorSetSchedulerParameters(virConnectPtr conn,
+                                            virDomainDefPtr def,
+                                            virTypedParameterPtr params,
+                                            int nparams)
           ATTRIBUTE_NONNULL (1);
 
-int     xenHypervisorDomainBlockStats   (virDomainPtr domain,
+int     xenHypervisorDomainBlockStats   (virConnectPtr conn,
+                                         virDomainDefPtr def,
                                          const char *path,
                                          struct _virDomainBlockStats *stats)
           ATTRIBUTE_NONNULL (1);
-int     xenHypervisorDomainInterfaceStats (virDomainPtr domain,
-                                         const char *path,
-                                         struct _virDomainInterfaceStats *stats)
+int     xenHypervisorDomainInterfaceStats (virDomainDefPtr def,
+                                           const char *path,
+                                           struct _virDomainInterfaceStats *stats)
           ATTRIBUTE_NONNULL (1);
 
 int     xenHypervisorNodeGetCellsFreeMemory(virConnectPtr conn,

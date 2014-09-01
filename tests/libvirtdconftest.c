@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Red Hat, Inc.
+ * Copyright (C) 2012-2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -12,8 +12,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -24,13 +24,17 @@
 
 #include "testutils.h"
 #include "daemon/libvirtd-config.h"
-#include "util.h"
+#include "virutil.h"
 #include "c-ctype.h"
-#include "virterror_internal.h"
-#include "logging.h"
-#include "conf.h"
+#include "virerror.h"
+#include "virfile.h"
+#include "virlog.h"
+#include "virconf.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_NONE
+
+VIR_LOG_INIT("tests.libvirtdconftest");
 
 struct testCorruptData {
     size_t *params;
@@ -76,10 +80,8 @@ munge_param(const char *datain,
         strlen(replace) +
         strlen(eol) + 1;
 
-    if (VIR_ALLOC_N(dataout, dataoutlen) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC_N(dataout, dataoutlen) < 0)
         return NULL;
-    }
     memcpy(dataout, datain, (eq - datain) + 1);
     memcpy(dataout + (eq - datain) + 1,
            replace, strlen(replace));
@@ -120,6 +122,13 @@ testCorrupt(const void *opaque)
         goto cleanup;
     }
 
+#if !WITH_SASL
+    if (strstr(err->message, "unsupported auth sasl")) {
+        VIR_DEBUG("sasl unsupported, skipping this config");
+        goto cleanup;
+    }
+#endif
+
     switch (type) {
     case VIR_CONF_LONG:
         if (!strstr(err->message, "invalid type: got string; expected long")) {
@@ -144,7 +153,7 @@ testCorrupt(const void *opaque)
         break;
     }
 
-cleanup:
+ cleanup:
     VIR_FREE(newdata);
     daemonConfigFree(conf);
     return ret;
@@ -214,17 +223,20 @@ mymain(void)
         goto cleanup;
     }
     VIR_DEBUG("Initial config [%s]", filedata);
-    for (i = 0 ; params[i] != 0 ; i++) {
+    for (i = 0; params[i] != 0; i++) {
         const struct testCorruptData data = { params, filedata, filename, i };
-        if (virtTestRun("Test corruption", 1, testCorrupt, &data) < 0)
+        /* Skip now ignored config param */
+        if (STRPREFIX(filedata + params[i], "log_buffer_size"))
+            continue;
+        if (virtTestRun("Test corruption", testCorrupt, &data) < 0)
             ret = -1;
     }
 
-cleanup:
+ cleanup:
     VIR_FREE(filename);
     VIR_FREE(filedata);
     VIR_FREE(params);
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2011 Red Hat, Inc.
+ * Copyright (C) 2010-2013 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -12,192 +12,274 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
 #include <config.h>
 
 #include "security_nop.h"
+#include "virstring.h"
+#include "virerror.h"
 
-static virSecurityDriverStatus virSecurityDriverProbeNop(void)
+#define VIR_FROM_THIS VIR_FROM_SECURITY
+
+static virSecurityDriverStatus
+virSecurityDriverProbeNop(const char *virtDriver ATTRIBUTE_UNUSED)
 {
     return SECURITY_DRIVER_ENABLE;
 }
 
-static int virSecurityDriverOpenNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED)
+static int
+virSecurityDriverOpenNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDriverCloseNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED)
+static int
+virSecurityDriverCloseNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static const char * virSecurityDriverGetModelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED)
+static const char *
+virSecurityDriverGetModelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED)
 {
     return "none";
 }
 
-static const char * virSecurityDriverGetDOINop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED)
+static const char *
+virSecurityDriverGetDOINop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED)
 {
     return "0";
 }
 
-static int virSecurityDomainRestoreImageLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                                 virDomainDefPtr vm ATTRIBUTE_UNUSED,
-                                                 virDomainDiskDefPtr disk ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainRestoreDiskLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                     virDomainDefPtr vm ATTRIBUTE_UNUSED,
+                                     virDomainDiskDefPtr disk ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainSetDaemonSocketLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                                    virDomainDefPtr vm ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainSetDaemonSocketLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                         virDomainDefPtr vm ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainSetSocketLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                              virDomainDefPtr vm ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainSetSocketLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                   virDomainDefPtr vm ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainClearSocketLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                                virDomainDefPtr vm ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainClearSocketLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                     virDomainDefPtr vm ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainSetImageLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                             virDomainDefPtr vm ATTRIBUTE_UNUSED,
-                                             virDomainDiskDefPtr disk ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainSetDiskLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                 virDomainDefPtr vm ATTRIBUTE_UNUSED,
+                                 virDomainDiskDefPtr disk ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainRestoreHostdevLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                                   virDomainDefPtr vm ATTRIBUTE_UNUSED,
-                                                   virDomainHostdevDefPtr dev ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainRestoreHostdevLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                        virDomainDefPtr vm ATTRIBUTE_UNUSED,
+                                        virDomainHostdevDefPtr dev ATTRIBUTE_UNUSED,
+                                        const char *vroot ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainSetHostdevLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                               virDomainDefPtr vm ATTRIBUTE_UNUSED,
-                                               virDomainHostdevDefPtr dev ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainSetHostdevLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                    virDomainDefPtr vm ATTRIBUTE_UNUSED,
+                                    virDomainHostdevDefPtr dev ATTRIBUTE_UNUSED,
+                                    const char *vroot ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainSetSavedStateLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                                  virDomainDefPtr vm ATTRIBUTE_UNUSED,
-                                                  const char *savefile ATTRIBUTE_UNUSED)
-{
-    return 0;
-}
-static int virSecurityDomainRestoreSavedStateLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                                      virDomainDefPtr vm ATTRIBUTE_UNUSED,
-                                                      const char *savefile ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainSetSavedStateLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                       virDomainDefPtr vm ATTRIBUTE_UNUSED,
+                                       const char *savefile ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainGenLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                        virDomainDefPtr sec ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainRestoreSavedStateLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                           virDomainDefPtr vm ATTRIBUTE_UNUSED,
+                                           const char *savefile ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainReserveLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                            virDomainDefPtr sec ATTRIBUTE_UNUSED,
-                                            pid_t pid ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainGenLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                             virDomainDefPtr sec ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainReleaseLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                            virDomainDefPtr sec ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainReserveLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                 virDomainDefPtr sec ATTRIBUTE_UNUSED,
+                                 pid_t pid ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainSetAllLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                           virDomainDefPtr sec ATTRIBUTE_UNUSED,
-                                           const char *stdin_path ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainReleaseLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                 virDomainDefPtr sec ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainRestoreAllLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                               virDomainDefPtr vm ATTRIBUTE_UNUSED,
-                                               int migrated ATTRIBUTE_UNUSED)
-{
-    return 0;
-}
-static int virSecurityDomainGetProcessLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                               virDomainDefPtr vm ATTRIBUTE_UNUSED,
-                                               pid_t pid ATTRIBUTE_UNUSED,
-                                               virSecurityLabelPtr sec ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainSetAllLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                virDomainDefPtr sec ATTRIBUTE_UNUSED,
+                                const char *stdin_path ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainSetProcessLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                               virDomainDefPtr vm ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainRestoreAllLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                    virDomainDefPtr vm ATTRIBUTE_UNUSED,
+                                    bool migrated ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainVerifyNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                      virDomainDefPtr def ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainGetProcessLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                    virDomainDefPtr vm ATTRIBUTE_UNUSED,
+                                    pid_t pid ATTRIBUTE_UNUSED,
+                                    virSecurityLabelPtr sec ATTRIBUTE_UNUSED)
 {
     return 0;
 }
 
-static int virSecurityDomainSetFDLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
-                                          virDomainDefPtr sec ATTRIBUTE_UNUSED,
-                                          int fd ATTRIBUTE_UNUSED)
+static int
+virSecurityDomainSetProcessLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                    virDomainDefPtr vm ATTRIBUTE_UNUSED)
 {
     return 0;
 }
+
+static int
+virSecurityDomainSetChildProcessLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                         virDomainDefPtr vm ATTRIBUTE_UNUSED,
+                                         virCommandPtr cmd ATTRIBUTE_UNUSED)
+{
+    return 0;
+}
+
+static int
+virSecurityDomainVerifyNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                           virDomainDefPtr def ATTRIBUTE_UNUSED)
+{
+    return 0;
+}
+
+static int
+virSecurityDomainSetFDLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                               virDomainDefPtr sec ATTRIBUTE_UNUSED,
+                               int fd ATTRIBUTE_UNUSED)
+{
+    return 0;
+}
+
+static char *
+virSecurityDomainGetMountOptionsNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                    virDomainDefPtr vm ATTRIBUTE_UNUSED)
+{
+    char *opts;
+
+    ignore_value(VIR_STRDUP(opts, ""));
+    return opts;
+}
+
+static const char *
+virSecurityGetBaseLabel(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                        int virtType ATTRIBUTE_UNUSED)
+{
+    return NULL;
+}
+
+static int
+virSecurityDomainRestoreImageLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                      virDomainDefPtr def ATTRIBUTE_UNUSED,
+                                      virStorageSourcePtr src ATTRIBUTE_UNUSED)
+{
+    return 0;
+}
+
+static int
+virSecurityDomainSetImageLabelNop(virSecurityManagerPtr mgr ATTRIBUTE_UNUSED,
+                                  virDomainDefPtr def ATTRIBUTE_UNUSED,
+                                  virStorageSourcePtr src ATTRIBUTE_UNUSED)
+{
+    return 0;
+}
+
 
 virSecurityDriver virSecurityDriverNop = {
-    0,
-    "none",
-    virSecurityDriverProbeNop,
-    virSecurityDriverOpenNop,
-    virSecurityDriverCloseNop,
+    .privateDataLen                     = 0,
+    .name                               = "none",
+    .probe                              = virSecurityDriverProbeNop,
+    .open                               = virSecurityDriverOpenNop,
+    .close                              = virSecurityDriverCloseNop,
 
-    virSecurityDriverGetModelNop,
-    virSecurityDriverGetDOINop,
+    .getModel                           = virSecurityDriverGetModelNop,
+    .getDOI                             = virSecurityDriverGetDOINop,
 
-    virSecurityDomainVerifyNop,
+    .domainSecurityVerify               = virSecurityDomainVerifyNop,
 
-    virSecurityDomainSetImageLabelNop,
-    virSecurityDomainRestoreImageLabelNop,
+    .domainSetSecurityDiskLabel         = virSecurityDomainSetDiskLabelNop,
+    .domainRestoreSecurityDiskLabel     = virSecurityDomainRestoreDiskLabelNop,
 
-    virSecurityDomainSetDaemonSocketLabelNop,
-    virSecurityDomainSetSocketLabelNop,
-    virSecurityDomainClearSocketLabelNop,
+    .domainSetSecurityImageLabel        = virSecurityDomainSetImageLabelNop,
+    .domainRestoreSecurityImageLabel    = virSecurityDomainRestoreImageLabelNop,
 
-    virSecurityDomainGenLabelNop,
-    virSecurityDomainReserveLabelNop,
-    virSecurityDomainReleaseLabelNop,
+    .domainSetSecurityDaemonSocketLabel = virSecurityDomainSetDaemonSocketLabelNop,
+    .domainSetSecuritySocketLabel       = virSecurityDomainSetSocketLabelNop,
+    .domainClearSecuritySocketLabel     = virSecurityDomainClearSocketLabelNop,
 
-    virSecurityDomainGetProcessLabelNop,
-    virSecurityDomainSetProcessLabelNop,
+    .domainGenSecurityLabel             = virSecurityDomainGenLabelNop,
+    .domainReserveSecurityLabel         = virSecurityDomainReserveLabelNop,
+    .domainReleaseSecurityLabel         = virSecurityDomainReleaseLabelNop,
 
-    virSecurityDomainSetAllLabelNop,
-    virSecurityDomainRestoreAllLabelNop,
+    .domainGetSecurityProcessLabel      = virSecurityDomainGetProcessLabelNop,
+    .domainSetSecurityProcessLabel      = virSecurityDomainSetProcessLabelNop,
+    .domainSetSecurityChildProcessLabel = virSecurityDomainSetChildProcessLabelNop,
 
-    virSecurityDomainSetHostdevLabelNop,
-    virSecurityDomainRestoreHostdevLabelNop,
+    .domainSetSecurityAllLabel          = virSecurityDomainSetAllLabelNop,
+    .domainRestoreSecurityAllLabel      = virSecurityDomainRestoreAllLabelNop,
 
-    virSecurityDomainSetSavedStateLabelNop,
-    virSecurityDomainRestoreSavedStateLabelNop,
+    .domainSetSecurityHostdevLabel      = virSecurityDomainSetHostdevLabelNop,
+    .domainRestoreSecurityHostdevLabel  = virSecurityDomainRestoreHostdevLabelNop,
 
-    virSecurityDomainSetFDLabelNop,
+    .domainSetSavedStateLabel           = virSecurityDomainSetSavedStateLabelNop,
+    .domainRestoreSavedStateLabel       = virSecurityDomainRestoreSavedStateLabelNop,
+
+    .domainSetSecurityImageFDLabel      = virSecurityDomainSetFDLabelNop,
+    .domainSetSecurityTapFDLabel        = virSecurityDomainSetFDLabelNop,
+
+    .domainGetSecurityMountOptions      = virSecurityDomainGetMountOptionsNop,
+
+    .getBaseLabel                       = virSecurityGetBaseLabel,
 };

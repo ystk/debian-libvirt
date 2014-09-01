@@ -12,8 +12,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * POSIX DAC security driver
  */
@@ -25,12 +25,14 @@
 
 extern virSecurityDriver virSecurityDriverDAC;
 
-void virSecurityDACSetUser(virSecurityManagerPtr mgr,
-                           uid_t user);
-void virSecurityDACSetGroup(virSecurityManagerPtr mgr,
-                            gid_t group);
+int virSecurityDACSetUserAndGroup(virSecurityManagerPtr mgr,
+                                  uid_t user,
+                                  gid_t group);
 
 void virSecurityDACSetDynamicOwnership(virSecurityManagerPtr mgr,
                                        bool dynamic);
+
+void virSecurityDACSetChownCallback(virSecurityManagerPtr mgr,
+                                    virSecurityManagerDACChownCallback chownCallback);
 
 #endif /* __VIR_SECURITY_DAC */

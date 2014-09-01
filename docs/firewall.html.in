@@ -1,5 +1,6 @@
-<?xml version="1.0"?>
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <h1 >Firewall and network filtering in libvirt</h1>
     <p>There are three pieces of libvirt functionality which do network
@@ -141,7 +142,7 @@ MASQUERADE all  --  *      *       192.168.122.0/24    !192.168.122.0/24</pre>
     <p><a href="http://www.dmtf.org/standards/cim/cim_schema_v2230/CIM_Network.pdf">http://www.dmtf.org/standards/cim/cim_schema_v2230/CIM_Network.pdf</a></p>
     <p>The filters are managed in libvirt as a top level, standalone object.
        This allows the filters to then be referenced by any libvirt object
-       that requires their functionality, instead tieing them only to use
+       that requires their functionality, instead tying them only to use
        by guest NICs. In the current implementation, filters can be associated
        with individual guest NICs via the libvirt domain XML format. In the
        future we might allow filters to be associated with the virtual network
@@ -198,7 +199,7 @@ using an XML format. At a high level the format looks like this:
     </p>
     <p>The <code>&lt;rule&gt;</code> element is where all the interesting stuff
        happens. It has three attributes, an action, a traffic direction and an
-       optional priority. eg:
+       optional priority. E.g.:
     </p>
     <pre>&lt;rule action='drop' direction='out' priority='500'&gt;</pre>
     <p>Within the rule there are a wide variety of elements allowed, which
@@ -271,7 +272,7 @@ f5c78134-9da4-0c60-a9f0-fb37bc21ac1f  no-other-rarp-traffic
        to update them. This ensures the guests have their iptables/ebtables
        rules recreated.
     </p>
-    <p>To associate the clean-trafffic filter with a guest, edit the
+    <p>To associate the clean-traffic filter with a guest, edit the
        guest XML config and change the <code>&lt;interface&gt;</code> element
        to include a <code>&lt;filterref&gt;</code> and also specify the
        whitelisted <code>&lt;ip address/&gt;</code> the guest is allowed to
@@ -317,7 +318,7 @@ Bridge chain: PREROUTING, entries: 1, policy: ACCEPT
 
 Bridge chain: POSTROUTING, entries: 1, policy: ACCEPT
 -o vnet0 -j libvirt-O-vnet0</pre>
-    <p>To keep things managable and easy to follow, the driver will then
+    <p>To keep things manageable and easy to follow, the driver will then
        create further sub-chains for each protocol then it needs to match
        against:
     </p>

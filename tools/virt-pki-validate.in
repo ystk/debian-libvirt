@@ -4,8 +4,54 @@
 # for the secure client/server support of libvirt as documented at
 # http://libvirt.org/remote.html#Remote_certificates
 #
+# Copyright (C) 2009-2013 Red Hat, Inc.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library.  If not, see
+# <http://www.gnu.org/licenses/>.
+#
 # Daniel Veillard <veillard@redhat.com>
 #
+
+case $1 in
+  -h | --h | --he | --hel | --help)
+    cat <<EOF
+Usage:
+  $0 [OPTION]
+
+Options:
+  -h | --help        Display program help
+  -V | --version     Display program version
+EOF
+    exit ;;
+  -V | --v | --ve | --ver | --vers | --versi | --versio | --version)
+    cat <<EOF
+$0 (libvirt) @VERSION@
+EOF
+    exit ;;
+  --) shift ;;
+  -) # Not an option but an argument; it gets rejected later
+    ;;
+  -*)
+    echo "$0: unrecognized option '$1'" >&2
+    exit 1 ;;
+esac
+
+if test $# != 0; then
+    echo "$0: unrecognized argument '$1'" >&2
+    exit 1
+fi
+
 USER=`who am i | awk '{ print $1 }'`
 SERVER=1
 CLIENT=1
@@ -25,7 +71,7 @@ echo Found "$CERTOOL"
 #
 # Check the directory structure
 #
-SYSCONFDIR="@SYSCONFDIR@"
+SYSCONFDIR="@sysconfdir@"
 PKI="$SYSCONFDIR/pki"
 if [ ! -d "$PKI" ]
 then
@@ -170,7 +216,8 @@ then
         else
             echo Found client private key $LIBVIRTP/clientkey.pem
             OWN=`ls -l "$LIBVIRTP/clientkey.pem" | awk '{ print $3 }'`
-            MOD=`ls -l "$LIBVIRTP/clientkey.pem" | awk '{ print $1 }'`
+            # The substr($1, 1, 10) gets rid of acl and xattr markers
+            MOD=`ls -l "$LIBVIRTP/clientkey.pem" | awk '{ print substr($1, 1, 10) }'`
             if [ "$OWN" != "root" ]
             then
                 echo The client private key should be owned by root
@@ -222,7 +269,8 @@ then
         else
             echo Found server private key $LIBVIRTP/serverkey.pem
             OWN=`ls -l "$LIBVIRTP/serverkey.pem" | awk '{ print $3 }'`
-            MOD=`ls -l "$LIBVIRTP/serverkey.pem" | awk '{ print $1 }'`
+            # The substr($1, 1, 10) gets rid of acl and xattr markers
+            MOD=`ls -l "$LIBVIRTP/serverkey.pem" | awk '{ print substr($1, 1, 10) }'`
             if [ "$OWN" != "root" ]
             then
                 echo The server private key should be owned by root
@@ -282,7 +330,7 @@ exit 0
 
 =head1 SYNOPSIS
 
-  virt-pki-validate
+  virt-pki-validate [OPTION]
 
 =head1 DESCRIPTION
 
@@ -290,6 +338,20 @@ This tool validates that the necessary PKI files are configured for
 a secure libvirt server or client using the TLS encryption protocol.
 It will report any missing certificate or key files on the host. It
 should be run as root to ensure it can read all the necessary files
+
+=head1 OPTIONS
+
+=over
+
+=item B<-h, --help>
+
+Display command line help usage then exit.
+
+=item B<-V, --version>
+
+Display version information then exit.
+
+=back
 
 =head1 EXIT STATUS
 
@@ -308,7 +370,7 @@ Alternatively report bugs to your software distributor / vendor.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2006-2010 by Red Hat, Inc.
+Copyright (C) 2006-2012 by Red Hat, Inc.
 
 =head1 LICENSE
 

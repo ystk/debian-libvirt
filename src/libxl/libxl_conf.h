@@ -1,6 +1,8 @@
-/*---------------------------------------------------------------------------*/
-/*  Copyright (c) 2011 SUSE LINUX Products GmbH, Nuernberg, Germany.
- *  Copyright (C) 2011 Univention GmbH.
+/*
+ * libxl_conf.h: libxl configuration management
+ *
+ * Copyright (C) 2011-2014 SUSE LINUX Products GmbH, Nuernberg, Germany.
+ * Copyright (C) 2011 Univention GmbH.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -13,32 +15,36 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *     Jim Fehlig <jfehlig@novell.com>
  *     Markus Groß <gross@univention.de>
  */
-/*---------------------------------------------------------------------------*/
 
 #ifndef LIBXL_CONF_H
 # define LIBXL_CONF_H
 
-# include <config.h>
-
 # include <libxl.h>
 
 # include "internal.h"
+# include "libvirt_internal.h"
 # include "domain_conf.h"
 # include "domain_event.h"
 # include "capabilities.h"
 # include "configmake.h"
-# include "bitmap.h"
+# include "virportallocator.h"
+# include "virobject.h"
+# include "virchrdev.h"
+# include "virhostdev.h"
 
-
+# define LIBXL_DRIVER_NAME "xenlight"
 # define LIBXL_VNC_PORT_MIN  5900
 # define LIBXL_VNC_PORT_MAX  65535
+
+# define LIBXL_MIGRATION_PORT_MIN  49152
+# define LIBXL_MIGRATION_PORT_MAX  49216
 
 # define LIBXL_CONFIG_DIR SYSCONFDIR "/libvirt/libxl"
 # define LIBXL_AUTOSTART_DIR LIBXL_CONFIG_DIR "/autostart"
@@ -46,24 +52,45 @@
 # define LIBXL_LOG_DIR LOCALSTATEDIR "/log/libvirt/libxl"
 # define LIBXL_LIB_DIR LOCALSTATEDIR "/lib/libvirt/libxl"
 # define LIBXL_SAVE_DIR LIBXL_LIB_DIR "/save"
+# define LIBXL_DUMP_DIR LIBXL_LIB_DIR "/dump"
+# define LIBXL_BOOTLOADER_PATH BINDIR "/pygrub"
 
+/* libxl interface for setting VCPU affinity changed in 4.5. In fact, a new
+ * parameter has been added, representative of 'VCPU soft affinity'. If one
+ * does not care about it (and that's libvirt case), passing NULL is the
+ * right thing to do. To mark that change, LIBXL_HAVE_VCPUINFO_SOFT_AFFINITY
+ * is defined. */
+# ifdef LIBXL_HAVE_VCPUINFO_SOFT_AFFINITY
+#  define libxl_set_vcpuaffinity(ctx, domid, vcpuid, map) \
+    libxl_set_vcpuaffinity((ctx), (domid), (vcpuid), (map), NULL)
+#  define libxl_set_vcpuaffinity_all(ctx, domid, max_vcpus, map) \
+    libxl_set_vcpuaffinity_all((ctx), (domid), (max_vcpus), (map), NULL)
+# endif
 
 typedef struct _libxlDriverPrivate libxlDriverPrivate;
 typedef libxlDriverPrivate *libxlDriverPrivatePtr;
-struct _libxlDriverPrivate {
-    virMutex lock;
-    virCapsPtr caps;
+
+typedef struct _libxlDriverConfig libxlDriverConfig;
+typedef libxlDriverConfig *libxlDriverConfigPtr;
+
+struct _libxlDriverConfig {
+    virObject parent;
+
+    const libxl_version_info *verInfo;
     unsigned int version;
 
+    /* log stream for driver-wide libxl ctx */
     FILE *logger_file;
     xentoollog_logger *logger;
     /* libxl ctx for driver wide ops; getVersion, getNodeInfo, ... */
-    libxl_ctx ctx;
+    libxl_ctx *ctx;
 
-    virBitmapPtr reservedVNCPorts;
-    virDomainObjList domains;
+    /* Controls automatic ballooning of domain0. If true, attempt to get
+     * memory for new domains from domain0. */
+    bool autoballoon;
 
-    virDomainEventStatePtr domainEventState;
+    /* Once created, caps are immutable */
+    virCapsPtr caps;
 
     char *configDir;
     char *autostartDir;
@@ -71,16 +98,42 @@ struct _libxlDriverPrivate {
     char *stateDir;
     char *libDir;
     char *saveDir;
+    char *autoDumpDir;
 };
 
-typedef struct _libxlDomainObjPrivate libxlDomainObjPrivate;
-typedef libxlDomainObjPrivate *libxlDomainObjPrivatePtr;
-struct _libxlDomainObjPrivate {
-    /* per domain libxl ctx */
-    libxl_ctx ctx;
-    libxl_waiter *dWaiter;
-    int waiterFD;
-    int eventHdl;
+
+struct _libxlDriverPrivate {
+    virMutex lock;
+
+    virHostdevManagerPtr hostdevMgr;
+    /* Require lock to get reference on 'config',
+     * then lockless thereafter */
+    libxlDriverConfigPtr config;
+
+    /* Atomic inc/dec only */
+    unsigned int nactive;
+
+    /* Immutable pointers. Caller must provide locking */
+    virStateInhibitCallback inhibitCallback;
+    void *inhibitOpaque;
+
+    /* Immutable pointer, self-locking APIs */
+    virDomainObjListPtr domains;
+
+    /* Immutable pointer, immutable object */
+    virDomainXMLOptionPtr xmlopt;
+
+    /* Immutable pointer, self-locking APIs */
+    virObjectEventStatePtr domainEventState;
+
+    /* Immutable pointer, self-locking APIs */
+    virPortAllocatorPtr reservedVNCPorts;
+
+    /* Immutable pointer, self-locking APIs */
+    virPortAllocatorPtr migrationPorts;
+
+    /* Immutable pointer, lockless APIs*/
+    virSysinfoDefPtr hostsysinfo;
 };
 
 # define LIBXL_SAVE_MAGIC "libvirt-xml\n \0 \r"
@@ -96,25 +149,51 @@ struct _libxlSavefileHeader {
     uint32_t unused[10];
 };
 
-# define libxlError(code, ...)                                     \
-    virReportErrorHelper(VIR_FROM_LIBXL, code, __FILE__,           \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
+libxlDriverConfigPtr
+libxlDriverConfigNew(void);
+
+libxlDriverConfigPtr
+libxlDriverConfigGet(libxlDriverPrivatePtr driver);
+
+int
+libxlDriverNodeGetInfo(libxlDriverPrivatePtr driver,
+                       virNodeInfoPtr info);
 
 virCapsPtr
 libxlMakeCapabilities(libxl_ctx *ctx);
 
 int
-libxlMakeDisk(virDomainDefPtr def, virDomainDiskDefPtr l_dev,
-              libxl_device_disk *x_dev);
+libxlMakeDisk(virDomainDiskDefPtr l_dev, libxl_device_disk *x_dev);
 int
-libxlMakeNic(virDomainDefPtr def, virDomainNetDefPtr l_nic,
+libxlMakeNic(virDomainDefPtr def,
+             virDomainNetDefPtr l_nic,
              libxl_device_nic *x_nic);
 int
-libxlMakeVfb(libxlDriverPrivatePtr driver, virDomainDefPtr def,
+libxlMakeVfb(virPortAllocatorPtr graphicsports,
              virDomainGraphicsDefPtr l_vfb, libxl_device_vfb *x_vfb);
 
 int
-libxlBuildDomainConfig(libxlDriverPrivatePtr driver,
-                       virDomainDefPtr def, libxl_domain_config *d_config);
+libxlMakePCI(virDomainHostdevDefPtr hostdev, libxl_device_pci *pcidev);
+
+virDomainXMLOptionPtr
+libxlCreateXMLConf(void);
+
+int
+libxlBuildDomainConfig(virPortAllocatorPtr graphicsports,
+                       virDomainDefPtr def,
+                       libxl_ctx *ctx,
+                       libxl_domain_config *d_config);
+
+static inline void
+libxlDriverLock(libxlDriverPrivatePtr driver)
+{
+    virMutexLock(&driver->lock);
+}
+
+static inline void
+libxlDriverUnlock(libxlDriverPrivatePtr driver)
+{
+    virMutexUnlock(&driver->lock);
+}
 
 #endif /* LIBXL_CONF_H */

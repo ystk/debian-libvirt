@@ -12,6 +12,9 @@
 #include "testutils.h"
 #include "network_conf.h"
 #include "testutilsqemu.h"
+#include "virstring.h"
+
+#define VIR_FROM_THIS VIR_FROM_NONE
 
 static int
 testCompareXMLToXMLFiles(const char *inxml, const char *outxml,
@@ -71,7 +74,7 @@ testCompareXMLToXMLHelper(const void *data)
 
     result = testCompareXMLToXMLFiles(inxml, outxml, info->flags);
 
-cleanup:
+ cleanup:
     VIR_FREE(inxml);
     VIR_FREE(outxml);
 
@@ -87,26 +90,37 @@ mymain(void)
     do {                                                                \
         const struct testInfo info = {name, flags};                     \
         if (virtTestRun("Network XML-2-XML " name,                      \
-                        1, testCompareXMLToXMLHelper, &info) < 0)       \
+                        testCompareXMLToXMLHelper, &info) < 0)          \
             ret = -1;                                                   \
     } while (0)
 #define DO_TEST(name) DO_TEST_FULL(name, 0)
 
+    DO_TEST("dhcp6host-routed-network");
+    DO_TEST("empty-allow-ipv6");
     DO_TEST("isolated-network");
     DO_TEST("routed-network");
     DO_TEST("nat-network");
     DO_TEST("netboot-network");
     DO_TEST("netboot-proxy-network");
     DO_TEST("nat-network-dns-txt-record");
+    DO_TEST("nat-network-dns-srv-record");
+    DO_TEST("nat-network-dns-srv-records");
+    DO_TEST("nat-network-dns-srv-record-minimal");
     DO_TEST("nat-network-dns-hosts");
+    DO_TEST("nat-network-dns-forward-plain");
+    DO_TEST("nat-network-dns-forwarders");
+    DO_TEST("nat-network-forward-nat-address");
     DO_TEST("8021Qbh-net");
     DO_TEST("direct-net");
     DO_TEST("host-bridge-net");
     DO_TEST("vepa-net");
     DO_TEST("bandwidth-network");
+    DO_TEST("openvswitch-net");
     DO_TEST_FULL("passthrough-pf", VIR_NETWORK_XML_INACTIVE);
+    DO_TEST("hostdev");
+    DO_TEST_FULL("hostdev-pf", VIR_NETWORK_XML_INACTIVE);
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

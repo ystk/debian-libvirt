@@ -1,7 +1,7 @@
 /*
  * eventtest.c: Test the libvirtd event loop impl
  *
- * Copyright (C) 2009, 2011 Red Hat, Inc.
+ * Copyright (C) 2009, 2011-2013 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -28,11 +28,13 @@
 
 #include "testutils.h"
 #include "internal.h"
-#include "threads.h"
-#include "logging.h"
-#include "util.h"
-#include "event.h"
-#include "event_poll.h"
+#include "virfile.h"
+#include "virthread.h"
+#include "virlog.h"
+#include "virutil.h"
+#include "vireventpoll.h"
+
+VIR_LOG_INIT("tests.eventtest");
 
 #define NUM_FDS 31
 #define NUM_TIME 31
@@ -143,18 +145,18 @@ verifyFired(const char *name, int handle, int timer)
 {
     int handleFired = 0;
     int timerFired = 0;
-    int i;
-    for (i = 0 ; i < NUM_FDS ; i++) {
+    size_t i;
+    for (i = 0; i < NUM_FDS; i++) {
         if (handles[i].fired) {
             if (i != handle) {
                 virtTestResult(name, 1,
-                               "Handle %d fired, but expected %d\n", i,
+                               "Handle %zu fired, but expected %d\n", i,
                                handle);
                 return EXIT_FAILURE;
             } else {
                 if (handles[i].error != EV_ERROR_NONE) {
                     virtTestResult(name, 1,
-                                   "Handle %d fired, but had error %d\n", i,
+                                   "Handle %zu fired, but had error %d\n", i,
                                    handles[i].error);
                     return EXIT_FAILURE;
                 }
@@ -177,16 +179,16 @@ verifyFired(const char *name, int handle, int timer)
     }
 
 
-    for (i = 0 ; i < NUM_TIME ; i++) {
+    for (i = 0; i < NUM_TIME; i++) {
         if (timers[i].fired) {
             if (i != timer) {
                 virtTestResult(name, 1,
-                               "Timer %d fired, but expected %d\n", i, timer);
+                               "Timer %zu fired, but expected %d\n", i, timer);
                 return EXIT_FAILURE;
             } else {
                 if (timers[i].error != EV_ERROR_NONE) {
                     virtTestResult(name, 1,
-                                   "Timer %d fired, but had error %d\n", i,
+                                   "Timer %zu fired, but had error %d\n", i,
                                    timers[i].error);
                     return EXIT_FAILURE;
                 }
@@ -247,12 +249,12 @@ finishJob(const char *name, int handle, int timer)
 static void
 resetAll(void)
 {
-    int i;
-    for (i = 0 ; i < NUM_FDS ; i++) {
+    size_t i;
+    for (i = 0; i < NUM_FDS; i++) {
         handles[i].fired = 0;
         handles[i].error = EV_ERROR_NONE;
     }
-    for (i = 0 ; i < NUM_TIME ; i++) {
+    for (i = 0; i < NUM_TIME; i++) {
         timers[i].fired = 0;
         timers[i].error = EV_ERROR_NONE;
     }
@@ -261,11 +263,11 @@ resetAll(void)
 static int
 mymain(void)
 {
-    int i;
+    size_t i;
     pthread_t eventThread;
     char one = '1';
 
-    for (i = 0 ; i < NUM_FDS ; i++) {
+    for (i = 0; i < NUM_FDS; i++) {
         if (pipe(handles[i].pipeFD) < 0) {
             fprintf(stderr, "Cannot create pipe: %d", errno);
             return EXIT_FAILURE;
@@ -282,7 +284,7 @@ mymain(void)
 
     virEventPollInit();
 
-    for (i = 0 ; i < NUM_FDS ; i++) {
+    for (i = 0; i < NUM_FDS; i++) {
         handles[i].delete = -1;
         handles[i].watch =
             virEventPollAddHandle(handles[i].pipeFD[0],
@@ -291,7 +293,7 @@ mymain(void)
                                   &handles[i], NULL);
     }
 
-    for (i = 0 ; i < NUM_TIME ; i++) {
+    for (i = 0; i < NUM_TIME; i++) {
         timers[i].delete = -1;
         timers[i].timeout = -1;
         timers[i].timer =
@@ -432,9 +434,9 @@ mymain(void)
     if (finishJob("Deleted during dispatch", -1, 2) != EXIT_SUCCESS)
         return EXIT_FAILURE;
 
-    for (i = 0 ; i < NUM_FDS - 1 ; i++)
+    for (i = 0; i < NUM_FDS - 1; i++)
         virEventPollRemoveHandle(handles[i].watch);
-    for (i = 0 ; i < NUM_TIME - 1 ; i++)
+    for (i = 0; i < NUM_TIME - 1; i++)
         virEventPollRemoveTimeout(timers[i].timer);
 
     resetAll();

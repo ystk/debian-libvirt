@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,33 +24,35 @@
 # define __LIBVIRT_AUDIT_H__
 
 # include "internal.h"
+# include "virlog.h"
 
-enum virAuditRecordType {
+typedef enum {
     VIR_AUDIT_RECORD_MACHINE_CONTROL,
     VIR_AUDIT_RECORD_MACHINE_ID,
     VIR_AUDIT_RECORD_RESOURCE,
-};
+} virAuditRecordType;
 
 int virAuditOpen(void);
 
 void virAuditLog(int enabled);
 
-void virAuditSend(const char *file, const char *func, size_t linenr,
+void virAuditSend(virLogSourcePtr source,
+                  const char *filename, size_t linenr, const char *funcname,
                   const char *clienttty, const char *clientaddr,
-                  enum virAuditRecordType type, bool success,
+                  virAuditRecordType type, bool success,
                   const char *fmt, ...)
-    ATTRIBUTE_FMT_PRINTF(8, 9);
+    ATTRIBUTE_FMT_PRINTF(9, 10);
 
 char *virAuditEncode(const char *key, const char *value);
 
 void virAuditClose(void);
 
 # define VIR_AUDIT(type, success, ...)				\
-    virAuditSend(__FILE__, __func__, __LINE__,			\
+    virAuditSend(&virLogSelf, __FILE__, __LINE__, __func__,     \
                  NULL, NULL, type, success, __VA_ARGS__);
 
 # define VIR_AUDIT_USER(type, success, clienttty, clientaddr, ...)	\
-    virAuditSend(__FILE__, __func__, __LINE__,				\
+    virAuditSend(&virLogSelf, __FILE__, __LINE__, __func__,             \
                  clienttty, clientaddr, type, success, __VA_ARGS__);
 
 # define VIR_AUDIT_STR(str) \

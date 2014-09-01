@@ -1,7 +1,7 @@
 /*
  * virmacaddr.h: MAC address handling
  *
- * Copyright (C) 2006-2012 Red Hat, Inc.
+ * Copyright (C) 2006-2013 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *     Daniel P. Berrange <berrange@redhat.com>
@@ -28,15 +28,30 @@
 
 # define VIR_MAC_BUFLEN 6
 # define VIR_MAC_PREFIX_BUFLEN 3
-# define VIR_MAC_STRING_BUFLEN VIR_MAC_BUFLEN * 3
+# define VIR_MAC_STRING_BUFLEN (VIR_MAC_BUFLEN * 3)
+
+typedef struct _virMacAddr virMacAddr;
+typedef virMacAddr *virMacAddrPtr;
+
+struct _virMacAddr {
+    unsigned char addr[VIR_MAC_BUFLEN];
+};
 
 int virMacAddrCompare(const char *mac1, const char *mac2);
-void virMacAddrFormat(const unsigned char *addr,
-                      char *str);
-void virMacAddrGenerate(const unsigned char *prefix,
-                        unsigned char *addr);
+int virMacAddrCmp(const virMacAddr *mac1, const virMacAddr *mac2);
+int virMacAddrCmpRaw(const virMacAddr *mac1,
+                     const unsigned char s[VIR_MAC_BUFLEN]);
+void virMacAddrSet(virMacAddrPtr dst, const virMacAddr *src);
+void virMacAddrSetRaw(virMacAddrPtr dst, const unsigned char s[VIR_MAC_BUFLEN]);
+void virMacAddrGetRaw(const virMacAddr *src, unsigned char dst[VIR_MAC_BUFLEN]);
+const char *virMacAddrFormat(const virMacAddr *addr,
+                             char *str);
+void virMacAddrGenerate(const unsigned char prefix[VIR_MAC_PREFIX_BUFLEN],
+                        virMacAddrPtr addr);
 int virMacAddrParse(const char* str,
-                    unsigned char *addr) ATTRIBUTE_RETURN_CHECK;
-bool virMacAddrIsUnicast(const unsigned char *addr);
-bool virMacAddrIsMulticast(const unsigned char *addr);
+                    virMacAddrPtr addr) ATTRIBUTE_RETURN_CHECK;
+bool virMacAddrIsUnicast(const virMacAddr *addr);
+bool virMacAddrIsMulticast(const virMacAddr *addr);
+bool virMacAddrIsBroadcastRaw(const unsigned char s[VIR_MAC_BUFLEN]);
+
 #endif /* __VIR_MACADDR_H__ */

@@ -8,7 +8,7 @@
  * This file is part of a free software library; you can redistribute
  * it and/or modify it under the terms of the GNU Lesser General
  * Public License version 2.1 as published by the Free Software
- * Foundation and shipped in the "COPYING" file with this library.
+ * Foundation and shipped in the "COPYING.LESSER" file with this library.
  * The library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY of any kind.
  *
@@ -37,18 +37,23 @@
 
 #include "vbox_XPCOMCGlue.h"
 #include "internal.h"
-#include "memory.h"
-#include "util.h"
-#include "logging.h"
-#include "virterror_internal.h"
+#include "viralloc.h"
+#include "virutil.h"
+#include "virlog.h"
+#include "virerror.h"
+#include "virfile.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_VBOX
 
+VIR_LOG_INIT("vbox.vbox_XPCOMCGlue");
 
 /*******************************************************************************
 *   Defined Constants And Macros                                               *
 *******************************************************************************/
-#if defined(__linux__) || defined(__linux_gnu__) || defined(__sun__) || defined(__FreeBSD__)
+#if defined(__linux__) || defined(__linux_gnu__) || defined(__sun__) || \
+    defined(__FreeBSD__) || defined(__OpenBSD__) || \
+    defined(__FreeBSD_kernel__)
 # define DYNLIB_NAME    "VBoxXPCOMC.so"
 #elif defined(__APPLE__)
 # define DYNLIB_NAME    "VBoxXPCOMC.dylib"
@@ -90,10 +95,8 @@ tryLoadOne(const char *dir, bool setAppHome, bool ignoreMissing,
     PFNVBOXGETXPCOMCFUNCTIONS pfnGetFunctions;
 
     if (dir != NULL) {
-        if (virAsprintf(&name, "%s/%s", dir, DYNLIB_NAME) < 0) {
-            virReportOOMError();
+        if (virAsprintf(&name, "%s/%s", dir, DYNLIB_NAME) < 0)
             return -1;
-        }
 
         if (!virFileExists(name)) {
             if (!ignoreMissing) {
@@ -104,12 +107,8 @@ tryLoadOne(const char *dir, bool setAppHome, bool ignoreMissing,
             return -1;
         }
     } else {
-        name = strdup(DYNLIB_NAME);
-
-        if (name == NULL) {
-            virReportOOMError();
+        if (VIR_STRDUP(name, DYNLIB_NAME) < 0)
             return -1;
-        }
     }
 
     /*
@@ -165,7 +164,7 @@ tryLoadOne(const char *dir, bool setAppHome, bool ignoreMissing,
         VIR_DEBUG("Found %s in dynamic linker search path", DYNLIB_NAME);
     }
 
-cleanup:
+ cleanup:
     if (hVBoxXPCOMC != NULL && result < 0) {
         dlclose(hVBoxXPCOMC);
         hVBoxXPCOMC = NULL;
@@ -186,7 +185,7 @@ cleanup:
 int
 VBoxCGlueInit(unsigned int *version)
 {
-    int i;
+    size_t i;
     static const char *knownDirs[] = {
         "/usr/lib/virtualbox",
         "/usr/lib/virtualbox-ose",
@@ -203,7 +202,7 @@ VBoxCGlueInit(unsigned int *version)
         "/usr/local/lib/VirtualBox",
         "/Applications/VirtualBox.app/Contents/MacOS"
     };
-    const char *home = getenv("VBOX_APP_HOME");
+    const char *home = virGetEnvBlockSUID("VBOX_APP_HOME");
 
     /* If the user specifies the location, try only that. */
     if (home != NULL) {
@@ -336,7 +335,7 @@ vboxArrayGetWithUintArg(vboxArray *array, void *self, void *getter, PRUint32 arg
 void
 vboxArrayRelease(vboxArray *array)
 {
-    int i;
+    size_t i;
     nsISupports *supports;
 
     if (array->items == NULL) {
@@ -363,7 +362,7 @@ vboxArrayRelease(vboxArray *array)
 void
 vboxArrayUnalloc(vboxArray *array)
 {
-    int i;
+    size_t i;
     void *item;
 
     if (array->items == NULL) {

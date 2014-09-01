@@ -1,5 +1,3 @@
-
-
 h1 {
     font-weight: normal;
     color: #3c857c;
@@ -184,23 +182,25 @@ div.api {
     border: 1px solid #999999;
     background: #eeeeee;
     color: black;
+    padding: 3px;
 }
 
 div.api pre {
     margin: 0px;
     border: 0px;
     background: inherit;
+    padding: inherit;
 }
 
 div.api table {
     margin: 0px;
     padding-left: 2em;
-    font-family: fixed;
-    whitespace: pre;
+    border-spacing: 0px;
 }
 
 div.api table td, div.variablelist table td {
     vertical-align: top;
+    padding-left: 1em;
 }
 
 
@@ -411,4 +411,101 @@ table.data tbody td.y {
 table.data tbody td.n {
     background: rgb(255,220,220);
     text-align: center;
+}
+
+.api {
+    font-family: monospace;
+}
+
+.api .type {
+    font-weight: bold;
+    white-space: nowrap;
+    color: darkslateblue;
+}
+
+.api .keyword {
+    font-weight: bold;
+    color: #A2F;
+}
+
+.api .comment {
+    color: #080;
+    margin-left: 2em;
+    position: relative;
+}
+
+.api .comment:before {
+    content: ": ";
+    position: absolute;
+    left: -1.3em;
+}
+
+.api .undisclosed {
+    font-style: italic;
+    letter-spacing: .3ex;
+    font-weight: bolder;
+    text-transform: uppercase;
+    margin-left: 2em;
+}
+
+.api .directive {
+    color: teal;
+}
+
+.api :link:hover, .api :link:focus {
+    color: blue;
+    border-color: blue;
+}
+
+.api :link {
+    text-decoration: none;
+}
+
+dl.variablelist > dt {
+    display: block;
+    float: left;
+    font-style: italic;
+    font-weight: inherit;
+}
+
+.variablelist dd {
+    padding-left: 10em;
+}
+
+dl.variablelist > dt:after {
+    content: ": ";
+}
+
+table.acl {
+    margin: 1em;
+    border-spacing: 0px;
+    border: 1px solid #ccc;
+}
+
+table.acl tr, table.acl td {
+    padding: 0.3em;
+}
+
+table.acl thead {
+    background: #ddd;
+}
+
+div.description pre.code {
+    border: 1px dashed grey;
+    background-color: inherit;
+    padding: 5px 10px 5px 10px;
+    margin-left: 2.5em;
+}
+
+a.headerlink {
+    text-decoration: none!important;
+    visibility: hidden;
+}
+
+h2:hover > a.headerlink,
+h3:hover > a.headerlink,
+h4:hover > a.headerlink,
+h5:hover > a.headerlink,
+h6:hover > a.headerlink {
+    visibility: visible;
 }

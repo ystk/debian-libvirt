@@ -1,4 +1,6 @@
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <h1>Applications using <strong>libvirt</strong></h1>
 
@@ -101,6 +103,19 @@
         in a virtual machine.  It prints out a list of facts about the
         virtual machine, derived from heuristics.
       </dd>
+      <dt><a href="http://sourceware.org/systemtap/">stap</a></dt>
+      <dd>
+        SystemTap is a tool used to gather rich information about a running
+        system through the use of scripts. Starting from v2.4, the front-end
+        application stap can use libvirt to gather data within virtual
+        machines.
+      </dd>
+      <dt><a href="https://github.com/pradels/vagrant-libvirt/">vagrant-libvirt</a></dt>
+      <dd>
+        Vagrant-Libvirt is a Vagrant plugin that uses libvirt to manage virtual
+        machines. It is a command line tool for developers that makes it very
+        fast and easy to deploy and re-deploy an environment of vm's.
+      </dd>
     </dl>
 
     <h2><a name="configmgmt">Configuration Management</a></h2>
@@ -188,7 +203,7 @@
         A general purpose desktop management tool, able to manage
         virtual machines across both local and remotely accessed
         hypervisors. It is targeted at home and small office usage
-        upto managing 10-20 hosts and their VMs.
+        up to managing 10-20 hosts and their VMs.
       </dd>
       <dt><a href="http://virt-manager.org/">virt-viewer</a></dt>
       <dd>
@@ -202,6 +217,13 @@
     <h2><a name="iaas">Infrastructure as a Service (IaaS)</a></h2>
 
     <dl>
+      <dt><a href="http://cc1.ifj.edu.pl">Cracow Cloud One</a></dt>
+      <dd>The CC1 system provides a complete solution for Private
+        Cloud Computing. An intuitive web access interface with an
+        administration module and simple installation procedure make
+        it easy to benefit from private Cloud Computing technology.
+      </dd>
+
       <dt><a href="http://www.emotivecloud.net">EMOTIVE Cloud</a></dt>
       <dd>The EMOTIVE (Elastic Management Of Tasks In Virtualized
         Environments) middleware allows executing tasks and providing
@@ -210,6 +232,14 @@
         with different scheduling policies. It can be also used as a
         cloud provider and is very easy to extend thanks to its
         modular Web Services architecture.
+      </dd>
+
+      <dt><a href="http://www.eucalyptus.com">Eucalyptus</a></dt>
+      <dd>
+        Eucalyptus is an on-premise Infrastructure as a Service cloud
+        software platform that is open source and
+        AWS-compatible. Eucalyptus uses libivrt virtualization API to
+        directly interact with Xen and KVM hypervisors.
       </dd>
 
       <dt><a href="http://www.nimbusproject.org">Nimbus</a></dt>
@@ -226,6 +256,15 @@
         virtual machine (VM) management framework for private clouds. It
         integrates libvirt for VM monitoring, live migration, and life-cycle
         management.
+      </dd>
+
+      <dt><a href="http://www.openstack.org">OpenStack</a></dt>
+      <dd>
+        OpenStack is a "cloud operating system" usable for both public
+        and private clouds.  Its various parts take care of compute,
+        storage and networking resources and interface with the user
+        using a dashboard.  Compute part uses libvirt to manage VM
+        life-cycle, monitoring and so on.
       </dd>
     </dl>
 
@@ -244,19 +283,24 @@
         host, and there is a subproject to allow merging changes into the
         Windows Registry in Windows guests.
       </dd>
+
+      <dt><a href="http://sandbox.libvirt.org">libvirt-sandbox</a></dt>
+      <dd>
+        A library and command line tools for simplifying the creation of
+        application sandboxes using virtualization technology. It currently
+        supports either KVM, QEMU or LXC as backends. Integration with
+        systemd facilitates sandboxing of system services like apache.
+      </dd>
+      <dt><a href="https://github.com/ohadlevy/virt#readme">Ruby
+          Libvirt Object bindings</a></dt>
+      <dd>
+        Allows using simple ruby objects to manipulate
+        hypervisors, guests, storage, network etc.  It is
+        based on top of
+        the <a href="http://libvirt.org/ruby">native ruby bindings</a>.
+      </dd>
     </dl>
 
-        <dl>
-            <dt><a href="https://github.com/ohadlevy/virt#readme">Ruby
-            Libvirt Object bindings</a></dt>
-            <dd>
-                Allows using simple ruby objects to manipulate
-                hypervisors, guests, storage, network etc.  It is
-                based on top of
-                the <a href="http://libvirt.org/ruby">native ruby
-                bindings</a>.
-            </dd>
-        </dl>
     <h2><a name="livecd">LiveCD / Appliances</a></h2>
 
     <dl>
@@ -332,6 +376,7 @@
           <li>Shows you Systems Inventory (based on Facter) and
           provides real time information about hosts status based on
           Puppet reports.</li>
+      </ul>
       </dd>
     </dl>
 
@@ -353,6 +398,15 @@
         machines across an entire data center of hosts. It integrates
         with FreeIPA for Kerberos authentication, and in the future,
         certificate management.
+      </dd>
+      <dt><a href="http://ispsystem.com/en/software/vmmanager">VMmanager</a></dt>
+      <dd>
+        VMmanager is a software solution for virtualization management
+        that can be used both for hosting virtual machines and
+        building a cloud.  VMmanager can manage not only one server,
+        but a large cluster of hypervisors.  It delivers a number of
+        functions, such as live migration that allows for load
+        balancing between cluster nodes, monitoring CPU, memory.
       </dd>
     </dl>
 

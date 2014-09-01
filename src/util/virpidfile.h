@@ -16,8 +16,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -56,9 +56,11 @@ int virPidFileDelete(const char *dir,
 
 
 int virPidFileAcquirePath(const char *path,
+                          bool waitForLock,
                           pid_t pid) ATTRIBUTE_RETURN_CHECK;
 int virPidFileAcquire(const char *dir,
                       const char *name,
+                      bool waitForLock,
                       pid_t pid) ATTRIBUTE_RETURN_CHECK;
 
 int virPidFileReleasePath(const char *path,

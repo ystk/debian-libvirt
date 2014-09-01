@@ -1,7 +1,7 @@
 /*
- * libvirtd.c: daemon start of day, guest process & i/o management
+ * libvirtd-config.c: daemon start of day, guest process & i/o management
  *
- * Copyright (C) 2006-2012 Red Hat, Inc.
+ * Copyright (C) 2006-2012, 2014 Red Hat, Inc.
  * Copyright (C) 2006 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -24,20 +24,20 @@
 #include <config.h>
 
 #include "libvirtd-config.h"
-#include "conf.h"
-#include "memory.h"
-#include "virterror_internal.h"
-#include "logging.h"
+#include "virconf.h"
+#include "viralloc.h"
+#include "virerror.h"
+#include "virlog.h"
 #include "rpc/virnetserver.h"
 #include "configmake.h"
 #include "remote/remote_protocol.h"
 #include "remote/remote_driver.h"
+#include "virstring.h"
+#include "virutil.h"
 
 #define VIR_FROM_THIS VIR_FROM_CONF
 
-#define virConfError(code, ...)                                      \
-    virReportErrorHelper(VIR_FROM_THIS, code, __FILE__,              \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
+VIR_LOG_INIT("daemon.libvirtd-config");
 
 /* Allocate an array of malloc'd strings from the config file, filename
  * (used only in diagnostics), using handle "conf".  Upon error, return -1
@@ -49,58 +49,51 @@ remoteConfigGetStringList(virConfPtr conf, const char *key, char ***list_arg,
                           const char *filename)
 {
     char **list;
-    virConfValuePtr p = virConfGetValue (conf, key);
+    virConfValuePtr p = virConfGetValue(conf, key);
     if (!p)
         return 0;
 
     switch (p->type) {
     case VIR_CONF_STRING:
         if (VIR_ALLOC_N(list, 2) < 0) {
-            virConfError(VIR_ERR_CONFIG_UNSUPPORTED,
-                         _("failed to allocate memory for %s config list"),
-                         key);
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                           _("failed to allocate memory for %s config list"),
+                           key);
             return -1;
         }
-        list[0] = strdup (p->str);
-        list[1] = NULL;
-        if (list[0] == NULL) {
-            virConfError(VIR_ERR_CONFIG_UNSUPPORTED,
-                         _("failed to allocate memory for %s config list value"),
-                         key);
+        if (VIR_STRDUP(list[0], p->str) < 0) {
             VIR_FREE(list);
             return -1;
         }
+        list[1] = NULL;
         break;
 
     case VIR_CONF_LIST: {
-        int i, len = 0;
+        int len = 0;
+        size_t i;
         virConfValuePtr pp;
         for (pp = p->list; pp; pp = pp->next)
             len++;
         if (VIR_ALLOC_N(list, 1+len) < 0) {
-            virConfError(VIR_ERR_CONFIG_UNSUPPORTED,
-                         _("failed to allocate memory for %s config list"),
-                         key);
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                           _("failed to allocate memory for %s config list"),
+                           key);
             return -1;
         }
         for (i = 0, pp = p->list; pp; ++i, pp = pp->next) {
             if (pp->type != VIR_CONF_STRING) {
-                virConfError(VIR_ERR_CONFIG_UNSUPPORTED,
-                             _("remoteReadConfigFile: %s: %s:"
-                               " must be a string or list of strings"),
-                             filename, key);
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                               _("remoteReadConfigFile: %s: %s:"
+                                 " must be a string or list of strings"),
+                               filename, key);
                 VIR_FREE(list);
                 return -1;
             }
-            list[i] = strdup (pp->str);
-            if (list[i] == NULL) {
-                int j;
-                for (j = 0 ; j < i ; j++)
+            if (VIR_STRDUP(list[i], pp->str) < 0) {
+                size_t j;
+                for (j = 0; j < i; j++)
                     VIR_FREE(list[j]);
                 VIR_FREE(list);
-                virConfError(VIR_ERR_CONFIG_UNSUPPORTED,
-                             _("failed to allocate memory for %s config list value"),
-                             key);
                 return -1;
             }
 
@@ -110,10 +103,10 @@ remoteConfigGetStringList(virConfPtr conf, const char *key, char ***list_arg,
     }
 
     default:
-        virConfError(VIR_ERR_CONFIG_UNSUPPORTED,
-                     _("remoteReadConfigFile: %s: %s:"
-                       " must be a string or list of strings"),
-                     filename, key);
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("remoteReadConfigFile: %s: %s:"
+                         " must be a string or list of strings"),
+                       filename, key);
         return -1;
     }
 
@@ -123,58 +116,61 @@ remoteConfigGetStringList(virConfPtr conf, const char *key, char ***list_arg,
 
 /* A helper function used by each of the following macros.  */
 static int
-checkType (virConfValuePtr p, const char *filename,
-           const char *key, virConfType required_type)
+checkType(virConfValuePtr p, const char *filename,
+          const char *key, virConfType required_type)
 {
     if (p->type != required_type) {
-        virConfError(VIR_ERR_CONFIG_UNSUPPORTED,
-                     _("remoteReadConfigFile: %s: %s: invalid type:"
-                       " got %s; expected %s"), filename, key,
-                     virConfTypeName (p->type),
-                     virConfTypeName (required_type));
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("remoteReadConfigFile: %s: %s: invalid type:"
+                         " got %s; expected %s"), filename, key,
+                       virConfTypeName(p->type),
+                       virConfTypeName(required_type));
         return -1;
     }
     return 0;
 }
 
 /* If there is no config data for the key, #var_name, then do nothing.
-   If there is valid data of type VIR_CONF_STRING, and strdup succeeds,
-   store the result in var_name.  Otherwise, (i.e. invalid type, or strdup
+   If there is valid data of type VIR_CONF_STRING, and VIR_STRDUP succeeds,
+   store the result in var_name.  Otherwise, (i.e. invalid type, or VIR_STRDUP
    failure), give a diagnostic and "goto" the cleanup-and-fail label.  */
 #define GET_CONF_STR(conf, filename, var_name)                          \
     do {                                                                \
-        virConfValuePtr p = virConfGetValue (conf, #var_name);          \
+        virConfValuePtr p = virConfGetValue(conf, #var_name);           \
         if (p) {                                                        \
-            if (checkType (p, filename, #var_name, VIR_CONF_STRING) < 0) \
+            if (checkType(p, filename, #var_name, VIR_CONF_STRING) < 0) \
                 goto error;                                             \
             VIR_FREE(data->var_name);                                   \
-            if (!(data->var_name = strdup (p->str))) {                  \
-                virReportOOMError();                                    \
+            if (VIR_STRDUP(data->var_name, p->str) < 0)                 \
                 goto error;                                             \
-            }                                                           \
         }                                                               \
     } while (0)
 
 /* Like GET_CONF_STR, but for integral values.  */
 #define GET_CONF_INT(conf, filename, var_name)                          \
     do {                                                                \
-        virConfValuePtr p = virConfGetValue (conf, #var_name);          \
+        virConfValuePtr p = virConfGetValue(conf, #var_name);           \
         if (p) {                                                        \
-            if (checkType (p, filename, #var_name, VIR_CONF_LONG) < 0)  \
+            if (checkType(p, filename, #var_name, VIR_CONF_LONG) < 0)   \
                 goto error;                                             \
             data->var_name = p->l;                                      \
         }                                                               \
     } while (0)
 
 
-static int remoteConfigGetAuth(virConfPtr conf, const char *key, int *auth, const char *filename) {
+static int
+remoteConfigGetAuth(virConfPtr conf,
+                    const char *key,
+                    int *auth,
+                    const char *filename)
+{
     virConfValuePtr p;
 
-    p = virConfGetValue (conf, key);
+    p = virConfGetValue(conf, key);
     if (!p)
         return 0;
 
-    if (checkType (p, filename, key, VIR_CONF_STRING) < 0)
+    if (checkType(p, filename, key, VIR_CONF_STRING) < 0)
         return -1;
 
     if (!p->str)
@@ -182,16 +178,16 @@ static int remoteConfigGetAuth(virConfPtr conf, const char *key, int *auth, cons
 
     if (STREQ(p->str, "none")) {
         *auth = VIR_NET_SERVER_SERVICE_AUTH_NONE;
-#if HAVE_SASL
+#if WITH_SASL
     } else if (STREQ(p->str, "sasl")) {
         *auth = VIR_NET_SERVER_SERVICE_AUTH_SASL;
 #endif
     } else if (STREQ(p->str, "polkit")) {
         *auth = VIR_NET_SERVER_SERVICE_AUTH_POLKIT;
     } else {
-        virConfError(VIR_ERR_CONFIG_UNSUPPORTED,
-                     _("remoteReadConfigFile: %s: %s: unsupported auth %s"),
-                     filename, key, p->str);
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("remoteReadConfigFile: %s: %s: unsupported auth %s"),
+                       filename, key, p->str);
         return -1;
     }
 
@@ -202,26 +198,24 @@ int
 daemonConfigFilePath(bool privileged, char **configfile)
 {
     if (privileged) {
-        if (!(*configfile = strdup(SYSCONFDIR "/libvirt/libvirtd.conf")))
-            goto no_memory;
+        if (VIR_STRDUP(*configfile, SYSCONFDIR "/libvirt/libvirtd.conf") < 0)
+            goto error;
     } else {
-        char *userdir = NULL;
+        char *configdir = NULL;
 
-        if (!(userdir = virGetUserDirectory(geteuid())))
+        if (!(configdir = virGetUserConfigDirectory()))
             goto error;
 
-        if (virAsprintf(configfile, "%s/.libvirt/libvirtd.conf", userdir) < 0) {
-            VIR_FREE(userdir);
-            goto no_memory;
+        if (virAsprintf(configfile, "%s/libvirtd.conf", configdir) < 0) {
+            VIR_FREE(configdir);
+            goto error;
         }
-        VIR_FREE(userdir);
+        VIR_FREE(configdir);
     }
 
     return 0;
 
-no_memory:
-    virReportOOMError();
-error:
+ error:
     return -1;
 }
 
@@ -232,21 +226,18 @@ daemonConfigNew(bool privileged ATTRIBUTE_UNUSED)
     char *localhost;
     int ret;
 
-    if (VIR_ALLOC(data) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(data) < 0)
         return NULL;
-    }
 
     data->listen_tls = 1;
     data->listen_tcp = 0;
 
-    if (!(data->tls_port = strdup(LIBVIRTD_TLS_PORT)))
-        goto no_memory;
-    if (!(data->tcp_port = strdup(LIBVIRTD_TCP_PORT)))
-        goto no_memory;
+    if (VIR_STRDUP(data->tls_port, LIBVIRTD_TLS_PORT) < 0 ||
+        VIR_STRDUP(data->tcp_port, LIBVIRTD_TCP_PORT) < 0)
+        goto error;
 
     /* Only default to PolicyKit if running as root */
-#if HAVE_POLKIT
+#if WITH_POLKIT
     if (privileged) {
         data->auth_unix_rw = REMOTE_AUTH_POLKIT;
         data->auth_unix_ro = REMOTE_AUTH_POLKIT;
@@ -254,20 +245,16 @@ daemonConfigNew(bool privileged ATTRIBUTE_UNUSED)
 #endif
         data->auth_unix_rw = REMOTE_AUTH_NONE;
         data->auth_unix_ro = REMOTE_AUTH_NONE;
-#if HAVE_POLKIT
+#if WITH_POLKIT
     }
 #endif
 
-    if (data->auth_unix_rw == REMOTE_AUTH_POLKIT)
-        data->unix_sock_rw_perms = strdup("0777"); /* Allow world */
-    else
-        data->unix_sock_rw_perms = strdup("0700"); /* Allow user only */
-    data->unix_sock_ro_perms = strdup("0777"); /* Always allow world */
-    if (!data->unix_sock_ro_perms ||
-        !data->unix_sock_rw_perms)
-        goto no_memory;
+    if (VIR_STRDUP(data->unix_sock_rw_perms,
+                   data->auth_unix_rw == REMOTE_AUTH_POLKIT ? "0777" : "0700") < 0 ||
+        VIR_STRDUP(data->unix_sock_ro_perms, "0777") < 0)
+        goto error;
 
-#if HAVE_SASL
+#if WITH_SASL
     data->auth_tcp = REMOTE_AUTH_SASL;
 #else
     data->auth_tcp = REMOTE_AUTH_NONE;
@@ -278,14 +265,13 @@ daemonConfigNew(bool privileged ATTRIBUTE_UNUSED)
 
     data->min_workers = 5;
     data->max_workers = 20;
-    data->max_clients = 20;
+    data->max_clients = 5000;
+    data->max_anonymous_clients = 20;
 
     data->prio_workers = 5;
 
     data->max_requests = 20;
     data->max_client_requests = 5;
-
-    data->log_buffer_size = 64;
 
     data->audit_level = 1;
     data->audit_logging = 0;
@@ -294,13 +280,13 @@ daemonConfigNew(bool privileged ATTRIBUTE_UNUSED)
     data->keepalive_count = 5;
     data->keepalive_required = 0;
 
-    localhost = virGetHostname(NULL);
+    localhost = virGetHostname();
     if (localhost == NULL) {
         /* we couldn't resolve the hostname; assume that we are
          * running in disconnected operation, and report a less
          * useful Avahi string
          */
-        ret = virAsprintf(&data->mdns_name, "Virtualization Host");
+        ret = VIR_STRDUP(data->mdns_name, "Virtualization Host");
     } else {
         char *tmp;
         /* Extract the host part of the potentially FQDN */
@@ -311,12 +297,11 @@ daemonConfigNew(bool privileged ATTRIBUTE_UNUSED)
     }
     VIR_FREE(localhost);
     if (ret < 0)
-        goto no_memory;
+        goto error;
 
     return data;
 
-no_memory:
-    virReportOOMError();
+ error:
     daemonConfigFree(data);
     return NULL;
 }
@@ -332,6 +317,12 @@ daemonConfigFree(struct daemonConfig *data)
     VIR_FREE(data->listen_addr);
     VIR_FREE(data->tls_port);
     VIR_FREE(data->tcp_port);
+    tmp = data->access_drivers;
+    while (tmp && *tmp) {
+        VIR_FREE(*tmp);
+        tmp++;
+    }
+    VIR_FREE(data->access_drivers);
 
     VIR_FREE(data->unix_sock_ro_perms);
     VIR_FREE(data->unix_sock_rw_perms);
@@ -370,24 +361,22 @@ daemonConfigLoadOptions(struct daemonConfig *data,
                         const char *filename,
                         virConfPtr conf)
 {
-    GET_CONF_INT (conf, filename, listen_tcp);
-    GET_CONF_INT (conf, filename, listen_tls);
-    GET_CONF_STR (conf, filename, tls_port);
-    GET_CONF_STR (conf, filename, tcp_port);
-    GET_CONF_STR (conf, filename, listen_addr);
+    GET_CONF_INT(conf, filename, listen_tcp);
+    GET_CONF_INT(conf, filename, listen_tls);
+    GET_CONF_STR(conf, filename, tls_port);
+    GET_CONF_STR(conf, filename, tcp_port);
+    GET_CONF_STR(conf, filename, listen_addr);
 
     if (remoteConfigGetAuth(conf, "auth_unix_rw", &data->auth_unix_rw, filename) < 0)
         goto error;
-#if HAVE_POLKIT
+#if WITH_POLKIT
     /* Change default perms to be wide-open if PolicyKit is enabled.
      * Admin can always override in config file
      */
     if (data->auth_unix_rw == REMOTE_AUTH_POLKIT) {
         VIR_FREE(data->unix_sock_rw_perms);
-        if (!(data->unix_sock_rw_perms = strdup("0777"))) {
-            virReportOOMError();
+        if (VIR_STRDUP(data->unix_sock_rw_perms, "0777") < 0)
             goto error;
-        }
     }
 #endif
     if (remoteConfigGetAuth(conf, "auth_unix_ro", &data->auth_unix_ro, filename) < 0)
@@ -397,22 +386,26 @@ daemonConfigLoadOptions(struct daemonConfig *data,
     if (remoteConfigGetAuth(conf, "auth_tls", &data->auth_tls, filename) < 0)
         goto error;
 
-    GET_CONF_STR (conf, filename, unix_sock_group);
-    GET_CONF_STR (conf, filename, unix_sock_ro_perms);
-    GET_CONF_STR (conf, filename, unix_sock_rw_perms);
+    if (remoteConfigGetStringList(conf, "access_drivers",
+                                  &data->access_drivers, filename) < 0)
+        goto error;
 
-    GET_CONF_STR (conf, filename, unix_sock_dir);
+    GET_CONF_STR(conf, filename, unix_sock_group);
+    GET_CONF_STR(conf, filename, unix_sock_ro_perms);
+    GET_CONF_STR(conf, filename, unix_sock_rw_perms);
 
-    GET_CONF_INT (conf, filename, mdns_adv);
-    GET_CONF_STR (conf, filename, mdns_name);
+    GET_CONF_STR(conf, filename, unix_sock_dir);
 
-    GET_CONF_INT (conf, filename, tls_no_sanity_certificate);
-    GET_CONF_INT (conf, filename, tls_no_verify_certificate);
+    GET_CONF_INT(conf, filename, mdns_adv);
+    GET_CONF_STR(conf, filename, mdns_name);
 
-    GET_CONF_STR (conf, filename, key_file);
-    GET_CONF_STR (conf, filename, cert_file);
-    GET_CONF_STR (conf, filename, ca_file);
-    GET_CONF_STR (conf, filename, crl_file);
+    GET_CONF_INT(conf, filename, tls_no_sanity_certificate);
+    GET_CONF_INT(conf, filename, tls_no_verify_certificate);
+
+    GET_CONF_STR(conf, filename, key_file);
+    GET_CONF_STR(conf, filename, cert_file);
+    GET_CONF_STR(conf, filename, ca_file);
+    GET_CONF_STR(conf, filename, crl_file);
 
     if (remoteConfigGetStringList(conf, "tls_allowed_dn_list",
                                   &data->tls_allowed_dn_list, filename) < 0)
@@ -424,32 +417,33 @@ daemonConfigLoadOptions(struct daemonConfig *data,
         goto error;
 
 
-    GET_CONF_INT (conf, filename, min_workers);
-    GET_CONF_INT (conf, filename, max_workers);
-    GET_CONF_INT (conf, filename, max_clients);
+    GET_CONF_INT(conf, filename, min_workers);
+    GET_CONF_INT(conf, filename, max_workers);
+    GET_CONF_INT(conf, filename, max_clients);
+    GET_CONF_INT(conf, filename, max_queued_clients);
+    GET_CONF_INT(conf, filename, max_anonymous_clients);
 
-    GET_CONF_INT (conf, filename, prio_workers);
+    GET_CONF_INT(conf, filename, prio_workers);
 
-    GET_CONF_INT (conf, filename, max_requests);
-    GET_CONF_INT (conf, filename, max_client_requests);
+    GET_CONF_INT(conf, filename, max_requests);
+    GET_CONF_INT(conf, filename, max_client_requests);
 
-    GET_CONF_INT (conf, filename, audit_level);
-    GET_CONF_INT (conf, filename, audit_logging);
+    GET_CONF_INT(conf, filename, audit_level);
+    GET_CONF_INT(conf, filename, audit_logging);
 
-    GET_CONF_STR (conf, filename, host_uuid);
+    GET_CONF_STR(conf, filename, host_uuid);
 
-    GET_CONF_INT (conf, filename, log_level);
-    GET_CONF_STR (conf, filename, log_filters);
-    GET_CONF_STR (conf, filename, log_outputs);
-    GET_CONF_INT (conf, filename, log_buffer_size);
+    GET_CONF_INT(conf, filename, log_level);
+    GET_CONF_STR(conf, filename, log_filters);
+    GET_CONF_STR(conf, filename, log_outputs);
 
-    GET_CONF_INT (conf, filename, keepalive_interval);
-    GET_CONF_INT (conf, filename, keepalive_count);
-    GET_CONF_INT (conf, filename, keepalive_required);
+    GET_CONF_INT(conf, filename, keepalive_interval);
+    GET_CONF_INT(conf, filename, keepalive_count);
+    GET_CONF_INT(conf, filename, keepalive_required);
 
     return 0;
 
-error:
+ error:
     return -1;
 }
 

@@ -1,10 +1,23 @@
-<?xml version="1.0"?>
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
   <body>
 
     <h1>Bug reporting</h1>
 
     <ul id="toc"></ul>
+
+    <h2><a name="security">Security Issues</a></h2>
+
+    <p>
+      If you think that an issue with libvirt may have security
+      implications, <strong>please do not</strong> publically
+      report it in the bug tracker, mailing lists, or irc. Libvirt
+      has <a href="securityprocess.html">a dedicated process for handling (potential) security issues</a>
+      that should be used instead. So if your issue has security
+      implications, ignore the rest of this page and follow the
+      <a href="securityprocess.html">security process</a> instead.
+    </p>
 
     <h2><a name="bugzilla">Bug Tracking</a></h2>
 
@@ -119,14 +132,14 @@
       crash, the simplest is to run the program under gdb, reproduce the
       steps leading to the crash and then issue a gdb "bt -a" command to
       get the stack trace, attach it to the bug. Note that for the
-      data to be really useful libvirt debug informations must be present
+      data to be really useful libvirt debug information must be present
       for example by installing libvirt debuginfo package on Fedora or
       Red Hat Enterprise Linux (with debuginfo-install libvirt) prior
       to running gdb.</p>
     <p>
       It may also happen that the libvirt daemon itself crashes or gets stuck,
       in the first case run it (as root) under gdb, and reproduce the sequence
-      leading to the crash, similary to a normal program provide the
+      leading to the crash, similarly to a normal program provide the
       "bt" backtrace information to where gdb will have stopped.<br/>
       But if libvirtd gets stuck, for example seems to stop processing
       commands, try to attach to the faulty daemon and issue a gdb command
@@ -134,11 +147,11 @@
       <pre> #  ps -o etime,pid `pgrep libvirt`
 ... note the process id from the output
 # gdb /usr/sbin/libvirtd
-.... some informations about gdb and loading debug data
-(gdb) attach $the_damon_process_id
+.... some information about gdb and loading debug data
+(gdb) attach $the_daemon_process_id
 ....
 (gdb) thread apply all bt
-.... informations to attach to the bug
+.... information to attach to the bug
 (gdb)
 </pre>
 

@@ -12,6 +12,9 @@
 #include "testutils.h"
 #include "storage_conf.h"
 #include "testutilsqemu.h"
+#include "virstring.h"
+
+#define VIR_FROM_THIS VIR_FROM_NONE
 
 static int
 testCompareXMLToXMLFiles(const char *inxml, const char *outxml)
@@ -64,7 +67,7 @@ testCompareXMLToXMLHelper(const void *data)
 
     result = testCompareXMLToXMLFiles(inxml, outxml);
 
-cleanup:
+ cleanup:
     VIR_FREE(inxml);
     VIR_FREE(outxml);
 
@@ -76,25 +79,34 @@ mymain(void)
 {
     int ret = 0;
 
-#define DO_TEST(name) \
-    if (virtTestRun("Storage Pool XML-2-XML " name, \
-                    1, testCompareXMLToXMLHelper, (name)) < 0) \
+#define DO_TEST(name)                                           \
+    if (virtTestRun("Storage Pool XML-2-XML " name,             \
+                    testCompareXMLToXMLHelper, (name)) < 0)     \
         ret = -1
 
     DO_TEST("pool-dir");
+    DO_TEST("pool-dir-naming");
     DO_TEST("pool-fs");
     DO_TEST("pool-logical");
+    DO_TEST("pool-logical-nopath");
     DO_TEST("pool-logical-create");
     DO_TEST("pool-disk");
     DO_TEST("pool-iscsi");
     DO_TEST("pool-iscsi-auth");
     DO_TEST("pool-netfs");
+    DO_TEST("pool-netfs-gluster");
     DO_TEST("pool-scsi");
+    DO_TEST("pool-scsi-type-scsi-host");
+    DO_TEST("pool-scsi-type-fc-host");
     DO_TEST("pool-mpath");
     DO_TEST("pool-iscsi-multiiqn");
     DO_TEST("pool-iscsi-vendor-product");
+    DO_TEST("pool-sheepdog");
+    DO_TEST("pool-gluster");
+    DO_TEST("pool-gluster-sub");
+    DO_TEST("pool-scsi-type-scsi-host-stable");
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

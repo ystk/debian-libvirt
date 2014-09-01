@@ -1,7 +1,7 @@
 /*
  * qemu_hotplug.h: QEMU device hotplug management
  *
- * Copyright (C) 2006-2007, 2009-2011 Red Hat, Inc.
+ * Copyright (C) 2006-2007, 2009-2012 Red Hat, Inc.
  * Copyright (C) 2006 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -28,81 +28,88 @@
 # include "qemu_domain.h"
 # include "domain_conf.h"
 
-int qemuDomainChangeEjectableMedia(struct qemud_driver *driver,
+int qemuDomainChangeEjectableMedia(virQEMUDriverPtr driver,
                                    virDomainObjPtr vm,
                                    virDomainDiskDefPtr disk,
+                                   virDomainDiskDefPtr orig_disk,
                                    bool force);
-int qemuDomainCheckEjectableMedia(struct qemud_driver *driver,
+int qemuDomainCheckEjectableMedia(virQEMUDriverPtr driver,
                                   virDomainObjPtr vm,
-                                  enum qemuDomainAsyncJob asyncJob);
-int qemuDomainAttachPciDiskDevice(virConnectPtr conn,
-                                  struct qemud_driver *driver,
-                                  virDomainObjPtr vm,
-                                  virDomainDiskDefPtr disk);
-int qemuDomainAttachPciControllerDevice(struct qemud_driver *driver,
-                                        virDomainObjPtr vm,
-                                        virDomainControllerDefPtr controller);
-int qemuDomainAttachSCSIDisk(virConnectPtr conn,
-                             struct qemud_driver *driver,
-                             virDomainObjPtr vm,
-                             virDomainDiskDefPtr disk);
-int qemuDomainAttachUsbMassstorageDevice(virConnectPtr conn,
-                                         struct qemud_driver *driver,
-                                         virDomainObjPtr vm,
-                                         virDomainDiskDefPtr disk);
+                                  qemuDomainAsyncJob asyncJob);
+int qemuDomainAttachControllerDevice(virQEMUDriverPtr driver,
+                                     virDomainObjPtr vm,
+                                     virDomainControllerDefPtr controller);
+int qemuDomainAttachDeviceDiskLive(virConnectPtr conn,
+                                   virQEMUDriverPtr driver,
+                                   virDomainObjPtr vm,
+                                   virDomainDeviceDefPtr dev);
 int qemuDomainAttachNetDevice(virConnectPtr conn,
-                              struct qemud_driver *driver,
+                              virQEMUDriverPtr driver,
                               virDomainObjPtr vm,
                               virDomainNetDefPtr net);
-int qemuDomainAttachHostPciDevice(struct qemud_driver *driver,
-                                  virDomainObjPtr vm,
-                                  virDomainHostdevDefPtr hostdev);
-int qemuDomainAttachHostUsbDevice(struct qemud_driver *driver,
-                                  virDomainObjPtr vm,
-                                  virDomainHostdevDefPtr hostdev);
-int qemuDomainAttachRedirdevDevice(struct qemud_driver *driver,
+int qemuDomainAttachRedirdevDevice(virQEMUDriverPtr driver,
                                    virDomainObjPtr vm,
                                    virDomainRedirdevDefPtr hostdev);
-int qemuDomainAttachHostDevice(struct qemud_driver *driver,
+int qemuDomainAttachHostDevice(virConnectPtr conn,
+                               virQEMUDriverPtr driver,
                                virDomainObjPtr vm,
                                virDomainHostdevDefPtr hostdev);
-int qemuDomainChangeGraphics(struct qemud_driver *driver,
+int qemuDomainChangeGraphics(virQEMUDriverPtr driver,
                              virDomainObjPtr vm,
                              virDomainGraphicsDefPtr dev);
-int qemuDomainChangeGraphicsPasswords(struct qemud_driver *driver,
+int qemuDomainChangeGraphicsPasswords(virQEMUDriverPtr driver,
                                       virDomainObjPtr vm,
                                       int type,
                                       virDomainGraphicsAuthDefPtr auth,
                                       const char *defaultPasswd);
-int qemuDomainChangeNet(struct qemud_driver *driver,
+int qemuDomainChangeNet(virQEMUDriverPtr driver,
                         virDomainObjPtr vm,
                         virDomainPtr dom,
-                        virDomainNetDefPtr dev);
-int qemuDomainChangeNetLinkState(struct qemud_driver *driver,
+                        virDomainDeviceDefPtr dev);
+int qemuDomainChangeNetLinkState(virQEMUDriverPtr driver,
                                  virDomainObjPtr vm,
                                  virDomainNetDefPtr dev,
                                  int linkstate);
-int qemuDomainDetachPciDiskDevice(struct qemud_driver *driver,
-                                  virDomainObjPtr vm,
-                                  virDomainDeviceDefPtr dev);
-int qemuDomainDetachDiskDevice(struct qemud_driver *driver,
-                               virDomainObjPtr vm,
-                               virDomainDeviceDefPtr dev);
-int qemuDomainDetachPciControllerDevice(struct qemud_driver *driver,
-                                        virDomainObjPtr vm,
-                                        virDomainDeviceDefPtr dev);
-int qemuDomainDetachNetDevice(struct qemud_driver *driver,
+int qemuDomainDetachDeviceDiskLive(virQEMUDriverPtr driver,
+                                   virDomainObjPtr vm,
+                                   virDomainDeviceDefPtr dev);
+int qemuDomainDetachControllerDevice(virQEMUDriverPtr driver,
+                                     virDomainObjPtr vm,
+                                     virDomainDeviceDefPtr dev);
+int qemuDomainDetachNetDevice(virConnectPtr conn,
+                              virQEMUDriverPtr driver,
                               virDomainObjPtr vm,
                               virDomainDeviceDefPtr dev);
-int qemuDomainDetachHostDevice(struct qemud_driver *driver,
+int qemuDomainDetachHostDevice(virConnectPtr conn,
+                               virQEMUDriverPtr driver,
                                virDomainObjPtr vm,
                                virDomainDeviceDefPtr dev);
-int qemuDomainAttachLease(struct qemud_driver *driver,
+int qemuDomainAttachLease(virQEMUDriverPtr driver,
                           virDomainObjPtr vm,
                           virDomainLeaseDefPtr lease);
-int qemuDomainDetachLease(struct qemud_driver *driver,
+int qemuDomainDetachLease(virQEMUDriverPtr driver,
                           virDomainObjPtr vm,
                           virDomainLeaseDefPtr lease);
+int qemuDomainAttachChrDevice(virQEMUDriverPtr driver,
+                              virDomainObjPtr vm,
+                              virDomainChrDefPtr chr);
+int qemuDomainDetachChrDevice(virQEMUDriverPtr driver,
+                              virDomainObjPtr vm,
+                              virDomainChrDefPtr chr);
 
+
+int
+qemuDomainChrInsert(virDomainDefPtr vmdef,
+                    virDomainChrDefPtr chr);
+virDomainChrDefPtr
+qemuDomainChrRemove(virDomainDefPtr vmdef,
+                    virDomainChrDefPtr chr);
+
+void qemuDomainRemoveDevice(virQEMUDriverPtr driver,
+                            virDomainObjPtr vm,
+                            virDomainDeviceDefPtr dev);
+
+bool qemuDomainSignalDeviceRemoval(virDomainObjPtr vm,
+                                   const char *devAlias);
 
 #endif /* __QEMU_HOTPLUG_H__ */

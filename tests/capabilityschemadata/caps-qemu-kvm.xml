@@ -25,6 +25,8 @@
     <secmodel>
       <model>selinux</model>
       <doi>0</doi>
+      <baselabel type='kvm'>system_u:system_r:svirt_t:s0</baselabel>
+      <baselabel type='qemu'>system_u:system_r:svirt_tcg_t:s0</baselabel>
     </secmodel>
   </host>
 
@@ -33,18 +35,18 @@
     <arch name='i686'>
       <wordsize>32</wordsize>
       <emulator>/usr/bin/qemu</emulator>
-      <machine>pc-0.11</machine>
-      <machine canonical='pc-0.11'>pc</machine>
-      <machine>pc-0.10</machine>
-      <machine>isapc</machine>
+      <machine maxCpus='255'>pc-0.11</machine>
+      <machine canonical='pc-0.11' maxCpus='255'>pc</machine>
+      <machine maxCpus='255'>pc-0.10</machine>
+      <machine maxCpus='1'>isapc</machine>
       <domain type='qemu'>
       </domain>
       <domain type='kvm'>
         <emulator>/usr/bin/qemu-kvm</emulator>
-        <machine>pc-0.11</machine>
-        <machine canonical='pc-0.11'>pc</machine>
-        <machine>pc-0.10</machine>
-        <machine>isapc</machine>
+        <machine maxCpus='255'>pc-0.11</machine>
+        <machine canonical='pc-0.11' maxCpus='255'>pc</machine>
+        <machine maxCpus='255'>pc-0.10</machine>
+        <machine maxCpus='1'>isapc</machine>
       </domain>
     </arch>
     <features>
@@ -82,7 +84,7 @@
 
   <guest>
     <os_type>hvm</os_type>
-    <arch name='arm'>
+    <arch name='armv7l'>
       <wordsize>32</wordsize>
       <emulator>/usr/bin/qemu-system-arm</emulator>
       <machine>integratorcp</machine>
@@ -106,6 +108,17 @@
       <machine>realview</machine>
       <machine>versatilepb</machine>
       <machine>versatileab</machine>
+      <domain type='qemu'>
+      </domain>
+    </arch>
+  </guest>
+
+  <guest>
+    <os_type>hvm</os_type>
+    <arch name='aarch64'>
+      <wordsize>64</wordsize>
+      <emulator>/usr/bin/qemu-system-aarch64</emulator>
+      <machine>machvirt</machine>
       <domain type='qemu'>
       </domain>
     </arch>

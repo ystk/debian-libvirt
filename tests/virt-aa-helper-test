@@ -56,7 +56,7 @@ uuid="00000000-0000-0000-0000-0123456789ab"
 disk1="$tmpdir/1.img"
 disk2="$tmpdir/2.img"
 relative_disk1="$tmpdir/./../`basename $tmpdir`//./1.img"
-nonexistent="$tmpdir/nonexistant.img"
+nonexistent="$tmpdir/nonexistent.img"
 bad_disk="/etc/passwd"
 valid_uuid="libvirt-$uuid"
 nonexistent_uuid="libvirt-00000000-0000-0000-0000-000000000001"
@@ -315,6 +315,12 @@ testme "0" "initrd is /initrd.img" "-r -u $valid_uuid" "$test_xml"
 
 sed -e "s,###UUID###,$uuid,g" -e "s,###DISK###,$disk1,g" -e "s,<graphics*,<graphics type='sdl' display=':0.0' xauth='/home/myself/.Xauthority'/>,g" "$template_xml" > "$test_xml"
 testme "0" "sdl Xauthority" "-r -u $valid_uuid" "$test_xml"
+
+sed -e "s,###UUID###,$uuid,g" -e "s,###DISK###,$disk1,g" "$template_xml" > "$test_xml"
+testme "0" "hugepages" "-r -u $valid_uuid -F /run/hugepages/kvm/\*\*" "$test_xml"
+
+sed -e "s,###UUID###,$uuid,g" -e "s,###DISK###,$disk1,g" -e "s,<graphics.*>,<graphics type='vnc' socket='/var/lib/libvirt/qemu/myself.vnc'><listen type='address' address='0.0.0.0'/></graphics>,g" "$template_xml" > "$test_xml"
+testme "0" "vnc socket" "-r -u $valid_uuid" "$test_xml"
 
 testme "0" "help" "-h"
 

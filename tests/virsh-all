@@ -14,17 +14,20 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see
+# <http://www.gnu.org/licenses/>.
 
 test -z "$srcdir" && srcdir=$(pwd)
 
 . "$srcdir/test-lib.sh"
 
+test_expensive
+
 fail=0
 
 test_url=test:///default
 
-$abs_top_builddir/tools/virsh -c $test_url help > cmds || framework_failure
+$abs_top_builddir/tools/virsh -c $test_url help | grep -v connect > cmds || framework_failure
 cmds=$(sed -n 's/^    \([^ ][^ ]*\) .*/\1/p' cmds) || framework_failure
 test -n "$cmds" || framework_failure
 

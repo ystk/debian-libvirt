@@ -9,15 +9,18 @@
 #include "virhash.h"
 #include "virhashdata.h"
 #include "testutils.h"
-#include "memory.h"
-#include "util.h"
-#include "logging.h"
+#include "viralloc.h"
+#include "virlog.h"
+#include "virstring.h"
 
+#define VIR_FROM_THIS VIR_FROM_NONE
+
+VIR_LOG_INIT("tests.hashtest");
 
 #define testError(...)                                          \
     do {                                                        \
         char *str;                                              \
-        if (virAsprintf(&str, __VA_ARGS__) == 0) {              \
+        if (virAsprintfQuiet(&str, __VA_ARGS__) >= 0) {         \
             fprintf(stderr, "%s", str);                         \
             VIR_FREE(str);                                      \
         }                                                       \
@@ -118,7 +121,7 @@ testHashGrow(const void *data)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     virHashFree(hash);
     return ret;
 }
@@ -129,7 +132,7 @@ testHashUpdate(const void *data ATTRIBUTE_UNUSED)
 {
     int count = ARRAY_CARDINALITY(uuids) + ARRAY_CARDINALITY(uuids_new);
     virHashTablePtr hash;
-    int i;
+    size_t i;
     int ret = -1;
 
     if (!(hash = testHashInit(0)))
@@ -160,7 +163,7 @@ testHashUpdate(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     virHashFree(hash);
     return ret;
 }
@@ -171,7 +174,7 @@ testHashRemove(const void *data ATTRIBUTE_UNUSED)
 {
     int count = ARRAY_CARDINALITY(uuids) - ARRAY_CARDINALITY(uuids_subset);
     virHashTablePtr hash;
-    int i;
+    size_t i;
     int ret = -1;
 
     if (!(hash = testHashInit(0)))
@@ -192,7 +195,7 @@ testHashRemove(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     virHashFree(hash);
     return ret;
 }
@@ -207,7 +210,7 @@ testHashRemoveForEachSome(void *payload ATTRIBUTE_UNUSED,
                           void *data)
 {
     virHashTablePtr hash = data;
-    int i;
+    size_t i;
 
     for (i = 0; i < ARRAY_CARDINALITY(uuids_subset); i++) {
         if (STREQ(uuids_subset[i], name)) {
@@ -242,7 +245,7 @@ testHashRemoveForEachForbidden(void *payload ATTRIBUTE_UNUSED,
                                void *data)
 {
     virHashTablePtr hash = data;
-    int i;
+    size_t i;
 
     for (i = 0; i < ARRAY_CARDINALITY(uuids_subset); i++) {
         if (STREQ(uuids_subset[i], name)) {
@@ -287,7 +290,7 @@ testHashRemoveForEach(const void *data)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     virHashFree(hash);
     return ret;
 }
@@ -298,7 +301,7 @@ testHashSteal(const void *data ATTRIBUTE_UNUSED)
 {
     int count = ARRAY_CARDINALITY(uuids) - ARRAY_CARDINALITY(uuids_subset);
     virHashTablePtr hash;
-    int i;
+    size_t i;
     int ret = -1;
 
     if (!(hash = testHashInit(0)))
@@ -319,7 +322,7 @@ testHashSteal(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     virHashFree(hash);
     return ret;
 }
@@ -390,7 +393,7 @@ testHashForEach(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     virHashFree(hash);
     return ret;
 }
@@ -403,7 +406,7 @@ testHashRemoveSetIter(const void *payload ATTRIBUTE_UNUSED,
 {
     int *count = (int *) data;
     bool rem = false;
-    int i;
+    size_t i;
 
     for (i = 0; i < ARRAY_CARDINALITY(uuids_subset); i++) {
         if (STREQ(uuids_subset[i], name)) {
@@ -450,7 +453,7 @@ testHashRemoveSet(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     virHashFree(hash);
     return ret;
 }
@@ -491,24 +494,24 @@ testHashSearch(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     virHashFree(hash);
     return ret;
 }
 
 
 static int
-testHashGetItemsCompKey(const virHashKeyValuePairPtr a,
-                        const virHashKeyValuePairPtr b)
+testHashGetItemsCompKey(const virHashKeyValuePair *a,
+                        const virHashKeyValuePair *b)
 {
-    return strcmp (a->key, b->key);
+    return strcmp(a->key, b->key);
 }
 
 static int
-testHashGetItemsCompValue(const virHashKeyValuePairPtr a,
-                          const virHashKeyValuePairPtr b)
+testHashGetItemsCompValue(const virHashKeyValuePair *a,
+                          const virHashKeyValuePair *b)
 {
-    return strcmp (a->value, b->value);
+    return strcmp(a->value, b->value);
 }
 
 static int
@@ -574,7 +577,7 @@ testHashGetItems(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     VIR_FREE(array);
     virHashFree(hash);
     return ret;
@@ -652,7 +655,7 @@ testHashEqual(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     virHashFree(hash1);
     virHashFree(hash2);
     return ret;
@@ -667,7 +670,7 @@ mymain(void)
 #define DO_TEST_FULL(name, cmd, data, count)                        \
     do {                                                            \
         struct testInfo info = { data, count };                     \
-        if (virtTestRun(name, 1, testHash ## cmd, &info) < 0)       \
+        if (virtTestRun(name, testHash ## cmd, &info) < 0)          \
             ret = -1;                                               \
     } while (0)
 

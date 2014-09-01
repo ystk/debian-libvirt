@@ -2,7 +2,7 @@ LC_ALL=C \
 PATH=/bin \
 HOME=/home/test \
 USER=test \
-LOGNAME=test \
+LOGNAME=test QEMU_AUDIO_DRV=none \
 /usr/bin/qemu \
 -S \
 -M pc \
@@ -16,6 +16,6 @@ LOGNAME=test \
 -no-shutdown \
 -no-acpi \
 -boot c \
--hda /dev/hda1 \
 -usb \
+-hda /dev/hda1 \
 -device virtio-balloon-pci,id=balloon0,bus=pci.0,addr=0x3

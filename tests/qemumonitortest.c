@@ -5,12 +5,12 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "testutils.h"
+
 #ifdef WITH_QEMU
 
 # include "internal.h"
-# include "memory.h"
-# include "testutils.h"
-# include "util.h"
+# include "viralloc.h"
 # include "qemu/qemu_monitor.h"
 
 struct testEscapeString
@@ -34,7 +34,7 @@ static struct testEscapeString escapeStrings[] = {
 
 static int testEscapeArg(const void *data ATTRIBUTE_UNUSED)
 {
-    int i;
+    size_t i;
     char *escaped = NULL;
     for (i = 0; i < ARRAY_CARDINALITY(escapeStrings); ++i) {
         escaped = qemuMonitorEscapeArg(escapeStrings[i].unescaped);
@@ -61,7 +61,7 @@ static int testEscapeArg(const void *data ATTRIBUTE_UNUSED)
 
 static int testUnescapeArg(const void *data ATTRIBUTE_UNUSED)
 {
-    int i;
+    size_t i;
     char *unescaped = NULL;
     for (i = 0; i < ARRAY_CARDINALITY(escapeStrings); ++i) {
         unescaped = qemuMonitorUnescapeArg(escapeStrings[i].escaped);
@@ -93,7 +93,7 @@ mymain(void)
 
 # define DO_TEST(_name)                                                 \
     do {                                                                \
-        if (virtTestRun("qemu monitor "#_name, 1, test##_name,          \
+        if (virtTestRun("qemu monitor "#_name, test##_name,             \
                         NULL) < 0) {                                    \
             result = -1;                                                \
         }                                                               \
@@ -108,7 +108,6 @@ mymain(void)
 VIRT_TEST_MAIN(mymain)
 
 #else
-# include "testutils.h"
 
 int main(void)
 {

@@ -1,5 +1,7 @@
 #include <config.h>
 
+#include "testutils.h"
+
 #ifdef WITH_ESX
 
 # include <stdio.h>
@@ -7,22 +9,10 @@
 # include <unistd.h>
 
 # include "internal.h"
-# include "memory.h"
-# include "testutils.h"
-# include "util.h"
+# include "viralloc.h"
 # include "vmx/vmx.h"
 # include "esx/esx_util.h"
 # include "esx/esx_vi_types.h"
-
-
-static void
-testQuietError(void *userData ATTRIBUTE_UNUSED,
-               virErrorPtr error ATTRIBUTE_UNUSED)
-{
-    /* nothing */
-}
-
-
 
 struct testPath {
     const char *datastorePath;
@@ -47,7 +37,8 @@ static struct testPath paths[] = {
 static int
 testParseDatastorePath(const void *data ATTRIBUTE_UNUSED)
 {
-    int i, result = 0;
+    int result = 0;
+    size_t i;
     char *datastoreName = NULL;
     char *directoryName = NULL;
     char *directoryAndFileName = NULL;
@@ -84,14 +75,14 @@ testParseDatastorePath(const void *data ATTRIBUTE_UNUSED)
         }
     }
 
-  cleanup:
+ cleanup:
     VIR_FREE(datastoreName);
     VIR_FREE(directoryName);
     VIR_FREE(directoryAndFileName);
 
     return result;
 
-  failure:
+ failure:
     result = -1;
 
     goto cleanup;
@@ -135,7 +126,7 @@ static struct testDateTime times[] = {
 static int
 testConvertDateTimeToCalendarTime(const void *data ATTRIBUTE_UNUSED)
 {
-    int i;
+    size_t i;
     esxVI_DateTime dateTime;
     long long calendarTime;
 
@@ -187,7 +178,7 @@ static struct testDatastoreItem datastoreItems[] = {
 static int
 testEscapeDatastoreItem(const void *data ATTRIBUTE_UNUSED)
 {
-    int i;
+    size_t i;
     char *escaped = NULL;
 
     for (i = 0; i < ARRAY_CARDINALITY(datastoreItems); ++i) {
@@ -228,7 +219,7 @@ static struct testWindows1252ToUTF8 windows1252ToUTF8[] = {
 static int
 testConvertWindows1252ToUTF8(const void *data ATTRIBUTE_UNUSED)
 {
-    int i;
+    size_t i;
     char *utf8 = NULL;
 
     for (i = 0; i < ARRAY_CARDINALITY(windows1252ToUTF8); ++i) {
@@ -258,11 +249,11 @@ mymain(void)
 {
     int result = 0;
 
-    virSetErrorFunc(NULL, testQuietError);
+    virtTestQuiesceLibvirtErrors(true);
 
 # define DO_TEST(_name)                                                       \
         do {                                                                  \
-            if (virtTestRun("VMware "#_name, 1, test##_name,                  \
+            if (virtTestRun("VMware "#_name, test##_name,                     \
                             NULL) < 0) {                                      \
                 result = -1;                                                  \
             }                                                                 \
@@ -279,7 +270,6 @@ mymain(void)
 VIRT_TEST_MAIN(mymain)
 
 #else
-# include "testutils.h"
 
 int main(void)
 {

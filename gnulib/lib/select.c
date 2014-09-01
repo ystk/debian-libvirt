@@ -1,7 +1,7 @@
 /* Emulation for select(2)
    Contributed by Paolo Bonzini.
 
-   Copyright 2008-2012 Free Software Foundation, Inc.
+   Copyright 2008-2014 Free Software Foundation, Inc.
 
    This file is part of gnulib.
 
@@ -82,9 +82,11 @@ typedef DWORD (WINAPI *PNtQueryInformationFile)
 #define PIPE_BUF        512
 #endif
 
-/* Optimized test whether a HANDLE refers to a console.
-   See <http://lists.gnu.org/archive/html/bug-gnulib/2009-08/msg00065.html>.  */
-#define IsConsoleHandle(h) (((intptr_t) (h) & 3) == 3)
+static BOOL IsConsoleHandle (HANDLE h)
+{
+  DWORD mode;
+  return GetConsoleMode (h, &mode) != 0;
+}
 
 static BOOL
 IsSocketHandle (HANDLE h)
@@ -252,6 +254,7 @@ rpl_select (int nfds, fd_set *rfds, fd_set *wfds, fd_set *xfds,
   DWORD ret, wait_timeout, nhandles, nsock, nbuffer;
   MSG msg;
   int i, fd, rc;
+  clock_t tend;
 
   if (nfds > FD_SETSIZE)
     nfds = FD_SETSIZE;
@@ -385,6 +388,14 @@ rpl_select (int nfds, fd_set *rfds, fd_set *wfds, fd_set *xfds,
         }
     }
 
+  /* Place a sentinel at the end of the array.  */
+  handle_array[nhandles] = NULL;
+
+  /* When will the waiting period expire?  */
+  if (wait_timeout != INFINITE)
+    tend = clock () + wait_timeout;
+
+restart:
   if (wait_timeout == 0 || nsock == 0)
     rc = 0;
   else
@@ -400,6 +411,16 @@ rpl_select (int nfds, fd_set *rfds, fd_set *wfds, fd_set *xfds,
           memcpy (&handle_wfds, wfds, sizeof (fd_set));
           memcpy (&handle_xfds, xfds, sizeof (fd_set));
         }
+      else
+        wait_timeout = 0;
+    }
+
+  /* How much is left to wait?  */
+  if (wait_timeout != INFINITE)
+    {
+      clock_t tnow = clock ();
+      if (tend >= tnow)
+        wait_timeout = tend - tnow;
       else
         wait_timeout = 0;
     }
@@ -427,13 +448,55 @@ rpl_select (int nfds, fd_set *rfds, fd_set *wfds, fd_set *xfds,
   if (rc == 0 && nsock > 0)
     rc = select (0, &handle_rfds, &handle_wfds, &handle_xfds, &tv0);
 
+  if (nhandles > 1)
+    {
+      /* Count results that are not counted in the return value of select.  */
+      nhandles = 1;
+      for (i = 0; i < nfds; i++)
+        {
+          if ((anyfds_in[i / CHAR_BIT] & (1 << (i & (CHAR_BIT - 1)))) == 0)
+            continue;
+
+          h = (HANDLE) _get_osfhandle (i);
+          if (h == handle_array[nhandles])
+            {
+              /* Not a socket.  */
+              nhandles++;
+              windows_poll_handle (h, i, &rbits, &wbits, &xbits);
+              if (rbits.out[i / CHAR_BIT] & (1 << (i & (CHAR_BIT - 1)))
+                  || wbits.out[i / CHAR_BIT] & (1 << (i & (CHAR_BIT - 1)))
+                  || xbits.out[i / CHAR_BIT] & (1 << (i & (CHAR_BIT - 1))))
+                rc++;
+            }
+        }
+
+      if (rc == 0
+          && (wait_timeout == INFINITE
+              /* If NHANDLES > 1, but no bits are set, it means we've
+                 been told incorrectly that some handle was signaled.
+                 This happens with anonymous pipes, which always cause
+                 MsgWaitForMultipleObjects to exit immediately, but no
+                 data is found ready to be read by windows_poll_handle.
+                 To avoid a total failure (whereby we return zero and
+                 don't wait at all), let's poll in a more busy loop.  */
+              || (wait_timeout != 0 && nhandles > 1)))
+        {
+          /* Sleep 1 millisecond to avoid busy wait and retry with the
+             original fd_sets.  */
+          memcpy (&handle_rfds, rfds, sizeof (fd_set));
+          memcpy (&handle_wfds, wfds, sizeof (fd_set));
+          memcpy (&handle_xfds, xfds, sizeof (fd_set));
+          SleepEx (1, TRUE);
+          goto restart;
+        }
+      if (timeout && wait_timeout == 0 && rc == 0)
+        timeout->tv_sec = timeout->tv_usec = 0;
+    }
+
   /* Now fill in the results.  */
   FD_ZERO (rfds);
   FD_ZERO (wfds);
   FD_ZERO (xfds);
-
-  /* Place a sentinel at the end of the array.  */
-  handle_array[nhandles] = NULL;
   nhandles = 1;
   for (i = 0; i < nfds; i++)
     {
@@ -443,8 +506,7 @@ rpl_select (int nfds, fd_set *rfds, fd_set *wfds, fd_set *xfds,
       h = (HANDLE) _get_osfhandle (i);
       if (h != handle_array[nhandles])
         {
-          /* Perform handle->descriptor mapping.  Don't update rc, as these
-             results are counted in the return value of Winsock's select.  */
+          /* Perform handle->descriptor mapping.  */
           WSAEventSelect ((SOCKET) h, NULL, 0);
           if (FD_ISSET (h, &handle_rfds))
             FD_SET (i, rfds);
@@ -457,22 +519,12 @@ rpl_select (int nfds, fd_set *rfds, fd_set *wfds, fd_set *xfds,
         {
           /* Not a socket.  */
           nhandles++;
-          windows_poll_handle (h, i, &rbits, &wbits, &xbits);
           if (rbits.out[i / CHAR_BIT] & (1 << (i & (CHAR_BIT - 1))))
-            {
-              rc++;
-              FD_SET (i, rfds);
-            }
+            FD_SET (i, rfds);
           if (wbits.out[i / CHAR_BIT] & (1 << (i & (CHAR_BIT - 1))))
-            {
-              rc++;
-              FD_SET (i, wfds);
-            }
+            FD_SET (i, wfds);
           if (xbits.out[i / CHAR_BIT] & (1 << (i & (CHAR_BIT - 1))))
-            {
-              rc++;
-              FD_SET (i, xfds);
-            }
+            FD_SET (i, xfds);
         }
     }
 
@@ -482,6 +534,9 @@ rpl_select (int nfds, fd_set *rfds, fd_set *wfds, fd_set *xfds,
 #else /* ! Native Windows.  */
 
 #include <sys/select.h>
+#include <stddef.h> /* NULL */
+#include <errno.h>
+#include <unistd.h>
 
 #undef select
 
@@ -489,6 +544,23 @@ int
 rpl_select (int nfds, fd_set *rfds, fd_set *wfds, fd_set *xfds,
             struct timeval *timeout)
 {
+  int i;
+
+  /* FreeBSD 8.2 has a bug: it does not always detect invalid fds.  */
+  if (nfds < 0 || nfds > FD_SETSIZE)
+    {
+      errno = EINVAL;
+      return -1;
+    }
+  for (i = 0; i < nfds; i++)
+    {
+      if (((rfds && FD_ISSET (i, rfds))
+           || (wfds && FD_ISSET (i, wfds))
+           || (xfds && FD_ISSET (i, xfds)))
+          && dup2 (i, i) != i)
+        return -1;
+    }
+
   /* Interix 3.5 has a bug: it does not support nfds == 0.  */
   if (nfds == 0)
     {

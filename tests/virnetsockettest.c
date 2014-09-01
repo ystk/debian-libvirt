@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Red Hat, Inc.
+ * Copyright (C) 2011, 2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -12,8 +12,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -28,15 +28,18 @@
 #include <netdb.h>
 
 #include "testutils.h"
-#include "util.h"
-#include "virterror_internal.h"
-#include "memory.h"
-#include "logging.h"
+#include "virutil.h"
+#include "virerror.h"
+#include "viralloc.h"
+#include "virlog.h"
 #include "virfile.h"
+#include "virstring.h"
 
 #include "rpc/virnetsocket.h"
 
 #define VIR_FROM_THIS VIR_FROM_RPC
+
+VIR_LOG_INIT("tests.netsockettest");
 
 #if HAVE_IFADDRS_H
 # define BASE_PORT 5672
@@ -51,7 +54,7 @@ checkProtocols(bool *hasIPv4, bool *hasIPv6,
     struct sockaddr_in in4;
     struct sockaddr_in6 in6;
     int s4 = -1, s6 = -1;
-    int i;
+    size_t i;
     int ret = -1;
 
     memset(&hints, 0, sizeof(hints));
@@ -59,8 +62,10 @@ checkProtocols(bool *hasIPv4, bool *hasIPv6,
     *hasIPv4 = *hasIPv6 = false;
     *freePort = 0;
 
-    if (getifaddrs(&ifaddr) < 0)
+    if (getifaddrs(&ifaddr) < 0) {
+        perror("getifaddrs");
         goto cleanup;
+    }
 
     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
         if (!ifa->ifa_addr)
@@ -85,16 +90,18 @@ checkProtocols(bool *hasIPv4, bool *hasIPv6,
 
     freeifaddrs(ifaddr);
 
-    for (i = 0 ; i < 50 ; i++) {
+    for (i = 0; i < 50; i++) {
         int only = 1;
         if ((s4 = socket(AF_INET, SOCK_STREAM, 0)) < 0)
             goto cleanup;
 
-        if ((s6 = socket(AF_INET6, SOCK_STREAM, 0)) < 0)
-            goto cleanup;
+        if (*hasIPv6) {
+            if ((s6 = socket(AF_INET6, SOCK_STREAM, 0)) < 0)
+                goto cleanup;
 
-        if (setsockopt(s6, IPPROTO_IPV6, IPV6_V6ONLY, &only, sizeof(only)) < 0)
-            goto cleanup;
+            if (setsockopt(s6, IPPROTO_IPV6, IPV6_V6ONLY, &only, sizeof(only)) < 0)
+                goto cleanup;
+        }
 
         memset(&in4, 0, sizeof(in4));
         memset(&in6, 0, sizeof(in6));
@@ -114,13 +121,16 @@ checkProtocols(bool *hasIPv4, bool *hasIPv6,
             }
             goto cleanup;
         }
-        if (bind(s6, (struct sockaddr *)&in6, sizeof(in6)) < 0) {
-            if (errno == EADDRINUSE) {
-                VIR_FORCE_CLOSE(s4);
-                VIR_FORCE_CLOSE(s6);
-                continue;
+
+        if (*hasIPv6) {
+            if (bind(s6, (struct sockaddr *)&in6, sizeof(in6)) < 0) {
+                if (errno == EADDRINUSE) {
+                    VIR_FORCE_CLOSE(s4);
+                    VIR_FORCE_CLOSE(s6);
+                    continue;
+                }
+                goto cleanup;
             }
-            goto cleanup;
         }
 
         *freePort = BASE_PORT + i;
@@ -131,7 +141,7 @@ checkProtocols(bool *hasIPv4, bool *hasIPv6,
 
     ret = 0;
 
-cleanup:
+ cleanup:
     VIR_FORCE_CLOSE(s4);
     VIR_FORCE_CLOSE(s6);
     return ret;
@@ -159,7 +169,7 @@ static int testSocketTCPAccept(const void *opaque)
     if (virNetSocketNewListenTCP(data->lnode, portstr, &lsock, &nlsock) < 0)
         goto cleanup;
 
-    for (i = 0 ; i < nlsock ; i++) {
+    for (i = 0; i < nlsock; i++) {
         if (virNetSocketListen(lsock[i], 0) < 0)
             goto cleanup;
     }
@@ -167,9 +177,9 @@ static int testSocketTCPAccept(const void *opaque)
     if (virNetSocketNewConnectTCP(data->cnode, portstr, &csock) < 0)
         goto cleanup;
 
-    virNetSocketFree(csock);
+    virObjectUnref(csock);
 
-    for (i = 0 ; i < nlsock ; i++) {
+    for (i = 0; i < nlsock; i++) {
         if (virNetSocketAccept(lsock[i], &ssock) != -1 && ssock) {
             char c = 'a';
             if (virNetSocketWrite(ssock, &c, 1) != -1 &&
@@ -178,16 +188,16 @@ static int testSocketTCPAccept(const void *opaque)
                 goto cleanup;
             }
         }
-        virNetSocketFree(ssock);
+        virObjectUnref(ssock);
         ssock = NULL;
     }
 
     ret = 0;
 
-cleanup:
-    virNetSocketFree(ssock);
-    for (i = 0 ; i < nlsock ; i++)
-        virNetSocketFree(lsock[i]);
+ cleanup:
+    virObjectUnref(ssock);
+    for (i = 0; i < nlsock; i++)
+        virObjectUnref(lsock[i]);
     VIR_FREE(lsock);
     return ret;
 }
@@ -202,7 +212,7 @@ static int testSocketUNIXAccept(const void *data ATTRIBUTE_UNUSED)
     virNetSocketPtr csock = NULL; /* Client socket */
     int ret = -1;
 
-    char *path;
+    char *path = NULL;
     char *tmpdir;
     char template[] = "/tmp/libvirt_XXXXXX";
 
@@ -214,7 +224,7 @@ static int testSocketUNIXAccept(const void *data ATTRIBUTE_UNUSED)
     if (virAsprintf(&path, "%s/test.sock", tmpdir) < 0)
         goto cleanup;
 
-    if (virNetSocketNewListenUNIX(path, 0700, -1, getgid(), &lsock) < 0)
+    if (virNetSocketNewListenUNIX(path, 0700, -1, getegid(), &lsock) < 0)
         goto cleanup;
 
     if (virNetSocketListen(lsock, 0) < 0)
@@ -223,7 +233,7 @@ static int testSocketUNIXAccept(const void *data ATTRIBUTE_UNUSED)
     if (virNetSocketNewConnectUNIX(path, false, NULL, &csock) < 0)
         goto cleanup;
 
-    virNetSocketFree(csock);
+    virObjectUnref(csock);
 
     if (virNetSocketAccept(lsock, &ssock) != -1) {
         char c = 'a';
@@ -235,10 +245,10 @@ static int testSocketUNIXAccept(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     VIR_FREE(path);
-    virNetSocketFree(lsock);
-    virNetSocketFree(ssock);
+    virObjectUnref(lsock);
+    virObjectUnref(ssock);
     if (tmpdir)
         rmdir(tmpdir);
     return ret;
@@ -252,7 +262,7 @@ static int testSocketUNIXAddrs(const void *data ATTRIBUTE_UNUSED)
     virNetSocketPtr csock = NULL; /* Client socket */
     int ret = -1;
 
-    char *path;
+    char *path = NULL;
     char *tmpdir;
     char template[] = "/tmp/libvirt_XXXXXX";
 
@@ -264,7 +274,7 @@ static int testSocketUNIXAddrs(const void *data ATTRIBUTE_UNUSED)
     if (virAsprintf(&path, "%s/test.sock", tmpdir) < 0)
         goto cleanup;
 
-    if (virNetSocketNewListenUNIX(path, 0700, -1, getgid(), &lsock) < 0)
+    if (virNetSocketNewListenUNIX(path, 0700, -1, getegid(), &lsock) < 0)
         goto cleanup;
 
     if (STRNEQ(virNetSocketLocalAddrString(lsock), "127.0.0.1;0")) {
@@ -313,11 +323,11 @@ static int testSocketUNIXAddrs(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     VIR_FREE(path);
-    virNetSocketFree(lsock);
-    virNetSocketFree(ssock);
-    virNetSocketFree(csock);
+    virObjectUnref(lsock);
+    virObjectUnref(ssock);
+    virObjectUnref(csock);
     if (tmpdir)
         rmdir(tmpdir);
     return ret;
@@ -340,14 +350,14 @@ static int testSocketCommandNormal(const void *data ATTRIBUTE_UNUSED)
     if (virNetSocketRead(csock, buf, sizeof(buf)) < 0)
         goto cleanup;
 
-    for (i = 0 ; i < sizeof(buf) ; i++)
+    for (i = 0; i < sizeof(buf); i++)
         if (buf[i] != '\0')
             goto cleanup;
 
     ret = 0;
 
-cleanup:
-    virNetSocketFree(csock);
+ cleanup:
+    virObjectUnref(csock);
     return ret;
 }
 
@@ -369,8 +379,8 @@ static int testSocketCommandFail(const void *data ATTRIBUTE_UNUSED)
 
     ret = 0;
 
-cleanup:
-    virNetSocketFree(csock);
+ cleanup:
+    virObjectUnref(csock);
     return ret;
 }
 
@@ -438,8 +448,8 @@ static int testSocketSSH(const void *opaque)
 
     ret = 0;
 
-cleanup:
-    virNetSocketFree(csock);
+ cleanup:
+    virObjectUnref(csock);
     return ret;
 }
 
@@ -465,35 +475,35 @@ mymain(void)
 
     if (hasIPv4) {
         struct testTCPData tcpData = { "127.0.0.1", freePort, "127.0.0.1" };
-        if (virtTestRun("Socket TCP/IPv4 Accept", 1, testSocketTCPAccept, &tcpData) < 0)
+        if (virtTestRun("Socket TCP/IPv4 Accept", testSocketTCPAccept, &tcpData) < 0)
             ret = -1;
     }
     if (hasIPv6) {
         struct testTCPData tcpData = { "::1", freePort, "::1" };
-        if (virtTestRun("Socket TCP/IPv6 Accept", 1, testSocketTCPAccept, &tcpData) < 0)
+        if (virtTestRun("Socket TCP/IPv6 Accept", testSocketTCPAccept, &tcpData) < 0)
             ret = -1;
     }
     if (hasIPv6 && hasIPv4) {
         struct testTCPData tcpData = { NULL, freePort, "127.0.0.1" };
-        if (virtTestRun("Socket TCP/IPv4+IPv6 Accept", 1, testSocketTCPAccept, &tcpData) < 0)
+        if (virtTestRun("Socket TCP/IPv4+IPv6 Accept", testSocketTCPAccept, &tcpData) < 0)
             ret = -1;
 
         tcpData.cnode = "::1";
-        if (virtTestRun("Socket TCP/IPv4+IPv6 Accept", 1, testSocketTCPAccept, &tcpData) < 0)
+        if (virtTestRun("Socket TCP/IPv4+IPv6 Accept", testSocketTCPAccept, &tcpData) < 0)
             ret = -1;
     }
 #endif
 
 #ifndef WIN32
-    if (virtTestRun("Socket UNIX Accept", 1, testSocketUNIXAccept, NULL) < 0)
+    if (virtTestRun("Socket UNIX Accept", testSocketUNIXAccept, NULL) < 0)
         ret = -1;
 
-    if (virtTestRun("Socket UNIX Addrs", 1, testSocketUNIXAddrs, NULL) < 0)
+    if (virtTestRun("Socket UNIX Addrs", testSocketUNIXAddrs, NULL) < 0)
         ret = -1;
 
-    if (virtTestRun("Socket External Command /dev/zero", 1, testSocketCommandNormal, NULL) < 0)
+    if (virtTestRun("Socket External Command /dev/zero", testSocketCommandNormal, NULL) < 0)
         ret = -1;
-    if (virtTestRun("Socket External Command /dev/does-not-exist", 1, testSocketCommandFail, NULL) < 0)
+    if (virtTestRun("Socket External Command /dev/does-not-exist", testSocketCommandFail, NULL) < 0)
         ret = -1;
 
     struct testSSHData sshData1 = {
@@ -506,7 +516,7 @@ mymain(void)
                                      "fi;"
                                      "'nc' $ARG -U /tmp/socket'\n",
     };
-    if (virtTestRun("SSH test 1", 1, testSocketSSH, &sshData1) < 0)
+    if (virtTestRun("SSH test 1", testSocketSSH, &sshData1) < 0)
         ret = -1;
 
     struct testSSHData sshData2 = {
@@ -525,7 +535,7 @@ mymain(void)
                      "fi;"
                      "'netcat' $ARG -U /tmp/socket'\n",
     };
-    if (virtTestRun("SSH test 2", 1, testSocketSSH, &sshData2) < 0)
+    if (virtTestRun("SSH test 2", testSocketSSH, &sshData2) < 0)
         ret = -1;
 
     struct testSSHData sshData3 = {
@@ -544,7 +554,7 @@ mymain(void)
                      "fi;"
                      "'netcat' $ARG -U /tmp/socket'\n",
     };
-    if (virtTestRun("SSH test 3", 1, testSocketSSH, &sshData3) < 0)
+    if (virtTestRun("SSH test 3", testSocketSSH, &sshData3) < 0)
         ret = -1;
 
     struct testSSHData sshData4 = {
@@ -552,7 +562,7 @@ mymain(void)
         .path = "/tmp/socket",
         .failConnect = true,
     };
-    if (virtTestRun("SSH test 4", 1, testSocketSSH, &sshData4) < 0)
+    if (virtTestRun("SSH test 4", testSocketSSH, &sshData4) < 0)
         ret = -1;
 
     struct testSSHData sshData5 = {
@@ -567,7 +577,7 @@ mymain(void)
                      "'nc' $ARG -U /tmp/socket'\n",
         .dieEarly = true,
     };
-    if (virtTestRun("SSH test 5", 1, testSocketSSH, &sshData5) < 0)
+    if (virtTestRun("SSH test 5", testSocketSSH, &sshData5) < 0)
         ret = -1;
 
     struct testSSHData sshData6 = {
@@ -583,7 +593,7 @@ mymain(void)
                      "fi;"
                      "'nc' $ARG -U /tmp/socket'\n",
     };
-    if (virtTestRun("SSH test 6", 1, testSocketSSH, &sshData6) < 0)
+    if (virtTestRun("SSH test 6", testSocketSSH, &sshData6) < 0)
         ret = -1;
 
     struct testSSHData sshData7 = {
@@ -597,12 +607,12 @@ mymain(void)
                                      "fi;"
                                      "''nc -4'' $ARG -U /tmp/socket'\n",
     };
-    if (virtTestRun("SSH test 7", 1, testSocketSSH, &sshData7) < 0)
+    if (virtTestRun("SSH test 7", testSocketSSH, &sshData7) < 0)
         ret = -1;
 
 #endif
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

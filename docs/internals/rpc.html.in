@@ -1,4 +1,6 @@
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <h1>libvirt RPC infrastructure</h1>
 
@@ -152,6 +154,7 @@
           <li>continue: for streams this indicates that further data packets
             will be following</li>
         </ol>
+      </dd>
     </dl>
 
     <h3><a href="protocolpayload">Packet payload</a></h3>
@@ -418,7 +421,7 @@
       After a complete packet has been read, the header must be decoded
       and all 6 fields fully validated, before attempting to dispatch
       the payload. Once dispatched, the payload can be decoded and passed
-      onto the appropriate API for execution. The RPC code must not take
+      on to the appropriate API for execution. The RPC code must not take
       any action based on the payload, since it has no way to validate
       the semantics of the payload data. It must delegate this to the
       execution API (e.g. corresponding libvirt public API).
@@ -740,7 +743,7 @@
 
     <p>
       The main libvirt event loop thread is responsible for performing all
-      socket I/O. It will read incoming packets from clients and willl
+      socket I/O. It will read incoming packets from clients and will
       transmit outgoing packets to clients. It will handle the I/O to/from
       streams associated with client API calls. When doing client I/O it
       will also pass the data through any applicable encryption layer
@@ -785,7 +788,7 @@
       return value and output parameters, or error object and encode
       them into a reply packet. Again it does not attempt to do any
       semantic validation of output data, aside from variable length
-      field limit checks. The worker thread puts the reply packet onto
+      field limit checks. The worker thread puts the reply packet on
       the transmission queue for the client. The worker is now finished
       and goes back to wait for another incoming method call.
     </p>
@@ -811,10 +814,10 @@
       for the worker threads, it is sidetracked into a per-stream
       processing queue. When the stream becomes writable, queued
       incoming stream packets will be processed, passing their data
-      payload onto the stream. Conversely when the stream becomes
+      payload on the stream. Conversely when the stream becomes
       readable, chunks of data will be read from it, encoded into
       new outgoing packets, and placed on the client's transmit
-      queue
+      queue.
     </p>
 
     <h4><a name="apiserverdispatchex1">Example with overlapping methods</a></h4>

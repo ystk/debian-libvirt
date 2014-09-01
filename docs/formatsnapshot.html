@@ -84,6 +84,10 @@
                         </div>
                       </li><li>
                         <div>
+                          <a title="The domain capabilities XML format" class="inactive" href="formatdomaincaps.html">Domain capabilities</a>
+                        </div>
+                      </li><li>
+                        <div>
                           <a title="The host device XML format" class="inactive" href="formatnode.html">Node Devices</a>
                         </div>
                       </li><li>
@@ -119,6 +123,10 @@
                 </li><li>
                   <div>
                     <a title="Command reference for virsh" class="inactive" href="virshcmdref.html">Virsh Commands</a>
+                  </div>
+                </li><li>
+                  <div>
+                    <a title="Project governance and code of conduct" class="inactive" href="governance.html">Governance</a>
                   </div>
                 </li></ul>
             </div>
@@ -160,7 +168,8 @@
             <a href="#example">Examples</a>
           </li></ul>
         <h2>
-          <a name="SnapshotAttributes" id="SnapshotAttributes">Snapshot XML</a>
+          <a name="SnapshotAttributes" shape="rect" id="SnapshotAttributes">Snapshot XML</a>
+          <a class="headerlink" href="#SnapshotAttributes" title="Permalink to this headline">¶</a>
         </h2>
         <p>
       There are several types of snapshots:
@@ -177,19 +186,19 @@
         formats such as qcow2 track both the snapshot and changes
         since the snapshot in a single file) and external (the
         snapshot is one file, and the changes since the snapshot are
-        in another file).</dd><dt>VM state</dt><dd>Tracks only the state of RAM and all other resources in use
+        in another file).</dd><dt>memory state (or VM state)</dt><dd>Tracks only the state of RAM and all other resources in use
         by the VM.  If the disks are unmodified between the time a VM
         state snapshot is taken and restored, then the guest will
         resume in a consistent state; but if the disks are modified
         externally in the meantime, this is likely to lead to data
         corruption.</dd><dt>system checkpoint</dt><dd>A combination of disk snapshots for all disks as well as VM
-        state, which can be used to resume the guest from where it
+        memory state, which can be used to resume the guest from where it
         left off with symptoms similar to hibernation (that is, TCP
         connections in the guest may have timed out, but no files or
         processes are lost).</dd></dl>
         <p>
       Libvirt can manage all three types of snapshots.  For now, VM
-      state snapshots are created only by
+      state (memory) snapshots are created only by
       the <code>virDomainSave()</code>, <code>virDomainSaveFlags</code>,
       and <code>virDomainManagedSave()</code> functions, and restored
       via the <code>virDomainRestore()</code>,
@@ -248,6 +257,15 @@
       </dd><dt><code>description</code></dt><dd>A human-readable description of the snapshot.  If the
         description is omitted when initially creating the snapshot,
         then this field will be empty.
+      </dd><dt><code>memory</code></dt><dd>On input, this is an optional request for how to handle VM
+        memory state.  For an offline domain or a disk-only snapshot,
+        attribute <code>snapshot</code> must be <code>no</code>, since
+        there is no VM state saved; otherwise, the attribute can
+        be <code>internal</code> if the memory state is piggy-backed with
+        other internal disk state, or <code>external</code> along with
+        a second attribute <code>file</code> giving the absolute path
+        of the file holding the VM memory state.  <span class="since">Since
+        1.0.1</span>
       </dd><dt><code>disks</code></dt><dd>On input, this is an optional listing of specific
         instructions for disk snapshots; it is needed when making a
         snapshot of only a subset of the disks associated with a
@@ -271,11 +289,12 @@
             mandatory, and must match either the <code>&lt;target
             dev='name'/&gt;</code> or an unambiguous <code>&lt;source
             file='name'/&gt;</code> of one of
-            the <a href="formatdomain.html#elementsDisks">disk
+            the <a href="formatdomain.html#elementsDisks" shape="rect">disk
             devices</a> specified for the domain at the time of the
             snapshot.  The attribute <code>snapshot</code> is
-            optional, and has the same values of the disk device
-            element for a domain
+            optional, and the possible values are the same as the
+            <code>snapshot</code> attribute for
+             <a href="formatdomain.html#elementsDisks" shape="rect">disk devices</a>
             (<code>no</code>, <code>internal</code>,
             or <code>external</code>).  Some hypervisors like ESX
             require that if specified, the snapshot mode must not
@@ -289,13 +308,32 @@
             attribute <code>type</code> giving the driver type (such
             as qcow2), of the new file created by the external
             snapshot of the new file.  If <code>source</code> is not
-            given, a file name is generated that consists of the
-            existing file name with anything after the trailing dot
-            replaced by the snapshot name.  Remember that with external
+            given and the disk is backed by a local image file (not
+            a block device or remote storage), a file name is
+            generated that consists of the existing file name
+            with anything after the trailing dot replaced by the
+            snapshot name.  Remember that with external
             snapshots, the original file name becomes the read-only
             snapshot, and the new file name contains the read-write
             delta of all disk changes since the snapshot.
-          </dd></dl></dd><dt><code>creationTime</code></dt><dd>The time this snapshot was created.  The time is specified
+
+            <span class="since">Since 1.2.2</span> the <code>disk</code> element
+            supports an optional attribute <code>type</code> if the
+            <code>snapshot</code> attribute is set to <code>external</code>.
+            This attribute specifies the snapshot target storage type and allows
+            to overwrite the default <code>file</code> type. The <code>type</code>
+            attribute along with the format of the <code>source</code>
+            sub-element is identical to the <code>source</code> element used in
+            domain disk definitions. See the
+            <a href="formatdomain.html#elementsDisks" shape="rect">disk devices</a> section
+            documentation for further information.
+
+            Libvirt currently supports the <code>type</code> element in the qemu
+            driver and supported values are <code>file</code>, <code>block</code>
+            and <code>network</code> with a protocol of <code>gluster</code>
+            <span class="since">(since 1.2.2)</span>.
+          </dd></dl>
+      </dd><dt><code>creationTime</code></dt><dd>The time this snapshot was created.  The time is specified
         in seconds since the Epoch, UTC (i.e. Unix time).  Readonly.
       </dd><dt><code>state</code></dt><dd>The state of the domain at the time this snapshot was taken.
         If the snapshot was created as a system checkpoint, then this
@@ -305,7 +343,7 @@
         to <code>virDomainRevertToSnapshot()</code>.  Additionally,
         this field can be the value "disk-snapshot"
         (<span class="since">since 0.9.5</span>) when it represents
-        only a disk snapshot (no VM state), and reverting to this
+        only a disk snapshot (no VM memory state), and reverting to this
         snapshot will default to an inactive guest.  Readonly.
       </dd><dt><code>parent</code></dt><dd>The parent of this snapshot.  If present, this element
         contains exactly one child element, name.  This specifies the
@@ -319,16 +357,17 @@
         <code>VIR_DOMAIN_SNAPSHOT_REVERT_FORCE</code> flag
         in <code>virDomainRevertToSnapshot()</code>.  Newer versions
         of libvirt (<span class="since">since 0.9.5</span>) store the entire
-        inactive <a href="formatdomain.html">domain configuration</a>
+        inactive <a href="formatdomain.html" shape="rect">domain configuration</a>
         at the time of the snapshot (<span class="since">since
         0.9.5</span>).  Readonly.
       </dd></dl>
         <h2>
-          <a name="example" id="example">Examples</a>
+          <a name="example" shape="rect" id="example">Examples</a>
+          <a class="headerlink" href="#example" title="Permalink to this headline">¶</a>
         </h2>
         <p>Using this XML to create a disk snapshot of just vda on a qemu
       domain with two disks:</p>
-        <pre>
+        <pre xml:space="preserve">
 &lt;domainsnapshot&gt;
   &lt;description&gt;Snapshot of OS install and updates&lt;/description&gt;
   &lt;disks&gt;
@@ -340,7 +379,7 @@
 &lt;/domainsnapshot&gt;</pre>
         <p>will result in XML similar to this from
       <code>virDomainSnapshotGetXMLDesc()</code>:</p>
-        <pre>
+        <pre xml:space="preserve">
 &lt;domainsnapshot&gt;
   &lt;name&gt;1270477159&lt;/name&gt;
   &lt;description&gt;Snapshot of OS install and updates&lt;/description&gt;
@@ -349,6 +388,7 @@
   &lt;parent&gt;
     &lt;name&gt;bare-os-install&lt;/name&gt;
   &lt;/parent&gt;
+  &lt;memory snapshot='no'/&gt;
   &lt;disks&gt;
     &lt;disk name='vda' snapshot='external'&gt;
       &lt;driver type='qcow2'/&gt;
@@ -384,7 +424,7 @@
       to <code>virDomainGetXMLDesc()</code> will show that the domain
       has been changed to reflect the snapshot:
     </p>
-        <pre>
+        <pre xml:space="preserve">
 &lt;domain&gt;
   &lt;name&gt;fedora&lt;/name&gt;
   &lt;uuid&gt;93a5c045-6457-2c09-e56c-927cdf34e178&lt;/uuid&gt;

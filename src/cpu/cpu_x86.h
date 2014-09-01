@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *      Jiri Denemark <jdenemar@redhat.com>
@@ -25,7 +25,16 @@
 # define __VIR_CPU_X86_H__
 
 # include "cpu.h"
+# include "cpu_x86_data.h"
 
 extern struct cpuArchDriver cpuDriverX86;
+
+int virCPUx86DataAddCPUID(virCPUx86Data *data,
+                          const virCPUx86CPUID *cpuid);
+
+void virCPUx86DataFree(virCPUx86Data *data);
+
+virCPUDataPtr virCPUx86MakeData(virArch arch,
+                                virCPUx86Data **data);
 
 #endif /* __VIR_CPU_X86_H__ */

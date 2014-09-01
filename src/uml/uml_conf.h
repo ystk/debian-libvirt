@@ -1,5 +1,5 @@
 /*
- * config.h: VM configuration management
+ * uml_conf.h: VM configuration management
  *
  * Copyright (C) 2006, 2007, 2010 Red Hat, Inc.
  * Copyright (C) 2006 Daniel P. Berrange
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -25,13 +25,14 @@
 # define __UML_CONF_H
 
 # include "internal.h"
+# include "libvirt_internal.h"
 # include "capabilities.h"
 # include "network_conf.h"
 # include "domain_conf.h"
 # include "domain_event.h"
-# include "virterror_internal.h"
-# include "threads.h"
-# include "command.h"
+# include "virerror.h"
+# include "virthread.h"
+# include "vircommand.h"
 # include "virhash.h"
 
 # define umlDebug(fmt, ...) do {} while(0)
@@ -44,12 +45,15 @@
 struct uml_driver {
     virMutex lock;
 
-    int privileged;
+    bool privileged;
+    virStateInhibitCallback inhibitCallback;
+    void *inhibitOpaque;
 
     unsigned long umlVersion;
     int nextvmid;
 
-    virDomainObjList domains;
+    virDomainObjListPtr domains;
+    size_t nactive;
 
     char *configDir;
     char *autostartDir;
@@ -60,20 +64,16 @@ struct uml_driver {
     int inotifyWatch;
 
     virCapsPtr caps;
+    virDomainXMLOptionPtr xmlopt;
 
     /* Event handling */
-    virDomainEventStatePtr domainEventState;
+    virObjectEventStatePtr domainEventState;
 
     /* Mapping of 'char *uuidstr' -> virConnectPtr
      * of guests which will be automatically killed
      * when the virConnectPtr is closed*/
     virHashTablePtr autodestroy;
 };
-
-
-# define umlReportError(code, ...)                                      \
-    virReportErrorHelper(VIR_FROM_UML, code, __FILE__,                  \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
 
 virCapsPtr  umlCapsInit               (void);
 

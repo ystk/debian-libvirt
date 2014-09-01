@@ -1,7 +1,7 @@
 /*
- * libvirt.h: publically exported APIs, not for public use
+ * libvirt_internal.h: internally exported APIs, not for public use
  *
- * Copyright (C) 2006-2008, 2011 Red Hat, Inc.
+ * Copyright (C) 2006-2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * NB This file is ABI sensitive. Things here impact the wire
  * protocol ABI in the remote driver. Same rules as for things
@@ -27,11 +27,16 @@
 
 # include "internal.h"
 
+typedef void (*virStateInhibitCallback)(bool inhibit,
+                                        void *opaque);
+
 # ifdef WITH_LIBVIRTD
-int virStateInitialize(int privileged);
+int virStateInitialize(bool privileged,
+                       virStateInhibitCallback inhibit,
+                       void *opaque);
 int virStateCleanup(void);
 int virStateReload(void);
-int virStateActive(void);
+int virStateStop(void);
 # endif
 
 /* Feature detection.  This is a libvirt-private interface for determining
@@ -95,10 +100,30 @@ enum {
      * messages).
      */
     VIR_DRV_FEATURE_PROGRAM_KEEPALIVE = 10,
+
+    /*
+     * Support for VIR_DOMAIN_XML_MIGRATABLE flag in domainGetXMLDesc
+     */
+    VIR_DRV_FEATURE_XML_MIGRATABLE = 11,
+
+    /*
+     * Support for offline migration.
+     */
+    VIR_DRV_FEATURE_MIGRATION_OFFLINE = 12,
+
+    /*
+     * Support for migration parameters.
+     */
+    VIR_DRV_FEATURE_MIGRATION_PARAMS = 13,
+
+    /*
+     * Support for server-side event filtering via callback ids in events.
+     */
+    VIR_DRV_FEATURE_REMOTE_EVENT_CALLBACK = 14,
 };
 
 
-int virDrvSupportsFeature (virConnectPtr conn, int feature);
+int virConnectSupportsFeature(virConnectPtr conn, int feature);
 
 int virDomainMigratePrepare (virConnectPtr dconn,
                              char **cookie,
@@ -206,4 +231,58 @@ int virDomainMigrateConfirm3(virDomainPtr domain,
                              unsigned long flags,
                              int restart); /* Restart the src VM */
 
+char *virDomainMigrateBegin3Params(virDomainPtr domain,
+                                   virTypedParameterPtr params,
+                                   int nparams,
+                                   char **cookieout,
+                                   int *cookieoutlen,
+                                   unsigned int flags);
+
+int virDomainMigratePrepare3Params(virConnectPtr dconn,
+                                   virTypedParameterPtr params,
+                                   int nparams,
+                                   const char *cookiein,
+                                   int cookieinlen,
+                                   char **cookieout,
+                                   int *cookieoutlen,
+                                   char **uri_out,
+                                   unsigned int flags);
+
+int virDomainMigratePrepareTunnel3Params(virConnectPtr conn,
+                                         virStreamPtr st,
+                                         virTypedParameterPtr params,
+                                         int nparams,
+                                         const char *cookiein,
+                                         int cookieinlen,
+                                         char **cookieout,
+                                         int *cookieoutlen,
+                                         unsigned int flags);
+
+int virDomainMigratePerform3Params(virDomainPtr domain,
+                                   const char *dconnuri,
+                                   virTypedParameterPtr params,
+                                   int nparams,
+                                   const char *cookiein,
+                                   int cookieinlen,
+                                   char **cookieout,
+                                   int *cookieoutlen,
+                                   unsigned int flags);
+
+virDomainPtr virDomainMigrateFinish3Params(virConnectPtr dconn,
+                                           virTypedParameterPtr params,
+                                           int nparams,
+                                           const char *cookiein,
+                                           int cookieinlen,
+                                           char **cookieout,
+                                           int *cookieoutlen,
+                                           unsigned int flags,
+                                           int cancelled);
+
+int virDomainMigrateConfirm3Params(virDomainPtr domain,
+                                   virTypedParameterPtr params,
+                                   int nparams,
+                                   const char *cookiein,
+                                   int cookieinlen,
+                                   unsigned int flags,
+                                   int cancelled);
 #endif

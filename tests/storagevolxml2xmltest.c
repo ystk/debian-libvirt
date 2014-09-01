@@ -12,6 +12,9 @@
 #include "testutils.h"
 #include "storage_conf.h"
 #include "testutilsqemu.h"
+#include "virstring.h"
+
+#define VIR_FROM_THIS VIR_FROM_NONE
 
 static int
 testCompareXMLToXMLFiles(const char *poolxml, const char *inxml,
@@ -83,7 +86,7 @@ testCompareXMLToXMLHelper(const void *data)
 
     result = testCompareXMLToXMLFiles(poolxml, inxml, outxml);
 
-cleanup:
+ cleanup:
     VIR_FREE(poolxml);
     VIR_FREE(inxml);
     VIR_FREE(outxml);
@@ -97,23 +100,30 @@ mymain(void)
 {
     int ret = 0;
 
-#define DO_TEST(pool, name) \
-    do {                    \
-        struct testInfo info = { pool, name };             \
-        if (virtTestRun("Storage Vol XML-2-XML " name, \
-                        1, testCompareXMLToXMLHelper, &info) < 0) \
-            ret = -1;   \
-       }    \
-    while(0);
+#define DO_TEST(pool, name)                                     \
+    do {                                                        \
+        struct testInfo info = { pool, name };                  \
+        if (virtTestRun("Storage Vol XML-2-XML " name,          \
+                        testCompareXMLToXMLHelper, &info) < 0)  \
+            ret = -1;                                           \
+    }                                                           \
+    while (0);
 
     DO_TEST("pool-dir", "vol-file");
+    DO_TEST("pool-dir", "vol-file-naming");
     DO_TEST("pool-dir", "vol-file-backing");
     DO_TEST("pool-dir", "vol-qcow2");
+    DO_TEST("pool-dir", "vol-qcow2-1.1");
+    DO_TEST("pool-dir", "vol-qcow2-lazy");
+    DO_TEST("pool-dir", "vol-qcow2-0.10-lazy");
+    DO_TEST("pool-dir", "vol-qcow2-nobacking");
     DO_TEST("pool-disk", "vol-partition");
     DO_TEST("pool-logical", "vol-logical");
     DO_TEST("pool-logical", "vol-logical-backing");
+    DO_TEST("pool-sheepdog", "vol-sheepdog");
+    DO_TEST("pool-gluster", "vol-gluster-dir");
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

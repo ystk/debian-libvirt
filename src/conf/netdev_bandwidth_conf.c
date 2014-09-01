@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Red Hat, Inc.
+ * Copyright (C) 2009-2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -12,8 +12,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *     Michal Privoznik <mprivozn@redhat.com>
@@ -23,15 +23,12 @@
 #include <config.h>
 
 #include "netdev_bandwidth_conf.h"
-#include "virterror_internal.h"
-#include "util.h"
-#include "memory.h"
+#include "virerror.h"
+#include "viralloc.h"
+#include "domain_conf.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_NONE
-#define virNetDevError(code, ...)                                   \
-    virReportErrorHelper(VIR_FROM_THIS, code, __FILE__,             \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
-
 
 static int
 virNetDevBandwidthParseRate(xmlNodePtr node, virNetDevBandwidthRatePtr rate)
@@ -40,9 +37,10 @@ virNetDevBandwidthParseRate(xmlNodePtr node, virNetDevBandwidthRatePtr rate)
     char *average = NULL;
     char *peak = NULL;
     char *burst = NULL;
+    char *floor = NULL;
 
     if (!node || !rate) {
-        virNetDevError(VIR_ERR_INVALID_ARG, "%s",
+        virReportError(VIR_ERR_INVALID_ARG, "%s",
                        _("invalid argument supplied"));
         return -1;
     }
@@ -50,40 +48,55 @@ virNetDevBandwidthParseRate(xmlNodePtr node, virNetDevBandwidthRatePtr rate)
     average = virXMLPropString(node, "average");
     peak = virXMLPropString(node, "peak");
     burst = virXMLPropString(node, "burst");
+    floor = virXMLPropString(node, "floor");
 
     if (average) {
         if (virStrToLong_ull(average, NULL, 10, &rate->average) < 0) {
-            virNetDevError(VIR_ERR_CONFIG_UNSUPPORTED,
-                           _("could not convert %s"),
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                           _("could not convert bandwidth average value '%s'"),
                            average);
             goto cleanup;
         }
-    } else {
-        virNetDevError(VIR_ERR_XML_DETAIL, "%s",
-                       _("Missing mandatory average attribute"));
+    } else if (!floor) {
+        virReportError(VIR_ERR_XML_DETAIL, "%s",
+                       _("Missing mandatory average or floor attributes"));
+        goto cleanup;
+    }
+
+    if ((peak || burst) && !average) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                       _("'peak' and 'burst' require 'average' attribute"));
         goto cleanup;
     }
 
     if (peak && virStrToLong_ull(peak, NULL, 10, &rate->peak) < 0) {
-        virNetDevError(VIR_ERR_CONFIG_UNSUPPORTED,
-                       _("could not convert %s"),
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("could not convert bandwidth peak value '%s'"),
                        peak);
         goto cleanup;
     }
 
     if (burst && virStrToLong_ull(burst, NULL, 10, &rate->burst) < 0) {
-        virNetDevError(VIR_ERR_CONFIG_UNSUPPORTED,
-                       _("could not convert %s"),
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("could not convert bandwidth burst value '%s'"),
                        burst);
+        goto cleanup;
+    }
+
+    if (floor && virStrToLong_ull(floor, NULL, 10, &rate->floor) < 0) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("could not convert bandwidth floor value '%s'"),
+                       floor);
         goto cleanup;
     }
 
     ret = 0;
 
-cleanup:
+ cleanup:
     VIR_FREE(average);
     VIR_FREE(peak);
     VIR_FREE(burst);
+    VIR_FREE(floor);
 
     return ret;
 }
@@ -91,34 +104,38 @@ cleanup:
 /**
  * virNetDevBandwidthParse:
  * @node: XML node
+ * @net_type: one of virDomainNetType
  *
- * Parse bandwidth XML and return pointer to structure
+ * Parse bandwidth XML and return pointer to structure.
+ * @net_type tell to which type will/is interface connected to.
+ * Pass -1 if this is not called on interface.
  *
  * Returns !NULL on success, NULL on error.
  */
 virNetDevBandwidthPtr
-virNetDevBandwidthParse(xmlNodePtr node)
+virNetDevBandwidthParse(xmlNodePtr node,
+                        int net_type)
 {
     virNetDevBandwidthPtr def = NULL;
-    xmlNodePtr cur = node->children;
+    xmlNodePtr cur;
     xmlNodePtr in = NULL, out = NULL;
 
-    if (VIR_ALLOC(def) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(def) < 0)
         return NULL;
-    }
 
     if (!node || !xmlStrEqual(node->name, BAD_CAST "bandwidth")) {
-        virNetDevError(VIR_ERR_INVALID_ARG, "%s",
+        virReportError(VIR_ERR_INVALID_ARG, "%s",
                        _("invalid argument supplied"));
         goto error;
     }
+
+    cur = node->children;
 
     while (cur) {
         if (cur->type == XML_ELEMENT_NODE) {
             if (xmlStrEqual(cur->name, BAD_CAST "inbound")) {
                 if (in) {
-                    virNetDevError(VIR_ERR_XML_DETAIL, "%s",
+                    virReportError(VIR_ERR_XML_DETAIL, "%s",
                                    _("Only one child <inbound> "
                                      "element allowed"));
                     goto error;
@@ -126,7 +143,7 @@ virNetDevBandwidthParse(xmlNodePtr node)
                 in = cur;
             } else if (xmlStrEqual(cur->name, BAD_CAST "outbound")) {
                 if (out) {
-                    virNetDevError(VIR_ERR_XML_DETAIL, "%s",
+                    virReportError(VIR_ERR_XML_DETAIL, "%s",
                                    _("Only one child <outbound> "
                                      "element allowed"));
                     goto error;
@@ -139,32 +156,49 @@ virNetDevBandwidthParse(xmlNodePtr node)
     }
 
     if (in) {
-        if (VIR_ALLOC(def->in) < 0) {
-            virReportOOMError();
+        if (VIR_ALLOC(def->in) < 0)
             goto error;
-        }
 
         if (virNetDevBandwidthParseRate(in, def->in) < 0) {
             /* helper reported error for us */
             goto error;
         }
+
+        if (def->in->floor && net_type != VIR_DOMAIN_NET_TYPE_NETWORK) {
+            if (net_type == -1) {
+                /* 'floor' on network isn't supported */
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                               _("floor attribute isn't supported for "
+                                 "network's bandwidth yet"));
+            } else {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                               _("floor attribute is supported only for "
+                                 "interfaces of type network"));
+            }
+            goto error;
+        }
     }
 
     if (out) {
-        if (VIR_ALLOC(def->out) < 0) {
-            virReportOOMError();
+        if (VIR_ALLOC(def->out) < 0)
             goto error;
-        }
 
         if (virNetDevBandwidthParseRate(out, def->out) < 0) {
             /* helper reported error for us */
+            goto error;
+        }
+
+        if (def->out->floor) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("'floor' attribute allowed "
+                             "only in <inbound> element"));
             goto error;
         }
     }
 
     return def;
 
-error:
+ error:
     virNetDevBandwidthFree(def);
     return NULL;
 }
@@ -179,12 +213,17 @@ virNetDevBandwidthRateFormat(virNetDevBandwidthRatePtr def,
     if (!def)
         return 0;
 
-    if (def->average) {
-        virBufferAsprintf(buf, "  <%s average='%llu'", elem_name,
-                          def->average);
+    if (def->average || def->floor) {
+        virBufferAsprintf(buf, "<%s", elem_name);
+
+        if (def->average)
+            virBufferAsprintf(buf, " average='%llu'", def->average);
 
         if (def->peak)
             virBufferAsprintf(buf, " peak='%llu'", def->peak);
+
+        if (def->floor)
+            virBufferAsprintf(buf, " floor='%llu'", def->floor);
 
         if (def->burst)
             virBufferAsprintf(buf, " burst='%llu'", def->burst);
@@ -218,13 +257,15 @@ virNetDevBandwidthFormat(virNetDevBandwidthPtr def, virBufferPtr buf)
     }
 
     virBufferAddLit(buf, "<bandwidth>\n");
+    virBufferAdjustIndent(buf, 2);
     if (virNetDevBandwidthRateFormat(def->in, buf, "inbound") < 0 ||
         virNetDevBandwidthRateFormat(def->out, buf, "outbound") < 0)
         goto cleanup;
+    virBufferAdjustIndent(buf, -2);
     virBufferAddLit(buf, "</bandwidth>\n");
 
     ret = 0;
 
-cleanup:
+ cleanup:
     return ret;
 }

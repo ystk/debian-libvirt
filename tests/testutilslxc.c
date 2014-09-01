@@ -4,27 +4,20 @@
 
 # include "testutilslxc.h"
 # include "testutils.h"
-# include "memory.h"
+# include "viralloc.h"
 # include "domain_conf.h"
 
 
-static int testLXCDefaultConsoleType(const char *ostype ATTRIBUTE_UNUSED)
+virCapsPtr testLXCCapsInit(void)
 {
-    return VIR_DOMAIN_CHR_CONSOLE_TARGET_TYPE_LXC;
-}
-
-
-virCapsPtr testLXCCapsInit(void) {
     virCapsPtr caps;
     virCapsGuestPtr guest;
 
-    if ((caps = virCapabilitiesNew("x86_64",
-                                   0, 0)) == NULL)
+    if ((caps = virCapabilitiesNew(VIR_ARCH_X86_64,
+                                   false, false)) == NULL)
         return NULL;
 
-    caps->defaultConsoleTargetType = testLXCDefaultConsoleType;
-
-    if ((guest = virCapabilitiesAddGuest(caps, "exe", "i686", 32,
+    if ((guest = virCapabilitiesAddGuest(caps, "exe", VIR_ARCH_I686,
                                          "/usr/libexec/libvirt_lxc", NULL,
                                          0, NULL)) == NULL)
         goto error;
@@ -33,7 +26,7 @@ virCapsPtr testLXCCapsInit(void) {
         goto error;
 
 
-    if ((guest = virCapabilitiesAddGuest(caps, "exe", "x86_64", 64,
+    if ((guest = virCapabilitiesAddGuest(caps, "exe", VIR_ARCH_X86_64,
                                          "/usr/libexec/libvirt_lxc", NULL,
                                          0, NULL)) == NULL)
         goto error;
@@ -56,8 +49,8 @@ virCapsPtr testLXCCapsInit(void) {
 
     return caps;
 
-error:
-    virCapabilitiesFree(caps);
+ error:
+    virObjectUnref(caps);
     return NULL;
 }
 #endif

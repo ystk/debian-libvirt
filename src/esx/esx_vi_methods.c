@@ -1,4 +1,3 @@
-
 /*
  * esx_vi_methods.c: client for the VMware VI API 2.5 to manage ESX hosts
  *
@@ -16,17 +15,16 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
 #include <config.h>
 
-#include "buf.h"
-#include "memory.h"
-#include "logging.h"
-#include "uuid.h"
+#include "virbuffer.h"
+#include "viralloc.h"
+#include "viruuid.h"
 #include "esx_vi_methods.h"
 #include "esx_util.h"
 
@@ -40,8 +38,8 @@
 
 
 #define ESX_VI__METHOD__CHECK_OUTPUT__NotNone                                 \
-    if (output == NULL || *output != 0) {                                     \
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));    \
+    if (!output || *output) {                                                 \
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));  \
         return -1;                                                            \
     }
 
@@ -87,7 +85,7 @@
 
 
 #define ESX_VI__METHOD__DESERIALIZE_OUTPUT__OptionalItem(_type, _suffix)      \
-    if (response->node != NULL &&                                             \
+    if (response->node &&                                                     \
         esxVI_##_type##_Deserialize##_suffix(response->node, output) < 0) {   \
         goto cleanup;                                                         \
     }
@@ -95,7 +93,7 @@
 
 
 #define ESX_VI__METHOD__DESERIALIZE_OUTPUT__OptionalList(_type, _suffix)      \
-    if (response->node != NULL &&                                             \
+    if (response->node &&                                                     \
         esxVI_##_type##_DeserializeList(response->node, output) < 0) {        \
         goto cleanup;                                                         \
     }
@@ -128,10 +126,8 @@
         virBufferAddLit(&buffer, "</"#_name">");                              \
         virBufferAddLit(&buffer, ESX_VI__SOAP__REQUEST_FOOTER);               \
                                                                               \
-        if (virBufferError(&buffer)) {                                        \
-            virReportOOMError();                                              \
+        if (virBufferCheckError(&buffer) < 0)                                 \
             goto cleanup;                                                     \
-        }                                                                     \
                                                                               \
         request = virBufferContentAndReset(&buffer);                          \
                                                                               \
@@ -161,8 +157,8 @@
 #define ESX_VI__METHOD__PARAMETER__THIS_FROM_SERVICE(_type, _name)            \
     esxVI_##_type *_this = NULL;                                              \
                                                                               \
-    if (ctx->service == NULL) {                                               \
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid call"));        \
+    if (!ctx->service) {                                                      \
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid call"));      \
         return -1;                                                            \
     }                                                                         \
                                                                               \
@@ -183,9 +179,9 @@
  */
 #define ESX_VI__METHOD__PARAMETER__REQUIRE(_name)                             \
     if (_name == 0) {                                                         \
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                                  \
-                     "Required parameter '%s' is missing for call to %s",     \
-                     #_name, methodName);                                     \
+        virReportError(VIR_ERR_INTERNAL_ERROR,                                \
+                       "Required parameter '%s' is missing for call to %s",   \
+                       #_name, methodName);                                   \
         return -1;                                                            \
     }
 
@@ -236,8 +232,8 @@ esxVI_RetrieveServiceContent(esxVI_Context *ctx,
                           ESX_VI__SOAP__REQUEST_FOOTER;
     esxVI_Response *response = NULL;
 
-    if (serviceContent == NULL || *serviceContent != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!serviceContent || *serviceContent) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
@@ -249,7 +245,7 @@ esxVI_RetrieveServiceContent(esxVI_Context *ctx,
 
     result = 0;
 
-  cleanup:
+ cleanup:
     esxVI_Response_Free(&response);
 
     return result;

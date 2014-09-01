@@ -1,5 +1,5 @@
 /*
- * xen_inofify.h: Xen notification of xml files
+ * xen_inotify.h: Xen notification of xml files
  *
  * Copyright (C) 2011 Red Hat, Inc.
  * Copyright (C) 2008 VirtualIron
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Ben Guthro
  */
@@ -24,13 +24,10 @@
 # define __VIR_XEN_INOTIFY_H__
 
 # include "internal.h"
-# include "driver.h"
 
-extern struct xenUnifiedDriver xenInotifyDriver;
-
-virDrvOpenStatus	xenInotifyOpen	(virConnectPtr conn,
-                                         virConnectAuthPtr auth,
-                                         unsigned int flags);
-int		xenInotifyClose		(virConnectPtr conn);
+int xenInotifyOpen(virConnectPtr conn,
+                   virConnectAuthPtr auth,
+                   unsigned int flags);
+int xenInotifyClose(virConnectPtr conn);
 
 #endif

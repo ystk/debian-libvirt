@@ -1,4 +1,6 @@
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <h1>Guest migration</h1>
 
@@ -7,11 +9,11 @@
     <p>
       Migration of guests between hosts is a complicated problem with many possible
       solutions, each with their own positive and negative points. For maximum
-      flexibility of both hypervisor integration, and adminsitrator deployment,
+      flexibility of both hypervisor integration, and administrator deployment,
       libvirt implements several options for migration.
     </p>
 
-    <h2><a id="transport">Network data transports</a></h2>
+    <h2><a name="transport">Network data transports</a></h2>
 
     <p>
       There are two options for the data transport used during migration, either
@@ -19,7 +21,7 @@
       over a libvirtd connection.
     </p>
 
-    <h3><a id="transportnative">Hypervisor native transport</a></h3>
+    <h3><a name="transportnative">Hypervisor native transport</a></h3>
     <p>
       <em>Native</em> data transports may or may not support encryption, depending
       on the hypervisor in question, but will typically have the lowest computational costs
@@ -30,10 +32,10 @@
     </p>
 
     <p>
-      <img class="diagram" src="migration-native.png" alt="Migration native path">
+      <img class="diagram" src="migration-native.png" alt="Migration native path"/>
     </p>
 
-    <h3><a id="transporttunnel">libvirt tunnelled transport</a></h3>
+    <h3><a name="transporttunnel">libvirt tunnelled transport</a></h3>
     <p>
       <em>Tunnelled</em> data transports will always be capable of strong encryption
       since they are able to leverage the capabilities built in to the libvirt RPC protocol.
@@ -48,10 +50,10 @@
     </p>
 
     <p>
-      <img class="diagram" src="migration-tunnel.png" alt="Migration tunnel path">
+      <img class="diagram" src="migration-tunnel.png" alt="Migration tunnel path"/>
     </p>
 
-    <h2><a id="flow">Communication control paths/flows</a></h2>
+    <h2><a name="flow">Communication control paths/flows</a></h2>
 
     <p>
       Migration of virtual machines requires close co-ordination of the two
@@ -59,7 +61,7 @@
       which may be on the source, the destination, or a third host.
     </p>
 
-    <h3><a id="flowmanageddirect">Managed direct migration</a></h3>
+    <h3><a name="flowmanageddirect">Managed direct migration</a></h3>
 
     <p>
       With <em>managed direct</em> migration, the libvirt client process
@@ -75,11 +77,11 @@
     </p>
 
     <p>
-      <img class="diagram" src="migration-managed-direct.png" alt="Migration direct, managed">
+      <img class="diagram" src="migration-managed-direct.png" alt="Migration direct, managed"/>
     </p>
 
 
-    <h3><a id="flowpeer2peer">Managed peer to peer migration</a></h3>
+    <h3><a name="flowpeer2peer">Managed peer to peer migration</a></h3>
 
     <p>
       With <em>peer to peer</em> migration, the libvirt client process only
@@ -97,11 +99,11 @@
     </p>
 
     <p>
-      <img class="diagram" src="migration-managed-p2p.png" alt="Migration peer-to-peer">
+      <img class="diagram" src="migration-managed-p2p.png" alt="Migration peer-to-peer"/>
     </p>
 
 
-    <h3><a id="flowunmanageddirect">Unmanaged direct migration</a></h3>
+    <h3><a name="flowunmanageddirect">Unmanaged direct migration</a></h3>
 
     <p>
       With <em>unmanaged direct</em> migration, neither the libvirt client
@@ -113,11 +115,11 @@
     </p>
 
     <p>
-      <img class="diagram" src="migration-unmanaged-direct.png" alt="Migration direct, unmanaged">
+      <img class="diagram" src="migration-unmanaged-direct.png" alt="Migration direct, unmanaged"/>
     </p>
 
 
-    <h2><a id="security">Data security</a></h2>
+    <h2><a name="security">Data security</a></h2>
 
     <p>
       Since the migration data stream includes a complete copy of the guest
@@ -136,7 +138,21 @@
       facility should be used.
     </p>
 
-    <h2><a id="uris">Migration URIs</a></h2>
+    <h2><a name="offline">Offline migration</a></h2>
+
+    <p>
+      Offline migration transfers inactive the definition of a domain
+      (which may or may not be active). After successful completion, the
+      domain remains in its current state on the source host and is defined
+      but inactive on the destination host. It's a bit more clever than
+      <code>virsh dumpxml</code> on source host followed by
+      <code>virsh define</code> on destination host, as offline migration
+      will run the pre-migration hook to update the domain XML on
+      destination host. Currently, copying non-shared storage is not
+      supported during offline migration.
+    </p>
+
+    <h2><a name="uris">Migration URIs</a></h2>
 
     <p>
       Initiating a guest migration requires the client application to
@@ -171,22 +187,22 @@
         URI. In this case the management application should specify the
         hypervisor specific URI explicitly, using an IP address, or a
         correct hostname.</li>
-      <li>The host has multiple network interaces. If a host has multiple
+      <li>The host has multiple network interfaces. If a host has multiple
         network interfaces, it might be desirable for the migration data
         stream to be sent over a specific interface for either security
         or performance reasons. In this case the management application
         should specify the hypervisor specific URI, using an IP address
         associated with the network to be used.</li>
       <li>The firewall restricts what ports are available. When libvirt
-        generates a migration URI will pick a port number using hypervisor
+        generates a migration URI it will pick a port number using hypervisor
         specific rules. Some hypervisors only require a single port to be
         open in the firewalls, while others require a whole range of port
         numbers. In the latter case the management application may wish
         to choose a specific port number outside the default range in order
-        to comply with local firewall policies</li>
+        to comply with local firewall policies.</li>
     </ol>
 
-    <h2><a id="config">Configuration file handling</a></h2>
+    <h2><a name="config">Configuration file handling</a></h2>
 
     <p>
       There are two types of virtual machine known to libvirt. A <em>transient</em>
@@ -429,10 +445,10 @@
       </tbody>
     </table>
 
-    <h2><a id="scenarios">Migration scenarios</a></h2>
+    <h2><a name="scenarios">Migration scenarios</a></h2>
 
 
-    <h3><a id="scenarionativedirect">Native migration, client to two libvirtd servers</a></h3>
+    <h3><a name="scenarionativedirect">Native migration, client to two libvirtd servers</a></h3>
 
     <p>
       At an API level this requires use of virDomainMigrate, without the
@@ -462,7 +478,7 @@
       Supported by Xen, QEMU, VMWare and VirtualBox drivers
     </p>
 
-    <h3><a id="scenarionativepeer2peer">Native migration, client to and peer2peer between, two libvirtd servers</a></h3>
+    <h3><a name="scenarionativepeer2peer">Native migration, client to and peer2peer between, two libvirtd servers</a></h3>
 
     <p>
       virDomainMigrate, with the VIR_MIGRATE_PEER2PEER flag set,
@@ -486,7 +502,7 @@
       Supported by QEMU driver
     </p>
 
-    <h3><a id="scenariotunnelpeer2peer1">Tunnelled migration, client and peer2peer between two libvirtd servers</a></h3>
+    <h3><a name="scenariotunnelpeer2peer1">Tunnelled migration, client and peer2peer between two libvirtd servers</a></h3>
 
     <p>
       virDomainMigrate, with the VIR_MIGRATE_PEER2PEER &amp; VIR_MIGRATE_TUNNELLED
@@ -509,7 +525,7 @@
       Supported by QEMU driver
     </p>
 
-    <h3><a id="nativedirectunmanaged">Native migration, client to one libvirtd server</a></h3>
+    <h3><a name="nativedirectunmanaged">Native migration, client to one libvirtd server</a></h3>
 
     <p>
       virDomainMigrateToURI, without the VIR_MIGRATE_PEER2PEER flag set,
@@ -533,7 +549,7 @@
       Supported by Xen driver
     </p>
 
-    <h3><a id="nativepeer2peer">Native migration, peer2peer between two libvirtd servers</a></h3>
+    <h3><a name="nativepeer2peer">Native migration, peer2peer between two libvirtd servers</a></h3>
 
     <p>
       virDomainMigrateToURI, with the VIR_MIGRATE_PEER2PEER flag set,
@@ -570,7 +586,7 @@
       Supported by the QEMU driver
     </p>
 
-    <h3><a id="scenariotunnelpeer2peer2">Tunnelled migration, peer2peer between two libvirtd servers</a></h3>
+    <h3><a name="scenariotunnelpeer2peer2">Tunnelled migration, peer2peer between two libvirtd servers</a></h3>
 
     <p>
       virDomainMigrateToURI, with the VIR_MIGRATE_PEER2PEER &amp; VIR_MIGRATE_TUNNELLED

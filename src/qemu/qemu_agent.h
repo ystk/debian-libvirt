@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -47,13 +47,17 @@ qemuAgentPtr qemuAgentOpen(virDomainObjPtr vm,
                            virDomainChrSourceDefPtr config,
                            qemuAgentCallbacksPtr cb);
 
-void qemuAgentLock(qemuAgentPtr mon);
-void qemuAgentUnlock(qemuAgentPtr mon);
-
-int qemuAgentRef(qemuAgentPtr mon);
-int qemuAgentUnref(qemuAgentPtr mon) ATTRIBUTE_RETURN_CHECK;
-
 void qemuAgentClose(qemuAgentPtr mon);
+
+typedef enum {
+    QEMU_AGENT_EVENT_NONE = 0,
+    QEMU_AGENT_EVENT_SHUTDOWN,
+    QEMU_AGENT_EVENT_SUSPEND,
+    QEMU_AGENT_EVENT_RESET,
+} qemuAgentEvent;
+
+void qemuAgentNotifyEvent(qemuAgentPtr mon,
+                          qemuAgentEvent event);
 
 typedef enum {
     QEMU_AGENT_SHUTDOWN_POWERDOWN,
@@ -66,9 +70,40 @@ typedef enum {
 int qemuAgentShutdown(qemuAgentPtr mon,
                       qemuAgentShutdownMode mode);
 
-int qemuAgentFSFreeze(qemuAgentPtr mon);
+int qemuAgentFSFreeze(qemuAgentPtr mon,
+                      const char **mountpoints, unsigned int nmountpoints);
 int qemuAgentFSThaw(qemuAgentPtr mon);
 
 int qemuAgentSuspend(qemuAgentPtr mon,
                      unsigned int target);
+
+int qemuAgentArbitraryCommand(qemuAgentPtr mon,
+                              const char *cmd,
+                              char **result,
+                              int timeout);
+int qemuAgentFSTrim(qemuAgentPtr mon,
+                    unsigned long long minimum);
+
+
+typedef struct _qemuAgentCPUInfo qemuAgentCPUInfo;
+typedef qemuAgentCPUInfo *qemuAgentCPUInfoPtr;
+struct _qemuAgentCPUInfo {
+    unsigned int id;    /* logical cpu ID */
+    bool online;        /* true if the CPU is activated */
+    bool offlinable;    /* true if the CPU can be offlined */
+};
+
+int qemuAgentGetVCPUs(qemuAgentPtr mon, qemuAgentCPUInfoPtr *info);
+int qemuAgentSetVCPUs(qemuAgentPtr mon, qemuAgentCPUInfoPtr cpus, size_t ncpus);
+int qemuAgentUpdateCPUInfo(unsigned int nvcpus,
+                           qemuAgentCPUInfoPtr cpuinfo,
+                           int ncpuinfo);
+
+int qemuAgentGetTime(qemuAgentPtr mon,
+                     long long *seconds,
+                     unsigned int *nseconds);
+int qemuAgentSetTime(qemuAgentPtr mon,
+                     long long seconds,
+                     unsigned int nseconds,
+                     bool sync);
 #endif /* __QEMU_AGENT_H__ */

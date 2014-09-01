@@ -2,7 +2,7 @@
  * nwfilter_conf.h: network filter XML processing
  *                  (derived from storage_conf.h)
  *
- * Copyright (C) 2006-2010 Red Hat, Inc.
+ * Copyright (C) 2006-2010, 2012-2014 Red Hat, Inc.
  * Copyright (C) 2006-2008 Daniel P. Berrange
  *
  * Copyright (C) 2010 IBM Corporation
@@ -18,24 +18,22 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Stefan Berger <stefanb@us.ibm.com>
  */
 #ifndef NWFILTER_CONF_H
 # define NWFILTER_CONF_H
 
-# include <stdint.h>
-# include <stddef.h>
-
 # include "internal.h"
 
-# include "util.h"
 # include "virhash.h"
-# include "xml.h"
-# include "buf.h"
+# include "virxml.h"
+# include "virbuffer.h"
 # include "virsocketaddr.h"
+# include "virmacaddr.h"
+# include "domain_conf.h"
 
 /* XXX
  * The config parser/structs should not be using platform specific
@@ -71,20 +69,21 @@
 # define MAX_CHAIN_SUFFIX_SIZE	12
 
 
-enum virNWFilterEntryItemFlags {
+typedef enum {
     NWFILTER_ENTRY_ITEM_FLAG_EXISTS   = 1 << 0,
     NWFILTER_ENTRY_ITEM_FLAG_IS_NEG   = 1 << 1,
     NWFILTER_ENTRY_ITEM_FLAG_HAS_VAR  = 1 << 2,
-};
+} virNWFilterEntryItemFlags;
 
 
 # define MAX_COMMENT_LENGTH  256
+# define MAX_IPSET_NAME_LENGTH 32 /* incl. terminating '\0' */
 
 # define HAS_ENTRY_ITEM(data) \
   (((data)->flags) & NWFILTER_ENTRY_ITEM_FLAG_EXISTS)
 
-# define ENTRY_GET_NEG_SIGN(data) \
-  ((((data)->flags) & NWFILTER_ENTRY_ITEM_FLAG_IS_NEG) ? "!" : "")
+# define ENTRY_WANT_NEG_SIGN(data) \
+  (((data)->flags) & NWFILTER_ENTRY_ITEM_FLAG_IS_NEG)
 
 /* datatypes appearing in rule attributes */
 enum attrDatatype {
@@ -103,28 +102,23 @@ enum attrDatatype {
     DATATYPE_BOOLEAN          = (1 << 12),
     DATATYPE_UINT32           = (1 << 13),
     DATATYPE_UINT32_HEX       = (1 << 14),
+    DATATYPE_IPSETNAME        = (1 << 15),
+    DATATYPE_IPSETFLAGS       = (1 << 16),
 
-    DATATYPE_LAST             = (1 << 15),
+    DATATYPE_LAST             = (1 << 17),
 };
 
 # define NWFILTER_MAC_BGA "01:80:c2:00:00:00"
 
 
-typedef struct _nwMACAddress nwMACAddress;
-typedef nwMACAddress *nwMACAddressPtr;
-struct _nwMACAddress {
-    unsigned char addr[6];
-};
-
-
 typedef struct _nwItemDesc nwItemDesc;
 typedef nwItemDesc *nwItemDescPtr;
 struct _nwItemDesc {
-    enum virNWFilterEntryItemFlags flags;
+    virNWFilterEntryItemFlags flags;
     virNWFilterVarAccessPtr varAccess;
     enum attrDatatype datatype;
     union {
-        nwMACAddress macaddr;
+        virMacAddr macaddr;
         virSocketAddr ipaddr;
         bool         boolean;
         uint8_t      u8;
@@ -136,9 +130,16 @@ struct _nwItemDesc {
             uint8_t  mask;
             uint8_t  flags;
         } tcpFlags;
+        struct {
+            char setname[MAX_IPSET_NAME_LENGTH];
+            uint8_t numFlags;
+            uint8_t flags;
+        } ipset;
     } u;
 };
 
+# define VALID_IPSETNAME \
+  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-+ "
 
 typedef struct _ethHdrDataDef ethHdrDataDef;
 typedef ethHdrDataDef *ethHdrDataDefPtr;
@@ -208,8 +209,10 @@ struct _arpHdrFilterDef {
     nwItemDesc dataOpcode;
     nwItemDesc dataARPSrcMACAddr;
     nwItemDesc dataARPSrcIPAddr;
+    nwItemDesc dataARPSrcIPMask;
     nwItemDesc dataARPDstMACAddr;
     nwItemDesc dataARPDstIPAddr;
+    nwItemDesc dataARPDstIPMask;
     nwItemDesc dataGratuitousARP;
     nwItemDesc dataComment;
 };
@@ -232,6 +235,8 @@ struct _ipHdrDataDef {
     nwItemDesc dataState;
     nwItemDesc dataConnlimitAbove;
     nwItemDesc dataComment;
+    nwItemDesc dataIPSet;
+    nwItemDesc dataIPSetFlags;
 };
 
 
@@ -343,7 +348,7 @@ struct _udpliteHdrFilterDef {
 };
 
 
-enum virNWFilterRuleActionType {
+typedef enum {
     VIR_NWFILTER_RULE_ACTION_DROP = 0,
     VIR_NWFILTER_RULE_ACTION_ACCEPT,
     VIR_NWFILTER_RULE_ACTION_REJECT,
@@ -351,24 +356,30 @@ enum virNWFilterRuleActionType {
     VIR_NWFILTER_RULE_ACTION_CONTINUE,
 
     VIR_NWFILTER_RULE_ACTION_LAST,
-};
+} virNWFilterRuleActionType;
 
-enum virNWFilterRuleDirectionType {
+typedef enum {
     VIR_NWFILTER_RULE_DIRECTION_IN = 0,
     VIR_NWFILTER_RULE_DIRECTION_OUT,
     VIR_NWFILTER_RULE_DIRECTION_INOUT,
 
     VIR_NWFILTER_RULE_DIRECTION_LAST,
-};
+} virNWFilterRuleDirectionType ;
 
-enum virNWFilterChainPolicyType {
+typedef enum {
     VIR_NWFILTER_CHAIN_POLICY_ACCEPT = 0,
     VIR_NWFILTER_CHAIN_POLICY_DROP,
 
     VIR_NWFILTER_CHAIN_POLICY_LAST,
-};
+} virNWFilterChainPolicyType;
 
-enum virNWFilterRuleProtocolType {
+
+/*
+ * If adding protocols be sure to update the
+ * virNWFilterRuleIsProtocolXXXX function impls
+ */
+typedef enum {
+    /* Ethernet layer protocols */
     VIR_NWFILTER_RULE_PROTOCOL_NONE = 0,
     VIR_NWFILTER_RULE_PROTOCOL_MAC,
     VIR_NWFILTER_RULE_PROTOCOL_VLAN,
@@ -377,6 +388,8 @@ enum virNWFilterRuleProtocolType {
     VIR_NWFILTER_RULE_PROTOCOL_RARP,
     VIR_NWFILTER_RULE_PROTOCOL_IP,
     VIR_NWFILTER_RULE_PROTOCOL_IPV6,
+
+    /* IPv4 layer protocols */
     VIR_NWFILTER_RULE_PROTOCOL_TCP,
     VIR_NWFILTER_RULE_PROTOCOL_ICMP,
     VIR_NWFILTER_RULE_PROTOCOL_IGMP,
@@ -386,6 +399,8 @@ enum virNWFilterRuleProtocolType {
     VIR_NWFILTER_RULE_PROTOCOL_AH,
     VIR_NWFILTER_RULE_PROTOCOL_SCTP,
     VIR_NWFILTER_RULE_PROTOCOL_ALL,
+
+    /* IPv6 layer protocols */
     VIR_NWFILTER_RULE_PROTOCOL_TCPoIPV6,
     VIR_NWFILTER_RULE_PROTOCOL_ICMPV6,
     VIR_NWFILTER_RULE_PROTOCOL_UDPoIPV6,
@@ -396,15 +411,15 @@ enum virNWFilterRuleProtocolType {
     VIR_NWFILTER_RULE_PROTOCOL_ALLoIPV6,
 
     VIR_NWFILTER_RULE_PROTOCOL_LAST
-};
+} virNWFilterRuleProtocolType;
 
-enum virNWFilterEbtablesTableType {
+typedef enum {
     VIR_NWFILTER_EBTABLES_TABLE_FILTER = 0,
     VIR_NWFILTER_EBTABLES_TABLE_NAT,
     VIR_NWFILTER_EBTABLES_TABLE_BROUTE,
 
     VIR_NWFILTER_EBTABLES_TABLE_LAST,
-};
+} virNWFilterEbtablesTableType;
 
 
 # define MIN_RULE_PRIORITY  -1000
@@ -422,14 +437,14 @@ enum virNWFilterEbtablesTableType {
 # define NWFILTER_ARP_FILTER_PRI  -500
 # define NWFILTER_RARP_FILTER_PRI -400
 
-enum virNWFilterRuleFlags {
+typedef enum {
     RULE_FLAG_NO_STATEMATCH      = (1 << 0),
     RULE_FLAG_STATE_NEW          = (1 << 1),
     RULE_FLAG_STATE_ESTABLISHED  = (1 << 2),
     RULE_FLAG_STATE_RELATED      = (1 << 3),
     RULE_FLAG_STATE_INVALID      = (1 << 4),
     RULE_FLAG_STATE_NONE         = (1 << 5),
-};
+} virNWFilterRuleFlags;
 
 
 # define IPTABLES_STATE_FLAGS \
@@ -448,10 +463,10 @@ typedef struct _virNWFilterRuleDef  virNWFilterRuleDef;
 typedef virNWFilterRuleDef *virNWFilterRuleDefPtr;
 struct _virNWFilterRuleDef {
     virNWFilterRulePriority priority;
-    enum virNWFilterRuleFlags flags;
-    int action; /*enum virNWFilterRuleActionType*/
-    int tt; /*enum virNWFilterRuleDirectionType*/
-    enum virNWFilterRuleProtocolType prtclType;
+    virNWFilterRuleFlags flags;
+    int action; /* virNWFilterRuleActionType */
+    int tt; /* virNWFilterRuleDirectionType */
+    virNWFilterRuleProtocolType prtclType;
     union {
         ethHdrFilterDef  ethHdrFilter;
         vlanHdrFilterDef vlanHdrFilter;
@@ -473,7 +488,7 @@ struct _virNWFilterRuleDef {
     size_t nVarAccess;
     virNWFilterVarAccessPtr *varAccess;
 
-    int nstrings;
+    size_t nstrings;
     char **strings;
 };
 
@@ -493,7 +508,7 @@ struct _virNWFilterEntry {
     virNWFilterIncludeDef *include;
 };
 
-enum virNWFilterChainSuffixType {
+typedef enum {
     VIR_NWFILTER_CHAINSUFFIX_ROOT = 0,
     VIR_NWFILTER_CHAINSUFFIX_MAC,
     VIR_NWFILTER_CHAINSUFFIX_VLAN,
@@ -504,7 +519,7 @@ enum virNWFilterChainSuffixType {
     VIR_NWFILTER_CHAINSUFFIX_IPv6,
 
     VIR_NWFILTER_CHAINSUFFIX_LAST,
-};
+} virNWFilterChainSuffixType;
 
 # define VALID_CHAINNAME \
   "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-"
@@ -521,7 +536,7 @@ struct _virNWFilterDef {
     char *chainsuffix;
     virNWFilterChainPriority chainPriority;
 
-    int nentries;
+    size_t nentries;
     virNWFilterEntryPtr *filterEntries;
 };
 
@@ -544,7 +559,7 @@ struct _virNWFilterObj {
 typedef struct _virNWFilterObjList virNWFilterObjList;
 typedef virNWFilterObjList *virNWFilterObjListPtr;
 struct _virNWFilterObjList {
-    unsigned int count;
+    size_t count;
     virNWFilterObjPtr *objs;
 };
 
@@ -553,112 +568,27 @@ typedef struct _virNWFilterDriverState virNWFilterDriverState;
 typedef virNWFilterDriverState *virNWFilterDriverStatePtr;
 struct _virNWFilterDriverState {
     virMutex lock;
+    bool privileged;
 
     virNWFilterObjList nwfilters;
 
     char *configDir;
+    bool watchingFirewallD;
 };
 
 
-typedef struct _virNWFilterTechDriver virNWFilterTechDriver;
-typedef virNWFilterTechDriver *virNWFilterTechDriverPtr;
-
-
-typedef struct _virNWFilterRuleInst virNWFilterRuleInst;
-typedef virNWFilterRuleInst *virNWFilterRuleInstPtr;
-struct _virNWFilterRuleInst {
-   int ndata;
-   void **data;
-   virNWFilterTechDriverPtr techdriver;
-};
-
-
-enum UpdateStep {
+typedef enum {
     STEP_APPLY_NEW,
     STEP_TEAR_NEW,
     STEP_TEAR_OLD,
     STEP_APPLY_CURRENT,
-};
+} UpdateStep;
 
 struct domUpdateCBStruct {
-    virConnectPtr conn;
-    enum UpdateStep step;
-    int err;
+    void *opaque;
+    UpdateStep step;
     virHashTablePtr skipInterfaces;
 };
-
-
-typedef int (*virNWFilterTechDrvInit)(bool privileged);
-typedef void (*virNWFilterTechDrvShutdown)(void);
-
-enum virDomainNetType;
-
-typedef int (*virNWFilterRuleCreateInstance)(enum virDomainNetType nettype,
-                                             virNWFilterDefPtr filter,
-                                             virNWFilterRuleDefPtr rule,
-                                             const char *ifname,
-                                             virNWFilterHashTablePtr vars,
-                                             virNWFilterRuleInstPtr res);
-
-typedef int (*virNWFilterRuleApplyNewRules)(const char *ifname,
-                                            int nruleInstances,
-                                            void **_inst);
-
-typedef int (*virNWFilterRuleTeardownNewRules)(const char *ifname);
-
-typedef int (*virNWFilterRuleTeardownOldRules)(const char *ifname);
-
-typedef int (*virNWFilterRuleRemoveRules)(const char *ifname,
-                                          int nruleInstances,
-                                          void **_inst);
-
-typedef int (*virNWFilterRuleAllTeardown)(const char *ifname);
-
-typedef int (*virNWFilterRuleFreeInstanceData)(void * _inst);
-
-typedef int (*virNWFilterRuleDisplayInstanceData)(void *_inst);
-
-typedef int (*virNWFilterCanApplyBasicRules)(void);
-
-typedef int (*virNWFilterApplyBasicRules)(const char *ifname,
-                                          const unsigned char *macaddr);
-
-typedef int (*virNWFilterApplyDHCPOnlyRules)(const char *ifname,
-                                             const unsigned char *macaddr,
-                                             virNWFilterVarValuePtr dhcpsrvs,
-                                             bool leaveTemporary);
-
-typedef int (*virNWFilterRemoveBasicRules)(const char *ifname);
-
-typedef int (*virNWFilterDropAllRules)(const char *ifname);
-
-enum techDrvFlags {
-    TECHDRV_FLAG_INITIALIZED = (1 << 0),
-};
-
-struct _virNWFilterTechDriver {
-    const char *name;
-    enum techDrvFlags flags;
-
-    virNWFilterTechDrvInit init;
-    virNWFilterTechDrvShutdown shutdown;
-
-    virNWFilterRuleCreateInstance createRuleInstance;
-    virNWFilterRuleApplyNewRules applyNewRules;
-    virNWFilterRuleTeardownNewRules tearNewRules;
-    virNWFilterRuleTeardownOldRules tearOldRules;
-    virNWFilterRuleRemoveRules removeRules;
-    virNWFilterRuleAllTeardown allTeardown;
-    virNWFilterRuleFreeInstanceData freeRuleInstance;
-    virNWFilterRuleDisplayInstanceData displayRuleInstance;
-
-    virNWFilterCanApplyBasicRules canApplyBasicRules;
-    virNWFilterApplyBasicRules applyBasicRules;
-    virNWFilterApplyDHCPOnlyRules applyDHCPOnlyRules;
-    virNWFilterDropAllRules applyDropAllRules;
-    virNWFilterRemoveBasicRules removeBasicRules;
-};
-
 
 
 void virNWFilterRuleDefFree(virNWFilterRuleDefPtr def);
@@ -683,17 +613,15 @@ int virNWFilterObjSaveDef(virNWFilterDriverStatePtr driver,
 
 int virNWFilterObjDeleteDef(virNWFilterObjPtr nwfilter);
 
-virNWFilterObjPtr virNWFilterObjAssignDef(virConnectPtr conn,
-                                          virNWFilterObjListPtr nwfilters,
+virNWFilterObjPtr virNWFilterObjAssignDef(virNWFilterObjListPtr nwfilters,
                                           virNWFilterDefPtr def);
 
-int virNWFilterTestUnassignDef(virConnectPtr conn,
-                               virNWFilterObjPtr nwfilter);
+int virNWFilterTestUnassignDef(virNWFilterObjPtr nwfilter);
 
 virNWFilterDefPtr virNWFilterDefParseNode(xmlDocPtr xml,
                                           xmlNodePtr root);
 
-char *virNWFilterDefFormat(virNWFilterDefPtr def);
+char *virNWFilterDefFormat(const virNWFilterDef *def);
 
 int virNWFilterSaveXML(const char *configDir,
                        virNWFilterDefPtr def,
@@ -702,36 +630,30 @@ int virNWFilterSaveXML(const char *configDir,
 int virNWFilterSaveConfig(const char *configDir,
                           virNWFilterDefPtr def);
 
-int virNWFilterLoadAllConfigs(virConnectPtr conn,
-                              virNWFilterObjListPtr nwfilters,
+int virNWFilterLoadAllConfigs(virNWFilterObjListPtr nwfilters,
                               const char *configDir);
 
 char *virNWFilterConfigFile(const char *dir,
                             const char *name);
 
-virNWFilterDefPtr virNWFilterDefParseString(virConnectPtr conn,
-                                            const char *xml);
-virNWFilterDefPtr virNWFilterDefParseFile(virConnectPtr conn,
-                                          const char *filename);
+virNWFilterDefPtr virNWFilterDefParseString(const char *xml);
+virNWFilterDefPtr virNWFilterDefParseFile(const char *filename);
 
 void virNWFilterObjLock(virNWFilterObjPtr obj);
 void virNWFilterObjUnlock(virNWFilterObjPtr obj);
 
-void virNWFilterLockFilterUpdates(void);
+void virNWFilterWriteLockFilterUpdates(void);
+void virNWFilterReadLockFilterUpdates(void);
 void virNWFilterUnlockFilterUpdates(void);
 
-int virNWFilterConfLayerInit(virHashIterator domUpdateCB);
+int virNWFilterConfLayerInit(virDomainObjListIterator domUpdateCB, void *opaque);
 void virNWFilterConfLayerShutdown(void);
 
-int virNWFilterInstFiltersOnAllVMs(virConnectPtr conn);
-
-# define virNWFilterReportError(code, fmt...)                      \
-        virReportErrorHelper(VIR_FROM_NWFILTER, code, __FILE__,    \
-                             __FUNCTION__, __LINE__, fmt)
+int virNWFilterInstFiltersOnAllVMs(void);
 
 
-typedef int (*virNWFilterRebuild)(virConnectPtr conn,
-                                  virHashIterator, void *data);
+typedef int (*virNWFilterRebuild)(virDomainObjListIterator domUpdateCB,
+                                  void *data);
 typedef void (*virNWFilterVoidCall)(void);
 
 
@@ -746,13 +668,17 @@ struct _virNWFilterCallbackDriver {
 };
 
 void virNWFilterRegisterCallbackDriver(virNWFilterCallbackDriverPtr);
+void virNWFilterUnRegisterCallbackDriver(virNWFilterCallbackDriverPtr);
 void virNWFilterCallbackDriversLock(void);
 void virNWFilterCallbackDriversUnlock(void);
 
 
-void virNWFilterPrintTCPFlags(virBufferPtr buf, uint8_t mask,
-                              char sep, uint8_t flags);
+char *virNWFilterPrintTCPFlags(uint8_t flags);
 
+
+bool virNWFilterRuleIsProtocolIPv4(virNWFilterRuleDefPtr rule);
+bool virNWFilterRuleIsProtocolIPv6(virNWFilterRuleDefPtr rule);
+bool virNWFilterRuleIsProtocolEthernet(virNWFilterRuleDefPtr rule);
 
 VIR_ENUM_DECL(virNWFilterRuleAction);
 VIR_ENUM_DECL(virNWFilterRuleDirection);

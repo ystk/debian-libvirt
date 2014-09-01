@@ -1,7 +1,7 @@
 /*
  * storage_driver.h: core driver for storage APIs
  *
- * Copyright (C) 2006-2008 Red Hat, Inc.
+ * Copyright (C) 2006-2008, 2014 Red Hat, Inc.
  * Copyright (C) 2006-2008 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -24,7 +24,33 @@
 #ifndef __VIR_STORAGE_DRIVER_H__
 # define __VIR_STORAGE_DRIVER_H__
 
+# include <sys/stat.h>
+
 # include "storage_conf.h"
+# include "virstoragefile.h"
+
+int virStorageFileInit(virStorageSourcePtr src);
+int virStorageFileInitAs(virStorageSourcePtr src,
+                         uid_t uid, gid_t gid);
+void virStorageFileDeinit(virStorageSourcePtr src);
+
+int virStorageFileCreate(virStorageSourcePtr src);
+int virStorageFileUnlink(virStorageSourcePtr src);
+int virStorageFileStat(virStorageSourcePtr src,
+                       struct stat *stat);
+ssize_t virStorageFileReadHeader(virStorageSourcePtr src,
+                                 ssize_t max_len,
+                                 char **buf);
+const char *virStorageFileGetUniqueIdentifier(virStorageSourcePtr src);
+int virStorageFileAccess(virStorageSourcePtr src, int mode);
+int virStorageFileChown(virStorageSourcePtr src, uid_t uid, gid_t gid);
+
+bool virStorageFileSupportsSecurityDriver(virStorageSourcePtr src);
+
+int virStorageFileGetMetadata(virStorageSourcePtr src,
+                              uid_t uid, gid_t gid,
+                              bool allow_probe)
+    ATTRIBUTE_NONNULL(1);
 
 int storageRegister(void);
 

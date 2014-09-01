@@ -15,32 +15,17 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Stefan Berger <stefanb@us.ibm.com>
  */
 #ifndef VIR_NWFILTER_EBTABLES_DRIVER_H__
 # define VIR_NWFILTER_EBTABLES_DRIVER_H__
 
+# include "nwfilter_tech_driver.h"
+
 # define MAX_CHAINNAME_LENGTH  32 /* see linux/netfilter_bridge/ebtables.h */
-
-enum RuleType {
-    RT_EBTABLES,
-    RT_IPTABLES,
-    RT_IP6TABLES,
-};
-
-typedef struct _ebiptablesRuleInst ebiptablesRuleInst;
-typedef ebiptablesRuleInst *ebiptablesRuleInstPtr;
-struct _ebiptablesRuleInst {
-    char *commandTemplate;
-    const char *neededProtocolChain;
-    virNWFilterChainPriority chainPriority;
-    char chainprefix;    /* I for incoming, O for outgoing */
-    virNWFilterRulePriority priority;
-    enum RuleType ruleType;
-};
 
 extern virNWFilterTechDriver ebiptables_driver;
 
