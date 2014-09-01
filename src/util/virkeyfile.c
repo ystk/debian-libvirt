@@ -1,7 +1,7 @@
 /*
  * virkeyfile.c: "ini"-style configuration file handling
  *
- * Copyright (C) 2012 Red Hat, Inc.
+ * Copyright (C) 2012-2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *     Daniel P. Berrange <berrange@redhat.com>
@@ -26,14 +26,18 @@
 #include <stdio.h>
 
 #include "c-ctype.h"
-#include "logging.h"
-#include "memory.h"
-#include "util.h"
+#include "virlog.h"
+#include "viralloc.h"
+#include "virfile.h"
+#include "virutil.h"
 #include "virhash.h"
 #include "virkeyfile.h"
-#include "virterror_internal.h"
+#include "virerror.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_CONF
+
+VIR_LOG_INIT("util.keyfile");
 
 typedef struct _virKeyFileGroup virKeyFileGroup;
 typedef virKeyFileGroup *virKeyFileGroupPtr;
@@ -99,11 +103,6 @@ virKeyFileErrorHelper(const char *file, const char *func, size_t line,
 }
 
 
-static void virKeyFileValueFree(void *value, const void *name ATTRIBUTE_UNUSED)
-{
-    VIR_FREE(value);
-}
-
 static int virKeyFileParseGroup(virKeyFileParserCtxtPtr ctxt)
 {
     int ret = -1;
@@ -121,21 +120,19 @@ static int virKeyFileParseGroup(virKeyFileParserCtxtPtr ctxt)
         return -1;
     }
 
-    if (!(ctxt->groupname = strndup(name, ctxt->cur - name))) {
-        virReportOOMError();
+    if (VIR_STRNDUP(ctxt->groupname, name, ctxt->cur - name) < 0)
         return -1;
-    }
 
     NEXT;
 
-    if (!(ctxt->group = virHashCreate(10, virKeyFileValueFree)))
+    if (!(ctxt->group = virHashCreate(10, virHashValueFree)))
         goto cleanup;
 
     if (virHashAddEntry(ctxt->conf->groups, ctxt->groupname, ctxt->group) < 0)
         goto cleanup;
 
     ret = 0;
-cleanup:
+ cleanup:
     if (ret != 0) {
         virHashFree(ctxt->group);
         ctxt->group = NULL;
@@ -167,10 +164,8 @@ static int virKeyFileParseValue(virKeyFileParserCtxtPtr ctxt)
         return -1;
     }
 
-    if (!(key = strndup(keystart, ctxt->cur - keystart))) {
-        virReportOOMError();
+    if (VIR_STRNDUP(key, keystart, ctxt->cur - keystart) < 0)
         return -1;
-    }
 
     NEXT;
     valuestart = ctxt->cur;
@@ -183,10 +178,8 @@ static int virKeyFileParseValue(virKeyFileParserCtxtPtr ctxt)
     len = ctxt->cur - valuestart;
     if (IS_EOF && !IS_EOL(CUR))
         len++;
-    if (!(value = strndup(valuestart, len))) {
-        virReportOOMError();
+    if (VIR_STRNDUP(value, valuestart, len) < 0)
         goto cleanup;
-    }
 
     if (virHashAddEntry(ctxt->group, key, value) < 0) {
         VIR_FREE(value);
@@ -197,7 +190,7 @@ static int virKeyFileParseValue(virKeyFileParserCtxtPtr ctxt)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     VIR_FREE(key);
     return ret;
 }
@@ -270,7 +263,7 @@ static int virKeyFileParse(virKeyFilePtr conf,
     }
 
     ret = 0;
-cleanup:
+ cleanup:
     VIR_FREE(ctxt.groupname);
     return ret;
 }
@@ -286,10 +279,8 @@ virKeyFilePtr virKeyFileNew(void)
 {
     virKeyFilePtr conf;
 
-    if (VIR_ALLOC(conf) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(conf) < 0)
         goto error;
-    }
 
     if (!(conf->groups = virHashCreate(10,
                                        virKeyFileEntryFree)))
@@ -297,7 +288,7 @@ virKeyFilePtr virKeyFileNew(void)
 
     return conf;
 
-error:
+ error:
     virKeyFileFree(conf);
     return NULL;
 }

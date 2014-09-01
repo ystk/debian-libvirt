@@ -1,5 +1,5 @@
 /*
- * domain_audit.c: Domain audit management
+ * domain_audit.h: Domain audit management
  *
  * Copyright (C) 2006-2011 Red Hat, Inc.
  * Copyright (C) 2006 Daniel P. Berrange
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -25,18 +25,22 @@
 # define __VIR_DOMAIN_AUDIT_H__
 
 # include "domain_conf.h"
-# include "cgroup.h"
+# include "vircgroup.h"
 
 void virDomainAuditStart(virDomainObjPtr vm,
                          const char *reason,
                          bool success)
     ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2);
+void virDomainAuditInit(virDomainObjPtr vm,
+                        pid_t pid,
+                        ino_t pidns)
+    ATTRIBUTE_NONNULL(1);
 void virDomainAuditStop(virDomainObjPtr vm,
                         const char *reason)
     ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2);
 void virDomainAuditDisk(virDomainObjPtr vm,
-                        const char *oldDef,
-                        const char *newDef,
+                        virStorageSourcePtr oldDef,
+                        virStorageSourcePtr newDef,
                         const char *reason,
                         bool success)
     ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(4);
@@ -106,5 +110,12 @@ void virDomainAuditRedirdev(virDomainObjPtr vm,
                             const char *reason,
                             bool success)
     ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3);
+
+void virDomainAuditChardev(virDomainObjPtr vm,
+                           virDomainChrDefPtr oldDef,
+                           virDomainChrDefPtr newDef,
+                           const char *reason,
+                           bool success)
+    ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(4);
 
 #endif /* __VIR_DOMAIN_AUDIT_H__ */

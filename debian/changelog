@@ -1,96 +1,878 @@
-libvirt (0.9.12-11+deb7u4) stable-security; urgency=low
+libvirt (1.2.7-11) unstable; urgency=medium
 
-  * [e91a86a] CVE-2013-4296: Fix crash in remoteDispatchDomainMemoryStats.
-    Thanks to "Daniel P. Berrange"
+  * [6534478] Check status in a systemd 208 compatible way
+    systemd 204 returned 0 when trying to reload a not running service but
+    208 changed behaviour. So use status instead of is-enabled.
+    Thanks to Neutron Soutmun for his feedback (Closes: #758688)
 
- -- Guido Günther <agx@sigxcpu.org>  Mon, 09 Sep 2013 13:12:45 +0200
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 24 Aug 2014 10:54:26 +0200
 
-libvirt (0.9.12-11+deb7u3) wheezy-proposed-updates; urgency=low
+libvirt (1.2.7-10) unstable; urgency=medium
 
-  * [9c12e5a] Fix race condition when destroying guests.
-    Closes: #717893
-    Thanks to Ferenc Wágner for sorting this out.
+  * [d319f15] Only reexec virtlockd if enabled (Closes: #758688)
 
- -- Guido Günther <agx@sigxcpu.org>  Wed, 21 Aug 2013 19:30:54 +0200
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 21 Aug 2014 16:34:36 +0200
 
-libvirt (0.9.12-11+deb7u2) wheezy-proposed-updates; urgency=low
+libvirt (1.2.7-9) unstable; urgency=medium
+
+  * [1c2c5ee] Don't let dh_systemd_start guess the package to act on
+    (Closes: #758552)
+  * [ab79901] Don't restart libvirt-guests when using systemd so it's
+    consistent with sysvinit. We'd restart VMs on package upgrads otherwise.
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 19 Aug 2014 09:59:47 +0200
+
+libvirt (1.2.7-8) unstable; urgency=medium
+
+  * [d98aa3b] Fix wrong relation in preinst.
+    Thanks to Laurent Bigonville (Closes: #758136)
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 14 Aug 2014 21:06:45 +0200
+
+libvirt (1.2.7-7) unstable; urgency=medium
+
+  * [42dbd16] Skip more linux specific stuff on kFreeBSD
+  * [a2ff23f] Don't restart virtlockd on upgrade virtlockd must be reloaded so
+    it reexecs itself. (Closes: #757453)
+  * [4914adc] Use symlinks for upstream changelog.  This safes 1.9M per
+    package
+  * [3583f4b] Don't fail qemu driver intialization if we can't determine
+    hugepage size.  Thanks to a lot to Jamie Heilman for testing it
+    (Closes: #757609)
+  * [3b23724] Make 'uri' command a bit more prominent. (Closes: #688778)
+  * [63e7e51] Also stop libvirt-bin in libvirt-bin's preinst.
+    When libvirt-daemon-system's preinst runs the new libvirt-bin might
+    already be unpacked and therefore the libvirt-bin service file already
+    gone. So additionally stop libvirt-bin in libvirt-bin's preinst.
+    (Closes: #757952)
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 13 Aug 2014 21:50:07 +0200
+
+libvirt (1.2.7-6) unstable; urgency=medium
+
+  * [5e39138] Don't provide libvirt-bin via LSB headers.
+    This avoids a conflict when /e/i/libvirt-bin and /e/i/libvirtd
+    are around at the same time during dpkg's configure phase and
+    both init scripts Provide: libvirt-bin.
+    (Closes: #757330)
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 08 Aug 2014 17:58:36 +0200
+
+libvirt (1.2.7-5) unstable; urgency=medium
+
+  * [06d457c] Bump comparison version so this applies to current failed
+    upgrades too.
+  * [bdae16d] Remove another obsolete conffile (Closes: #757332)
+  * [2f486c5] Don't try to stop libvirt-bin if it's already gone
+    (Closes: #757407)
+  * [a9643a0] Remove another obsolete conffile (Closes: #757332)
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 07 Aug 2014 23:21:39 +0200
+
+libvirt (1.2.7-4) unstable; urgency=medium
+
+  * [5e71896] Move networking configuration to libvirt-daemon-system too
+  * [32eea48] Remove left over empty directory
+  * [b3a2735] Also purge libvirt-bin.service on new installations.
+    The old service file was in libvirt-bin so we need to remove it when
+    libvirt-daemon-service is first installed (as we did before when
+    the whole code was in the postinst).
+    Thanks to Laurent Bigonville for the analysis (Closes: #757293)
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 07 Aug 2014 10:57:53 +0200
+
+libvirt (1.2.7-3) unstable; urgency=medium
+
+  * Upload to unstable
+  * [f634d53] Don't try to install qemu configuration on kFreeBSD.
+    QEMU support on kFreeBSD support is currently disabled due to test
+    failures.
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 06 Aug 2014 20:28:05 +0200
+
+libvirt (1.2.7-2) experimental; urgency=medium
+
+  * [ebfec9b] Don't try to install lxc.conf on kFreeBSD.
+    Another kFreeBSD build fix
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 04 Aug 2014 14:10:57 +0200
+
+libvirt (1.2.7-1) experimental; urgency=medium
+
+  * [65e69d3] New upstream version 1.2.7
+  * [d615910] Don't try to install virt-login-shell on non-linux.
+    It's LXC only. This fixes the build failure on kFreeBSD.
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 03 Aug 2014 19:20:26 +0200
+
+libvirt (1.2.7~rc2-1) experimental; urgency=medium
 
   [ Guido Günther ]
-  * [5bc00df] Make sure qemu.conf isn't world readable by default
+  * [16575d9] New upstream version 1.2.7~rc2
+  * [bc785a7] Drop left over libvirt-bin references.
+    Fixes more leftovers of #730604.
+  * [ca64c62] Rediff patches
+  * [998e7d4] Update symbols file
+  * [06cf7b4] Make sure libvirt-bin versioned dependencies are recent enough
+
+  [ Laurent Bigonville ]
+  * [daf46fe] Stop the daemon in the preinst script instead of the postinst
+    one when renaming the .service file as it now contains the
+   "Restart=on-failure" option and blindly killing the daemon is not working
+   anymore.  This completes the fix for #730604
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 01 Aug 2014 10:52:57 +0200
+
+libvirt (1.2.6-2) experimental; urgency=medium
+
+  * [501afad] Update copyright information
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 29 Jul 2014 08:55:26 +0200
+
+libvirt (1.2.6-1) experimental; urgency=medium
+
+  [ Laurent Bigonville ]
+  * [4c4977e,87fc2db] Rename libvirt-bin.service back to libvirtd.service
+    and use symlink or Alias= instead. This is what upstream uses.
+    (Closes: #730604)
+
+  [ Guido Günther ]
+  * Upload to experimental
+  * [9321997] Drop build-dep on hal-dev too (Closes: #710195)
+  * [899c1d3] New upstream version 1.2.5
+  * [34d54b9] Refresh patches.
+    Dropped, fixed upstream:
+       LSN-2014-0003-Don-t-expand-entities-when-parsing-XML.patch
+  * [12e5468] Update symbols file
+  * [8ae2cf5] Depend on gnutls/gcrypt explicitly (Closes: #753121)
+  * [8881fe5] Recommend iproute2 instead of iproute (Closes: #753713)
+  * [ab710a4] New upstream version 1.2.6
+  * [a23d7fc] Rediff patches
+  * [e6c037b] Bump symbol versions
+  * [7ca6a8a] Split out daemon configuration (Closes: #679074)
+  * [60ec538] Cleanup old conffile (Closes: #748720)
+  * [cc59dd4] Provide build and packager information (Closes: #753306)
+  * [74baa7e] Use sensible-editor as fallback.
+    Based on a patch by Dmitry Smirnov (Closes: #594444)
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 22 Jul 2014 22:33:51 +0200
+
+libvirt (1.2.4-3) unstable; urgency=medium
+
+  * [b0b7359] Don't pretend kFreeBSD supports linux only features.  So far we
+    worked around missing kFreeBSD features by creating empty dirs this looks
+    bad on the target systems and makes us maintain things in debian rules and
+    *.install. Explicitly invoke dh_install in debian/rules instead.
+    Closes: #747658
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 10 May 2014 22:23:06 +0200
+
+libvirt (1.2.4-2) unstable; urgency=medium
+
+  * [8bcbf97] Only linux has apparmor (Closes: #747565)
+  * [0fa7624] Disable tests requiring filesystem attributes since they seem to
+    fail on the buildd (Closes: #747565)
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 10 May 2014 15:38:57 +0200
+
+libvirt (1.2.4-1) unstable; urgency=medium
+
+  * [b38846c] New upstream version 1.2.4
+  * [f8d48c5] Drop.
+        tests-Only-use-privileged-mode-if-Qemu-user-and-grou.patch
+    applied upstream
+  * [8388a28] Disable hal on all architectures (Closes: #710195)
+  * [726b0bb] LSN-2014-0003: Don't expand entities when parsing XML
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 05 May 2014 10:59:18 +0200
+
+libvirt (1.2.4~rc2-1) experimental; urgency=medium
+
+  * [1190eb8] New upstream version 1.2.4~rc2
+  * [382f71a] Bump symbol versions
+  * [278d3b6] Rebase patches.
+    Dropped
+        libvirt-guests-avoid-bashism.patch
+        tests-Don-t-crash-when-creating-the-config-object-fa.patch
+    fixed upstream
+    Modified:
+        tests-Only-use-privileged-mode-if-Qemu-user-and-grou.patch
+    to better suite upstream.
+  * [057fc1d] Add more build-deps so we can run more test during "make check"
+  * [7f310c8] More verbose test output
+  * [5be4d5e] Include bug-presubj to request some more data on bug reports.
+  * [6bd3b3e] Stab at a build fix for kFreeBSD
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 03 May 2014 14:08:24 +0200
+
+libvirt (1.2.3-1) experimental; urgency=medium
+
+  * [aa5cd19] /etc/init.d/libvirt-guests: source /lib/lsb/init-function.
+    This make sure we redirect calls to systemctl correctly
+    Thanks to Laurent Bigonville (Closes: #739082)
+  * [9be0bf9] Remove old restart handling code from postinst.
+    This brings the dh_installinit calls in line with the dh_systemd_start
+    calls.
+    Thanks to Laurent Bigonville (Closes: #739096)
+  * [9c408f9] New upstream version 1.2.2. Fixes CVE-2013-6456
+    (Closes: #741276, #732394)
+  * [e2f0077] Bump symbols versions
+  * [c7bf776] Update patches.
+    Dropped
+      xen-fix-parsing-xend-http-response.patch - applied upstream
+  * [cca8c1e] New upstream version 1.2.3
+  * [11ad777] New patch Skip-vircgrouptest.patch.
+    Skip vircgrouptest since the sys emulating code isn't complete and fails
+    in our /sys free chroot.
+  * [448ab8c] Build-depend on libsystemd-daemon-dev on linux
+  * [66f2a93] Refresh patches
+  * [3038786] Fix test failures
+  * [bbed2fd] Depend on libattr1-dev for selinux tests
+  * [659fc63] Bump symbol versions
+  * [618b64f] Adjust systemd installation to upstream changes
+  * [1850e36] Bump standards version
+  * [e934847] libvirt-guests: avoid bashism
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 07 Apr 2014 12:15:02 +0200
+
+libvirt (1.2.1-2) unstable; urgency=medium
+
+  * [e936a7e] Document libvirt user capabilities
+  * [94096c9] xen: fix parsing xend http response.  This unbreaks xen on
+    wheezy.
+    Thanks to Jim Fehlig
+  * [fb06860] Install virt-aa-helper for apparmor
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 29 Jan 2014 07:42:22 +0100
+
+libvirt (1.2.1-1) unstable; urgency=medium
+
+  * Upload to unstable
+  * [22e83d7] New upstream version 1.2.1.
+    Fixes CVE-2014-0028, CVE-2014-1447, CVE-2013-6457
+    (Closes: #735676)
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 17 Jan 2014 06:16:29 +0100
+
+libvirt (1.2.1~rc2-1) experimental; urgency=medium
+
+  * [e559e92] libvirt-bin.init: Fix typo in path when checking for systemd
+  * [fef0f8f] New upstream version 1.2.1~rc2
+  * [caf3c45] Rediff patches
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 14 Jan 2014 11:21:55 +0100
+
+libvirt (1.2.1~rc1-1) experimental; urgency=medium
+
+  [ Laurent Bigonville ]
+  * [f6b0feb] Pass --with-selinux-mount=/sys/fs/selinux to ./configure.
+    The buildd are not running selinux and this make the auto-detection code
+    defaults to /selinux which is actually not existing anymore in sid.
+    This complete the fix for SELinux support.
+
+  [ Guido Günther ]
+  * Upload to experimental
+  * [20d9129] Enable parallel build support.
+    Thanks to Felix Geyer for pointing this out
+  * [0d0590e] New upstream version 1.2.1~rc1. Fixes CVE-2013-6458
+    (Closes: #734556)
+  * [a3f978b] Bump symbol versions
+  * [0a6a276] Rediff patches.
+    Dropped (fixed upstream):
+      security-fix-crash-in-lxcDomainGetMemoryParameters.patch
+      security-fix-crash-in-lxcDomainSetMemoryParameters.patch
+  * [3061b11] Build with apparmor support.
+    Note that this isn't enough to run with apparmor support since the
+    profiles will need more work but it makes testing this a lot simpler.
+    This is heavily based on a patch by Felix Geyer.
+    See: #725144
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 09 Jan 2014 08:23:57 +0100
+
+libvirt (1.2.0-2) unstable; urgency=medium
+
+  [ Guido Günther ]
+  * [949fae6] Suggest systemd since it improves thinks like e.g. cgroup
+    handling
+  * [96f9aae] Make mounted cgroups configurable via /etc/default/libvirt-bin
+    and check for memory cgroup on kernel command line. (Closes: #732666)
+  * [ce356fe] Really remove "memory" from default mount list. Thanks to phep
+    <phep-lists@teletopie.net>
+
+  [ Laurent Bigonville ]
+  * [13052e4] Enable selinux driver (Closes: #688179)
+  * [a00df46] Switch LSB dependencies to avahi-daemon since only the later
+    exists as native systemd service. (Closes: #731612)
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 01 Jan 2014 20:24:37 +0100
+
+libvirt (1.2.0-1) unstable; urgency=medium
+
+  * Upload to unstable
+  * [230609e] Depend on kmod instead of module-init-tools (Closes: #731451)
+  * [affb1ce] New upstream version 1.2.0
+  * [e9de7b2] Fix crashes in lxcDomain{S,G}etMemoryParameters.
+    This fixes CVE-2013-6436
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 18 Dec 2013 08:18:48 +0100
+
+libvirt (1.2.0~rc2-1) experimental; urgency=low
+
+  * [8bfdc7f] New upstream version 1.2.0~rc2
+  * [56d17d0] Bump symbol versions
+  * [288778f] Drop atomic-pthread-link-fix.  Fixed upstream.
+  * [c8151f5] Rediff patches
+  * [dd5ae42] Drop python-libvirt.  Python bindings were split out of
+    libvirt's git into libvirt-python.
+  * [bafc3d6] Install API files into dev package.  These are needed by the
+    python bindings
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 02 Dec 2013 21:31:31 +0100
+
+libvirt (1.1.4-2) unstable; urgency=low
+
+  * [78cadf5] Rados storage backend needs --with-storage-rbd not
+    --with-storage-rados
+  * [a384975] Explicitly disable phyp support so we can enable libssh2 uri
+    support.
+  * [9d8f3c5] Check correct dirs for existence (Closes: #729331)
+  * [1ede11d] Document new cgroup rrequirements (Closes: #707201)
+  * Acknowledge NMU, Thanks Julien Cristau (Closes: #730345)
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 01 Dec 2013 19:56:25 +0100
+
+libvirt (1.1.4-1.1) unstable; urgency=high
+
+  * Non-maintainer upload.
+  * Fix linking when using pthread atomic ops, such as on armel.
+  * Disable silent build rules.
+
+ -- Julien Cristau <jcristau@debian.org>  Sun, 24 Nov 2013 12:27:18 +0100
+
+libvirt (1.1.4-1) unstable; urgency=low
+
+  * Upload to unstable
+  * [54c6758] New upstream version 1.1.4
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 04 Nov 2013 07:05:45 +0100
+
+libvirt (1.1.4~rc2-1) experimental; urgency=low
+
+  * [b56f727] Add option to mount cgroups during daemon start.  The init
+    script can mount each control group to a different mount point during
+    prior to starting libvirt bin. This allows running qemu and lxc guests
+    together without using systemd.
+    Thanks to Manuel VIVES (Closes: #725261)
+  * [e044f56] New upstream version 1.1.4~rc2 (Closes: #727101)
+  * [d046906] Update symbols file
+  * [6a8cd2d] Update patches
+  * [ac24680] Lower policykit-1 build-dep since CVE-2013-4288 was fixed in
+    unstable by patching policykit instead of moving the new upstream version
+    from unstable.
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 03 Nov 2013 11:44:18 +0100
+
+libvirt (1.1.3-2) experimental; urgency=low
+
+  * [63167cd] Enable libxl (Closes: #698093)
+  * [c7747b0] Enable rados block device support
+  * [6aa2998] Build against fuse for lxc fuse support
+  * [a2a1a74] Don't fail chmod/chdir if a file doesn't exist.  We don't use -f
+    since we want to detect other errors (ro filesystem, etc.)
+    (Closes: #726203)
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 14 Oct 2013 12:22:13 +0200
+
+libvirt (1.1.3-1) experimental; urgency=low
+
+  * [6ec841f] New upstream version 1.1.3
+  * [3721380] Drop Add-check-aclperms.pl.patch applied upstream
+  * [acc5263] Refresh patches
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 01 Oct 2013 13:22:11 +0200
+
+libvirt (1.1.3~rc1-1) experimental; urgency=low
+
+  * [1894ff0] Use libvirt-qemu as group for qemu-kvm related directories since
+    this is the group we run the process with.
+  * [adf14d0] Make sure qemu guest agent related directories are
+    readable/writeable by the kvm process (Closes: #717406)
+  * [b7c1b69] Explicitly enable sheepdog support we already set the configure
+    params but didn't pass them on. Sheepdog support was enabled anyway due to
+    ./configure autoprobing.
+  * [85436a4] No need for gawk.  Awk isn't used in libvirt anymore and
+    virt-pki-validate can cope with mawk. (Closes: #703380)
+  * [20cacff] New upstream version 1.1.3~rc1
+  * [fe3ccca] Drop patches fixed upstream.
+        Fix-cgroups-when-all-are-mounted-on-sys-fs-cgroup.patch
+        Fix-launching-of-VMs-on-when-only-logind-part-of-sys.patch
+        Fix-make-check-not-finding-finding-the-libvirtd-lens.patch
+        Parse-AM_LDFLAGS-to-driver-modules-too.patch
+        virFileNBDDeviceAssociate-Avoid-use-of-uninitialized.patch
+  * [da60777] Rediff patches
+  * [d5e311a] Update symbols file
+  * [634a67a] Depend on newer polkit. We want a pkcheck that supports the uid
+    arg to address CVE-2013-4311
+  * [7c5e09d] Add check-aclperms.pl missing from the dist tarball
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 26 Sep 2013 14:08:44 +0200
+
+libvirt (1.1.2-3) unstable; urgency=low
+
+  * [d7b6d7a] Cherry-pick cgroup related fixes from upstream trunk.
+    (a48838ad2e36c124229b6faaf6e24284810e3802 and
+    f0b6d8d472de3c1bf3ade24e07df7c6d02075b77).
+    Thanks to Laurent Biognville for chasing this and Daniel P. Berrange for
+    the actual fixes.
+    (Closes: #721979)
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 12 Sep 2013 16:15:31 +0200
+
+libvirt (1.1.2-2) unstable; urgency=low
+
+  * [f5f3818] virFileNBDDeviceAssociate: Avoid use of uninitialized variable.
+    This fixes CVE-2013-4297.
+    Thanks to Michal Privoznik
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 09 Sep 2013 09:22:20 +0200
+
+libvirt (1.1.2-1) unstable; urgency=low
+
+  * [1fb0a76] Parse AM_LDFLAGS to driver modules too got get a RO got
+    Thanks again lintian and lintian-maintainers!
+  * [921150d] Bump standards version to 0.9.4
+  * [7b8d517] New upstream version 1.1.2
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 02 Sep 2013 10:04:33 +0200
+
+libvirt (1.1.2~rc2-1) experimental; urgency=low
+
+  * [4db5aa3] Remove unneeded systemd targets.
+    While it's nice to have them upstream for backward compat we can drop
+    them in Debian already.
+  * [b4a9eaf] New upstream version 1.1.2~rc2 (Closes: #721325)
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 30 Aug 2013 17:46:54 +0200
+
+libvirt (1.1.2~rc1-1) experimental; urgency=low
+
+  * [a3b140a] New upstream version 1.1.2~rc1 (Closes: #719533)
+  * [6c162e3] Update patches:
+    Drop virGetGroupList-always-include-the-primary-group.patch applied
+    upstream.
+  * [e6c12ec] Update symbols
+  * [a3548ee] Drop versioned libaudit-dev dependency (Closes: #721172)
+  * [1562bb3] Fix "make check" not finding finding the libvirtd lense
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 29 Aug 2013 20:22:10 +0200
+
+libvirt (1.1.1-1) unstable; urgency=low
+
+  * [58c2a29] New upstream version 1.1.1 (Closes: #15510, #715320)
+  * [0a06224] Move directory creation form dh_auto_build to dh_auto_install
+    since this isn't part of the building but the installing process.
+  * [a1c747a] Update symbols
+  * [90a1881] Update patches.
+    Dropped patches fixed upstream
+        CVE-2013-4153-qemu-Fix-double-free-of-returned-JSON-.patch
+        CVE-2013-4154-qemu-Prevent-crash-of-libvirtd-without.patch
+        Create-directory-for-lease-files-if-it-s-missing.patch
+        Fix-crash-when-multiple-event-callbacks-were-registe.patch
+  * [1308542] virGetGroupList: always include the primary group
+    otherwise we're lacking the group to access /dev/kvm
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 05 Aug 2013 11:31:05 +0200
+
+libvirt (1.1.0-4) unstable; urgency=low
+
+  * [22913a0] Skip tests on all architectures except for i386 and amd64 as we
+    did with cdbs
+  * [23a28f2] CVE-2013-4153: qemu: Fix double free of returned JSON array in
+    qemuAgentGetVCPUs() Thanks to Peter Krempa (Closes: #717354)
+  * [85b5fda] CVE-2013-4154: qemu: Prevent crash of libvirtd without guest
+    agent configuration.  Thanks to Alex Jia (Closes: #717355)
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 20 Jul 2013 09:58:29 +0200
+
+libvirt (1.1.0-3) unstable; urgency=low
+
+  * [3a2a899] Create directory for lease files if it's missing
+    (Closes: #715200)
+  * [000df64] Don't assume EXAMPLES_DIR exists as seen on the autobuilders
+    (Closes: #717059)
+  * [8369f65] Fix crash when multiple event callbacks were registered.
+    CVE-2013-2230. Thanks to Ján Tomko (Closes: #715559)
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 16 Jul 2013 16:03:40 +0200
+
+libvirt (1.1.0-2) unstable; urgency=low
+
+  * [ac2fb88] Create /var/lib/libvirt/qemu/channel/target (Closes: #712179)
+  * [54deab3] Switch to dh
+  * [642e1f9] Set LD_PRELOAD empty (Closes: #714515)
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 09 Jul 2013 15:51:16 +0200
+
+libvirt (1.1.0-1) unstable; urgency=low
+
+  [ Guido Günther ]
+  * [f0c8ed9] Remove now unused DM-Upload-Allowed
+  * [aff716e] Depend on newer libnetcf1 that has a proper symbols file so we
+    can drop the explicit libnetcf1 dependency in libvirt-bin
+    (Closes: #712073)
+  * [985164b] New upstream version 1.1.0. Addresses CVE-2013-2218.
+    (Closes: #714699)
+  * [390c5bd] Update symbols file
+  * [9854fa9] Rebase patches
+  * [9f9bb30] Move renaming of the service files prior to the dh_systemd_*
+    helpers so they pick up the right service name.
+
+  [ Michael Stapelberg ]
+  * [5978fc0] switch to dh-systemd for proper systemd maintscripts
+    (Closes: #714197)
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 02 Jul 2013 22:40:05 +0200
+
+libvirt (1.0.6-1) unstable; urgency=low
+
+  * [d233204] Make sure qemu.conf isn't world readable by default
     since the user might add passwords to it. (Closes: #710537)
+  * [3a2c75c] New upstream version 1.0.6
+  * [792d607] Update symbols
+  * [7921e44] Update patches:
+     Changed patches.
+        Debianize-libvirt-guests.patch adjuste to upstream changes
+     Dropped patches (applied upstream):
+        Add-sanitytest.py.patch
+        Fixup-rpcgen-code-on-kFreeBSD-too.patch
+        Make-detect_scsi_host_caps-a-function-on-all-archite.patch
+        daemon-fix-leak-after-listing-all-volumes.patch
+        virInitctlRequest-Don-t-hardcode-384-bytes-size.patch
+        virthreadpthread-don-t-try-to-cast-pthread_t-to-void.patch
 
-  [ Ferenc Wagner ]
-  * [ce7ef48] Fix libvirtd crash when destroying a domain with attached console
-    (Closes: #710517)
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 06 Jun 2013 15:27:52 +0200
 
- -- Guido Günther <agx@sigxcpu.org>  Tue, 20 Aug 2013 10:37:16 +0200
+libvirt (1.0.5-3) unstable; urgency=low
 
-libvirt (0.9.12-11+deb7u1) wheezy-proposed-updates; urgency=low
+  * Upload to unstable (Closes: #709216, #705205)
+  * [037b674] daemon: fix leak after listing all volumes.
+    Thanks to Ján Tomko (Closes: #708647)
 
-  [ Guido Günther ]
-  * [af660e5] Allow xen toolstack to find it's binaries.
-    Thanks to George Dunlap for the patch. (Closes: #685749)
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 29 May 2013 11:10:18 +0200
 
-  [ Luca Tettamanti ]
-  * [90d8287] Fix leak in virStorageBackendLogicalMakeVol
-    (Closes: #705205)
+libvirt (1.0.5-2) experimental; urgency=low
 
- -- Guido Günther <agx@sigxcpu.org>  Wed, 29 May 2013 13:42:44 +0200
+  * [3686504] virInitctlRequest: Don't hardcode 384 bytes size
+    another kFreeBSD build fix
+  * [b47d706] Disable xen and vbox on all non-linux platforms
+  * [031648a] Fixup rpcgen code on kFreeBSD too
+  * [5154850] Make detect_scsi_host_caps a function on all architectures.
+    Another kFreeBSD build fix
 
-libvirt (0.9.12-11) unstable; urgency=low
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 03 May 2013 10:42:38 +0200
 
-  * [422c506] Use "getent passwd" instead of the non existing "getent user"
-    Thanks to again to Adam D. Barratt
+libvirt (1.0.5-1) experimental; urgency=low
 
- -- Guido Günther <agx@sigxcpu.org>  Wed, 06 Mar 2013 12:27:09 +0100
+  * [c90d756] New upstream version 1.0.5
+    Fixes a kFreeBSD build failure
+  * [910e185] virthreadpthread: don't try to cast pthread_t to void*
+    Fixes another build failure on kFreeBSD
+  * [3f914e6] Add back sanitytest.py that got lost in the upstream tarball
 
-libvirt (0.9.12-10) unstable; urgency=low
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 02 May 2013 21:34:32 +0200
 
-  * [56bcb4c] Properly remove libvirt-qemu group and user.
-    Thanks to Adam D. Barratt for noticing
-  * [8abfe79] Make sure libvirt-bin.NEWS gets displayed in wheezy as well
+libvirt (1.0.5~rc1-1) experimental; urgency=low
 
- -- Guido Günther <agx@sigxcpu.org>  Wed, 06 Mar 2013 08:23:55 +0100
+  * [c2302f5] Dont' fail with aug-tools installed.
+    Thanks; Manuel VIVES (Closes: #705528)
+  * [60e9fd4] New upstream version 1.0.5~rc1
+  * [2625e81] Update patches. Dropped.
+        Add-sanitytest.py.patch
+    applied upstream.
+  * [f16f97d] Don't ship files for static linking
+  * [77362d6] Update symbols
 
-libvirt (0.9.12-9) unstable; urgency=low
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 30 Apr 2013 15:35:01 +0200
 
-  * [424ffbc] Revert "Enable systemd services" We enabled systemd support in
-    0.9.13 Thanks to Antti-Juhani Kaijanaho
-    (Closes: #702324)
+libvirt (1.0.4-1) experimental; urgency=low
 
- -- Guido Günther <agx@sigxcpu.org>  Tue, 05 Mar 2013 12:35:06 +0100
+  * [ddd8c30] lxc: Init activeUsbHostdevs (Closes: #700267)
+  * [95adca0] New upstream version 1.0.4
+  * [237a6ca] Update symbols file
 
-libvirt (0.9.12-8) unstable; urgency=low
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 01 Apr 2013 14:25:22 +0200
 
-  * [181eab1] CVE-2013-1766: Use libvirt-qemu as group to run qemu/kvm
+libvirt (1.0.3-1) experimental; urgency=low
+
+  * [38c4d9a] New upstream version 1.0.3
+  * [4fa2cf2] Update patches.
+    Dropped (fixed upstream)
+        - Hook-log-the-exit-status-of-the-hook-not-256.patch
+  * [ab5c109] Add sanitytest.py missing from the upstream tarball
+  * [524cdb1] Properly remove libvirt-qemu group and user.
+    Thanks to Adam D.  Barratt for noticing
+  * [5dbabe0] Use "getent passwd" instead of the non existing "getent user"
+    Thanks again to Adam D. Barratt
+  * [f59b09c] Only add libvirt-qemu user to libvirt-qemu group once when the
+    group gets created
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 08 Mar 2013 19:07:33 +0100
+
+libvirt (1.0.3~rc2-1) experimental; urgency=low
+
+  * [9afb984] Enable systemd services
+  * [623674a] New upstream version 1.0.3~rc2
+  * [e0bccfc] Update symbols
+  * [7414d07] Refresh patches.
+    Drop
+        Fix-missing-error-constants-in-libvirt-python-module.patch
+        complete-virterror-virerror-name-change.patch
+    fixed upstream.
+  * [bae2f7b] Hook log the exit status of the hook not 256
+    (Closes: #701570)
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 01 Mar 2013 16:54:48 +0100
+
+libvirt (1.0.2-3) experimental; urgency=low
+
+  * [6270001] CVE-2013-1766: Use libvirt-qemu as group to run qemu/kvm
     instances.  This makes sure we don't chown files to groups possibly used
     by other programs. (Closes: #701649)
-  * [0ef17cc] Enable systemd services
 
- -- Guido Günther <agx@sigxcpu.org>  Mon, 04 Mar 2013 16:58:19 +0100
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 26 Feb 2013 09:32:59 +0100
 
-libvirt (0.9.12-7) unstable; urgency=low
+libvirt (1.0.2-2) experimental; urgency=low
 
-  * [d45d576] qemu: Add support for -no-user-config
-    so newer cpu models can be used.
-    Thanks to Philipp Kern for his report and testing (Closes: #699813)
+  * [7e3ee2f] Cherry-pick upstream fixes for Python bindings (Closes: #700077)
 
- -- Guido Günther <agx@sigxcpu.org>  Sun, 17 Feb 2013 10:09:07 +0100
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 08 Feb 2013 14:04:08 +0100
 
-libvirt (0.9.12-6) unstable; urgency=low
+libvirt (1.0.2-1) experimental; urgency=low
 
-  * [78a3a68] Revert "rpc: Discard non-blocking calls only when necessary"
-    Thanks to Jiri Denemark for the patch and Philipp Hahn for debugging
-  * [5b4dc1a] qemu: Fix off-by-one error while unescaping monitor strings.
-    Thanks to Peter Krempa for the patch and Philipp Hahn for debugging this
-    (Closes: #699281)
-  * [372f53d] rpc: Fix crash on error paths of message dispatching.
-    This fixes CVE-2013-0170
-    Thanks to Peter Krempa (Closes: #699224)
-  * [2a2a60e] Make python-libvirt depend on the exact same libvirt0 version
-    (Closes: #697852, #699128)
+  * [7adf6b4] New upstream version 1.0.2
+  * [1156772] Drop Don-t-fail-the-build-without-libcurl-and-esx.patch
+    applied upstream
+  * [5d66d5a] Rediff patches
 
- -- Guido Günther <agx@sigxcpu.org>  Tue, 29 Jan 2013 21:02:05 +0100
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 30 Jan 2013 21:06:02 +0100
+
+libvirt (1.0.2~rc1-1) experimental; urgency=low
+
+  * [5ce607c] Make python-libvirt depend on the exact same libvirt0 version
+    (Closes: #697852)
+  * [9335bdd] New upstream version 1.0.2~rc1
+  * [8af24a9] Dropped patch
+       Define-SANLK_INQ_WAIT-if-missing-in-headers.patch - fixed upstream
+  * [be521af] Update symbols
+  * [47dbf6b] New patch Don-t-fail-the-build-without-libcurl-and-esx.patch
+  * [9e52c7b] Install libvirt-lxc.so
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 28 Jan 2013 08:55:36 +0100
+
+libvirt (1.0.1-4) experimental; urgency=low
+
+  * [753d41c] Add epoch to libnetcf1 dependency (Closes: #697457)
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 07 Jan 2013 15:59:51 +0100
+
+libvirt (1.0.1-3) experimental; urgency=low
+
+  * [11f91ea] Make sure we build against sid's libaudit since libaudit0 and
+    libaudit1 aren't coinstallable (see #697459).
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 05 Jan 2013 17:04:51 +0100
+
+libvirt (1.0.1-2) experimental; urgency=low
+
+  * [0019ff9] Pass WITH_AUDIT to configure (Closes: #688177)
+  * [faf7972] Add epoch to libnetcf build dependency since both the usuable
+    and unusable verion carry an epoch now (Closes: #697303)
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 03 Jan 2013 22:36:56 +0100
+
+libvirt (1.0.1-1) experimental; urgency=low
+
+  * [e722456] New upstream version 1.0.1
+  * [dccead7] Update patches
+  * [1384de7] Dropped patches.
+      * Define-SANLK_INQ_WAIT-if-missing-in-headers.patch - fixed upstream
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 23 Dec 2012 12:28:01 +0100
+
+libvirt (1.0.1~rc1-1) experimental; urgency=low
+
+  * [dca42fb] Rely on DBus activation for hal (Closes: #694020)
+  * [cbb8fd5] Disable firewalld since this would make us hard depend on DBus
+  * [751c235] New upstream version 1.0.1~rc1
+  * [f672206] Update patches
+  * [a6fae3d] Define SANLK_INQ_WAIT if missing in headers
+  * [50956c7] libvirt-guests init script moved
+    for better systemd integration
+  * [a05c9c7] Update symbols
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 13 Dec 2012 18:54:12 +0100
+
+libvirt (1.0.0-1) experimental; urgency=low
+
+  * [f5c8dae] New upstream version 1.0.0
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 06 Nov 2012 20:59:48 +0100
+
+libvirt (1.0.0~rc3-1) experimental; urgency=low
+
+  * [d3d06ad] New upstream version 1.0.0~rc3
+  * [610ff5d] Drop Create-temporary-dir-for-socket.patch, applied upstream.
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 01 Nov 2012 21:59:41 +0100
+
+libvirt (1.0.0~rc2-3) experimental; urgency=low
+
+  * [55ec399] Don't try to configure systemtap support on architectures
+    lacking support for it.
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 30 Oct 2012 13:28:50 +0100
+
+libvirt (1.0.0~rc2-2) experimental; urgency=low
+
+  * [a2dd93d] Adjust systemtap build-dependency to architectures that actually
+    have it.
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 30 Oct 2012 07:21:19 +0100
+
+libvirt (1.0.0~rc2-1) experimental; urgency=low
+
+  * [2b79e3d] New upstream version 1.0.0~rc2
+  * [79d2200] Add empty systemtap dir so dh_install doesn't fail on kFreeBSD
+  * [e68850a] Create temporary dir for socket to avoid ENAMETOOLONG
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 29 Oct 2012 10:55:22 +0100
+
+libvirt (1.0.0~rc1-1) experimental; urgency=low
+
+  * [51182d6] New upstream version 1.0.0~rc1
+  * [a8b162b] Refresh patches.
+    Fixed upstream:
+        * Properly-parse-unsigned-long-long.patch
+        * storage-lvm-Don-t-overwrite-lvcreate-errors.patch
+        * storage-lvm-lvcreate-fails-with-allocation-0-don-t-d.patch
+  * [418be04] Update symbols
+  * [f3fdef3] Install systemtap tapsets on Linux
+  * [e18098f] Build require a netcf linked against libnl-3-dev
+  * [8acbd16] Adjust to changed policy file names
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 28 Oct 2012 17:13:08 +0100
+
+libvirt (0.10.2-4) experimental; urgency=low
+
+  * [cb74dfd] Properly parse (unsigned) long long in the python bindings to
+    fix those on platforms where sizeof(long) != sizeof(long long).
+    This fixes virt-install's '--location='.
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 13 Oct 2012 10:31:21 +0200
+
+libvirt (0.10.2-3) experimental; urgency=low
+
+  * [ce15a08] Build against libnl-3 on Linux systems (Closes: #688167)
+  * [19ec20b] Depend on a libnetcf1 that's build against libnl3 to avoid
+    pulling in libnl1 symbols.
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 09 Oct 2012 20:30:51 +0200
+
+libvirt (0.10.2-2) experimental; urgency=low
+
+  * [20830ab] Mark sheepdog as linux-any since it's not available on kFreeBSD
+  * [be7423c] Allow xen toolstack to find it's binaries. 
+    Thanks to George Dunlap for the patch. (Closes: #685749)
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 02 Oct 2012 19:20:17 +0200
+
+libvirt (0.10.2-1) experimental; urgency=low
+
+  * [40e1704] Enable auditing on linux-any.
+    Thanks to Laurent Bigonville for testing. (Closes: 688177)
+  * [8d56723] New upstream version 0.10.2
+  * [312d8e6] Update symbols
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 27 Sep 2012 16:25:26 +0200
+
+libvirt (0.10.1-2) experimental; urgency=low
+
+  * [cd7e695] Recommend pm-utils used for host power management.
+  * [2f928f7] Add missing "-d" to libvirt-bin's restart option otherwise
+    daemon restarts will just hang. Thanks to Laurent Bigonville.
+    (Closes: #688146)
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 19 Sep 2012 22:32:34 +0200
+
+libvirt (0.10.1-1) experimental; urgency=low
+
+  * [aa3d87e] New upstream version 0.10.1
+  * [39ae471] Drop Revert-security-Add-DAC-to-security_drivers.patch: fixed
+    upstream.
+  * [b531061] Update symbol file
+  * [8d4f9dc] Enable sheepdog support
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 06 Sep 2012 13:06:02 +0200
+
+libvirt (1.0.0-2) unstable; urgency=low
+
+  * Upload to unstable
+  * [dca42fb] Rely on DBus activation for hal (Closes: #694020)
+  * [cbb8fd5] Disable firewalld since this would make us hard depend on DBus
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 26 Nov 2012 22:10:17 +0100
+
+libvirt (0.10.0-1) experimental; urgency=low
+
+  * [b3ae724] New upstream version 0.10.0
+  * [19618d9] Update symbols file
+  * Dropped patches, fixed upstream:
+        * security/CVE-2012-3445.patch
+        * virsh-Initialize-library-before-calling-virResetLast.patch 
+        * Don-t-require-gawk-for-a-simple-print-expression.patch
+  * [2a5d5b7] Revert "security: Add DAC to security_drivers" to allow guest
+    start. Thanks to Peter Krempa and Marcelo Cerri for tracking this down.
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 30 Aug 2012 09:27:43 +0200
+
+libvirt (0.9.13-1) experimental; urgency=low
+
+  * [6cf501c] New upstream version 0.9.13
+  * [8ff7077] Fix CVE-2012-3445 with upstream commit
+    6039a2cb49c8af4c68460d2faf365a7e1c686c7b. (Closes: #683483)
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 01 Aug 2012 13:14:30 +0200
+
+libvirt (0.9.13~rc2-1) experimental; urgency=low
+
+  * [505f873] New upstream version 0.9.13~rc2
+  * [bd1c1e0] Rebase patches
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 29 Jun 2012 11:23:54 +0200
+
+libvirt (0.9.13~rc1-2) experimental; urgency=low
+
+  * [628a05a] Add empty systemd dir on kFreeBSD to make dh_install pass
+  * [e5b4fbf] Remove -d from libvirtd_opts
+    so we can use the same options in the systemd unit file without having
+    to fork there too.
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 28 Jun 2012 11:30:29 +0200
+
+libvirt (0.9.13~rc1-1) experimental; urgency=low
+
+  * [9deae39] New upstream version 0.9.13~rc1
+  * [487acd7] Drop Include-stdint.h-for-uint32_t.patch fixed upstream
+  * [ab7be10] Drop Only-check-for-cluster-fs-if-we-re-using-a-filesyste.patch
+    applied upstream
+  * [385bac4] Rebase remaining patches
+  * [cb0d1f7] Update symbol versions
+  * [c2bd465] Remove *.la files generated for dynamically loaded modules
+  * [e4714b7] Add sanlock support.
+    Thanks to David Weber (Closes: #676345)
+  * [5f715ed] Install systemd init scripts on Linux
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 26 Jun 2012 15:29:27 +0200
 
 libvirt (0.9.12-5) unstable; urgency=high
 
@@ -107,6 +889,7 @@ libvirt (0.9.12-4) unstable; urgency=low
     6039a2cb49c8af4c68460d2faf365a7e1c686c7b (Closes: #683483)
 
  -- Guido Günther <agx@sigxcpu.org>  Wed, 01 Aug 2012 21:12:13 +0200
+
 
 libvirt (0.9.12-3) unstable; urgency=low
 

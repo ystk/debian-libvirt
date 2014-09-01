@@ -32,7 +32,23 @@ module Libvirtd_qemu =
                  | str_entry "vnc_password"
                  | bool_entry "vnc_sasl"
                  | str_entry "vnc_sasl_dir"
-                 | str_entry "security_driver"
+                 | bool_entry "vnc_allow_host_audio"
+
+   let spice_entry = str_entry "spice_listen"
+                 | bool_entry "spice_tls"
+                 | str_entry  "spice_tls_x509_cert_dir"
+                 | str_entry "spice_password"
+                 | bool_entry "spice_sasl"
+                 | str_entry "spice_sasl_dir"
+
+   let nogfx_entry = bool_entry "nographics_allow_host_audio"
+
+   let remote_display_entry = int_entry "remote_display_port_min"
+                 | int_entry "remote_display_port_max"
+                 | int_entry "remote_websocket_port_min"
+                 | int_entry "remote_websocket_port_max"
+
+   let security_entry = str_entry "security_driver"
                  | bool_entry "security_default_confined"
                  | bool_entry "security_require_confined"
                  | str_entry "user"
@@ -40,26 +56,51 @@ module Libvirtd_qemu =
                  | bool_entry "dynamic_ownership"
                  | str_array_entry "cgroup_controllers"
                  | str_array_entry "cgroup_device_acl"
-                 | str_entry "save_image_format"
+                 | int_entry "seccomp_sandbox"
+
+   let save_entry =  str_entry "save_image_format"
                  | str_entry "dump_image_format"
+                 | str_entry "snapshot_image_format"
                  | str_entry "auto_dump_path"
                  | bool_entry "auto_dump_bypass_cache"
                  | bool_entry "auto_start_bypass_cache"
-                 | str_entry "hugetlbfs_mount"
-                 | bool_entry "relaxed_acs_check"
-                 | bool_entry "vnc_allow_host_audio"
+
+   let process_entry = str_entry "hugetlbfs_mount"
                  | bool_entry "clear_emulator_capabilities"
-                 | bool_entry "allow_disk_format_probing"
+                 | str_entry "bridge_helper"
                  | bool_entry "set_process_name"
                  | int_entry "max_processes"
                  | int_entry "max_files"
+
+   let device_entry = bool_entry "mac_filter"
+                 | bool_entry "relaxed_acs_check"
+                 | bool_entry "allow_disk_format_probing"
                  | str_entry "lock_manager"
-                 | int_entry "max_queued"
+
+   let rpc_entry = int_entry "max_queued"
                  | int_entry "keepalive_interval"
                  | int_entry "keepalive_count"
 
-   (* Each enty in the config is one of the following three ... *)
+   let network_entry = str_entry "migration_address"
+                 | int_entry "migration_port_min"
+                 | int_entry "migration_port_max"
+                 | str_entry "migration_host"
+
+   let log_entry = bool_entry "log_timestamp"
+
+   (* Each entry in the config is one of the following ... *)
    let entry = vnc_entry
+             | spice_entry
+             | nogfx_entry
+             | remote_display_entry
+             | security_entry
+             | save_entry
+             | process_entry
+             | device_entry
+             | rpc_entry
+             | network_entry
+             | log_entry
+
    let comment = [ label "#comment" . del /#[ \t]*/ "# " .  store /([^ \t\n][^\n]*)?/ . del /\n/ "\n" ]
    let empty = [ label "#empty" . eol ]
 

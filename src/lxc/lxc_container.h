@@ -17,8 +17,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  */
 
 #ifndef LXC_CONTAINER_H
@@ -46,20 +46,31 @@ enum {
 
 # define LXC_DEV_MAJ_PTY     136
 
+# define LXC_DEV_MAJ_FUSE    10
+# define LXC_DEV_MIN_FUSE    229
+
 int lxcContainerSendContinue(int control);
 int lxcContainerWaitForContinue(int control);
 
 int lxcContainerStart(virDomainDefPtr def,
                       virSecurityManagerPtr securityDriver,
-                      unsigned int nveths,
+                      size_t nveths,
                       char **veths,
+                      size_t npassFDs,
+                      int *passFDs,
                       int control,
                       int handshakefd,
-                      char **ttyPaths,
-                      size_t nttyPaths);
+                      size_t nttyPaths,
+                      char **ttyPaths);
 
 int lxcContainerAvailable(int features);
 
-const char *lxcContainerGetAlt32bitArch(const char *arch);
+int lxcContainerSetupHostdevCapsMakePath(const char *dev);
+
+virArch lxcContainerGetAlt32bitArch(virArch arch);
+
+int lxcContainerChown(virDomainDefPtr def, const char *path);
+
+bool lxcIsBasicMountLocation(const char *path);
 
 #endif /* LXC_CONTAINER_H */

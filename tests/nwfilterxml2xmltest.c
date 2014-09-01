@@ -10,11 +10,14 @@
 
 #include "internal.h"
 #include "testutils.h"
-#include "xml.h"
-#include "threads.h"
+#include "virxml.h"
+#include "virthread.h"
 #include "nwfilter_params.h"
 #include "nwfilter_conf.h"
 #include "testutilsqemu.h"
+#include "virstring.h"
+
+#define VIR_FROM_THIS VIR_FROM_NONE
 
 static int
 testCompareXMLToXMLFiles(const char *inxml, const char *outxml,
@@ -33,15 +36,12 @@ testCompareXMLToXMLFiles(const char *inxml, const char *outxml,
 
     virResetLastError();
 
-    if (!(dev = virNWFilterDefParseString(NULL, inXmlData)))
+    if (!(dev = virNWFilterDefParseString(inXmlData))) {
+        if (expect_error) {
+            virResetLastError();
+            goto done;
+        }
         goto fail;
-
-    if (!!virGetLastError() != expect_error)
-        goto fail;
-
-    if (expect_error) {
-        /* need to suppress the errors */
-        virResetLastError();
     }
 
     if (!(actual = virNWFilterDefFormat(dev)))
@@ -52,6 +52,7 @@ testCompareXMLToXMLFiles(const char *inxml, const char *outxml,
         goto fail;
     }
 
+ done:
     ret = 0;
 
  fail:
@@ -84,7 +85,7 @@ testCompareXMLToXMLHelper(const void *data)
 
     result = testCompareXMLToXMLFiles(inxml, outxml, tp->expect_warning);
 
-cleanup:
+ cleanup:
     VIR_FREE(inxml);
     VIR_FREE(outxml);
 
@@ -103,7 +104,7 @@ mymain(void)
             .expect_warning = EXPECT_WARN,                        \
         };                                                        \
         if (virtTestRun("NWFilter XML-2-XML " NAME,               \
-                        1, testCompareXMLToXMLHelper, (&tp)) < 0) \
+                        testCompareXMLToXMLHelper, (&tp)) < 0)    \
             ret = -1;                                             \
     } while (0)
 
@@ -157,7 +158,9 @@ mymain(void)
     DO_TEST("iter-test2", false);
     DO_TEST("iter-test3", false);
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    DO_TEST("ipset-test", false);
+
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

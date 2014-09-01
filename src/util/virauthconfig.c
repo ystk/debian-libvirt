@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -25,11 +25,10 @@
 #include "virauthconfig.h"
 
 #include "virkeyfile.h"
-#include "memory.h"
-#include "util.h"
-#include "logging.h"
-#include "virterror_internal.h"
-
+#include "viralloc.h"
+#include "virlog.h"
+#include "virerror.h"
+#include "virstring.h"
 
 struct _virAuthConfig {
     virKeyFilePtr keyfile;
@@ -38,24 +37,17 @@ struct _virAuthConfig {
 
 #define VIR_FROM_THIS VIR_FROM_NONE
 
-#define virAuthReportError(code, ...)                                   \
-    virReportErrorHelper(VIR_FROM_THIS, code, __FILE__,                 \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
-
+VIR_LOG_INIT("util.authconfig");
 
 virAuthConfigPtr virAuthConfigNew(const char *path)
 {
     virAuthConfigPtr auth;
 
-    if (VIR_ALLOC(auth) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(auth) < 0)
         goto error;
-    }
 
-    if (!(auth->path = strdup(path))) {
-        virReportOOMError();
+    if (VIR_STRDUP(auth->path, path) < 0)
         goto error;
-    }
 
     if (!(auth->keyfile = virKeyFileNew()))
         goto error;
@@ -65,7 +57,7 @@ virAuthConfigPtr virAuthConfigNew(const char *path)
 
     return auth;
 
-error:
+ error:
     virAuthConfigFree(auth);
     return NULL;
 }
@@ -77,15 +69,11 @@ virAuthConfigPtr virAuthConfigNewData(const char *path,
 {
     virAuthConfigPtr auth;
 
-    if (VIR_ALLOC(auth) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(auth) < 0)
         goto error;
-    }
 
-    if (!(auth->path = strdup(path))) {
-        virReportOOMError();
+    if (VIR_STRDUP(auth->path, path) < 0)
         goto error;
-    }
 
     if (!(auth->keyfile = virKeyFileNew()))
         goto error;
@@ -95,7 +83,7 @@ virAuthConfigPtr virAuthConfigNewData(const char *path,
 
     return auth;
 
-error:
+ error:
     virAuthConfigFree(auth);
     return NULL;
 }
@@ -130,10 +118,8 @@ int virAuthConfigLookup(virAuthConfigPtr auth,
     if (!hostname)
         hostname = "localhost";
 
-    if (virAsprintf(&authgroup, "auth-%s-%s", service, hostname) < 0) {
-        virReportOOMError();
+    if (virAsprintf(&authgroup, "auth-%s-%s", service, hostname) < 0)
         goto cleanup;
-    }
 
     if (!virKeyFileHasGroup(auth->keyfile, authgroup)) {
         ret = 0;
@@ -141,21 +127,19 @@ int virAuthConfigLookup(virAuthConfigPtr auth,
     }
 
     if (!(authcred = virKeyFileGetValueString(auth->keyfile, authgroup, "credentials"))) {
-        virAuthReportError(VIR_ERR_CONF_SYNTAX,
-                           _("Missing item 'credentials' in group '%s' in '%s'"),
-                           authgroup, auth->path);
+        virReportError(VIR_ERR_CONF_SYNTAX,
+                       _("Missing item 'credentials' in group '%s' in '%s'"),
+                       authgroup, auth->path);
         goto cleanup;
     }
 
-    if (virAsprintf(&credgroup, "credentials-%s", authcred) < 0) {
-        virReportOOMError();
+    if (virAsprintf(&credgroup, "credentials-%s", authcred) < 0)
         goto cleanup;
-    }
 
     if (!virKeyFileHasGroup(auth->keyfile, credgroup)) {
-        virAuthReportError(VIR_ERR_CONF_SYNTAX,
-                           _("Missing group 'credentials-%s' referenced from group '%s' in '%s'"),
-                           authcred, authgroup, auth->path);
+        virReportError(VIR_ERR_CONF_SYNTAX,
+                       _("Missing group 'credentials-%s' referenced from group '%s' in '%s'"),
+                       authcred, authgroup, auth->path);
         goto cleanup;
     }
 
@@ -168,7 +152,7 @@ int virAuthConfigLookup(virAuthConfigPtr auth,
 
     ret = 0;
 
-cleanup:
+ cleanup:
     VIR_FREE(authgroup);
     VIR_FREE(credgroup);
     return ret;

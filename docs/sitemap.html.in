@@ -1,4 +1,6 @@
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <h1>Sitemap</h1>
 
@@ -67,6 +69,16 @@
                 <span>Configure authentication for the libvirt daemon</span>
               </li>
               <li>
+                <a href="acl.html">Access control</a>
+                <span>Configure access control libvirt APIs</span>
+                <ul>
+                  <li>
+                    <a href="aclpolkit.html">Polkit access control</a>
+                    <span>Using polkit for API access control</span>
+                  </li>
+                </ul>
+              </li>
+              <li>
                 <a href="migration.html">Migration</a>
                 <span>Migrating guests between machines</span>
               </li>
@@ -79,12 +91,20 @@
                 <span>The library and the daemon logging support</span>
               </li>
               <li>
+                <a href="auditlog.html">Audit log</a>
+                <span>Audit trail logs for host operations</span>
+              </li>
+              <li>
                 <a href="firewall.html">Firewall</a>
                 <span>Firewall and network filter configuration</span>
               </li>
               <li>
                 <a href="locking.html">Disk locking</a>
                 <span>Ensuring exclusive guest access to disks</span>
+              </li>
+              <li>
+                <a href="cgroups.html">CGroups</a>
+                <span>Control groups integration</span>
               </li>
               <li>
                 <a href="hooks.html">Hooks</a>
@@ -120,6 +140,10 @@
                 <a href="archnode.html">Node Devices</a>
                 <span>Enumerating host node devices</span>
               </li>
+              <li>
+                <a href="secureusage.html">Secure usage</a>
+                <span>Secure usage of the libvirt APIs</span>
+              </li>
             </ul>
           </li>
           <li>
@@ -149,6 +173,10 @@
               <li>
                 <a href="formatcaps.html">Capabilities</a>
                 <span>The driver capabilities XML format</span>
+              </li>
+              <li>
+                <a href="formatdomaincaps.html">Domain capabilities</a>
+                <span>The domain capabilities XML format</span>
               </li>
               <li>
                 <a href="formatnode.html">Node Devices</a>
@@ -215,6 +243,18 @@
               <li>
                 <a href="drvhyperv.html">Microsoft Hyper-V</a>
                 <span>Driver for Microsoft Hyper-V</span>
+              </li>
+              <li>
+                <a href="drvphyp.html">IBM PowerVM</a>
+                <span>Driver for IBM PowerVM</span>
+              </li>
+              <li>
+                <a href="drvparallels.html">Parallels</a>
+                <span>Driver for Parallels Cloud Server</span>
+              </li>
+              <li>
+                <a href="drvbhyve.html">Bhyve</a>
+                <span>Driver for bhyve</span>
               </li>
             </ul>
           </li>
@@ -310,6 +350,10 @@
                 <a href="internals/locking.html">Lock managers</a>
                 <span>Use lock managers to protect disk content</span>
               </li>
+              <li>
+                <a href="internals/oomtesting.html">Out of memory testing</a>
+                <span>Simulating OOM conditions in the test suite</span>
+              </li>
             </ul>
           </li>
           <li>
@@ -319,6 +363,10 @@
           <li>
             <a href="virshcmdref.html">Virsh Commands</a>
             <span>Command reference for virsh</span>
+          </li>
+          <li>
+            <a href="governance.html">Governance</a>
+            <span>Project governance and code of conduct</span>
           </li>
         </ul>
       </li>
@@ -334,6 +382,10 @@
         <a href="bugs.html">Bug reports</a>
         <span>How and where to report bugs and request features</span>
         <ul>
+          <li>
+            <a href="securityprocess.html">Security Process</a>
+            <span>Security bug reporting and resolution process</span>
+          </li>
           <li>
             <a href="todo.html">Todo list</a>
             <span>Main feature request list</span>

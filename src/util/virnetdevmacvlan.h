@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Red Hat, Inc.
+ * Copyright (C) 2011, 2013 Red Hat, Inc.
  * Copyright (C) 2010 IBM Corporation
  *
  * This library is free software; you can redistribute it and/or
@@ -13,8 +13,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *     Stefan Berger <stefanb@us.ibm.com>
@@ -24,24 +24,25 @@
 # define __UTIL_MACVTAP_H__
 
 # include "internal.h"
+# include "virmacaddr.h"
 # include "virsocketaddr.h"
 # include "virnetdevbandwidth.h"
 # include "virnetdevvportprofile.h"
 
 /* the mode type for macvtap devices */
-enum virNetDevMacVLanMode {
+typedef enum {
     VIR_NETDEV_MACVLAN_MODE_VEPA,
     VIR_NETDEV_MACVLAN_MODE_PRIVATE,
     VIR_NETDEV_MACVLAN_MODE_BRIDGE,
     VIR_NETDEV_MACVLAN_MODE_PASSTHRU,
 
     VIR_NETDEV_MACVLAN_MODE_LAST,
-};
+} virNetDevMacVLanMode;
 VIR_ENUM_DECL(virNetDevMacVLanMode)
 
 int virNetDevMacVLanCreate(const char *ifname,
                            const char *type,
-                           const unsigned char *macaddress,
+                           const virMacAddr *macaddress,
                            const char *srcdev,
                            uint32_t macvlan_mode,
                            int *retry)
@@ -52,22 +53,22 @@ int virNetDevMacVLanDelete(const char *ifname)
     ATTRIBUTE_NONNULL(1) ATTRIBUTE_RETURN_CHECK;
 
 int virNetDevMacVLanCreateWithVPortProfile(const char *ifname,
-                                           const unsigned char *macaddress,
+                                           const virMacAddr *macaddress,
                                            const char *linkdev,
-                                           enum virNetDevMacVLanMode mode,
+                                           virNetDevMacVLanMode mode,
                                            bool withTap,
                                            int vnet_hdr,
                                            const unsigned char *vmuuid,
                                            virNetDevVPortProfilePtr virtPortProfile,
                                            char **res_ifname,
-                                           enum virNetDevVPortProfileOp vmop,
+                                           virNetDevVPortProfileOp vmop,
                                            char *stateDir,
                                            virNetDevBandwidthPtr bandwidth)
     ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3) ATTRIBUTE_NONNULL(7)
     ATTRIBUTE_NONNULL(9) ATTRIBUTE_NONNULL(11) ATTRIBUTE_RETURN_CHECK;
 
 int virNetDevMacVLanDeleteWithVPortProfile(const char *ifname,
-                                           const unsigned char *macaddress,
+                                           const virMacAddr *macaddress,
                                            const char *linkdev,
                                            int mode,
                                            virNetDevVPortProfilePtr virtPortProfile,
@@ -76,20 +77,20 @@ int virNetDevMacVLanDeleteWithVPortProfile(const char *ifname,
     ATTRIBUTE_NONNULL(6) ATTRIBUTE_RETURN_CHECK;
 
 int virNetDevMacVLanRestartWithVPortProfile(const char *cr_ifname,
-                                           const unsigned char *macaddress,
+                                           const virMacAddr *macaddress,
                                            const char *linkdev,
                                            const unsigned char *vmuuid,
                                            virNetDevVPortProfilePtr virtPortProfile,
-                                           enum virNetDevVPortProfileOp vmOp)
+                                           virNetDevVPortProfileOp vmOp)
     ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3)
     ATTRIBUTE_NONNULL(4) ATTRIBUTE_RETURN_CHECK;
 
 int virNetDevMacVLanVPortProfileRegisterCallback(const char *ifname,
-                                             const unsigned char *macaddress ,
+                                             const virMacAddr *macaddress,
                                              const char *linkdev,
                                              const unsigned char *vmuuid,
                                              virNetDevVPortProfilePtr virtPortProfile,
-                                             enum virNetDevVPortProfileOp vmOp)
+                                             virNetDevVPortProfileOp vmOp)
 ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3)
 ATTRIBUTE_NONNULL(4) ATTRIBUTE_RETURN_CHECK;
 #endif /* __UTIL_MACVTAP_H__ */

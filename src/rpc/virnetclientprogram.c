@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -28,19 +28,19 @@
 #include "virnetclient.h"
 #include "virnetprotocol.h"
 
-#include "memory.h"
-#include "virterror_internal.h"
-#include "logging.h"
-#include "util.h"
+#include "viralloc.h"
+#include "virerror.h"
+#include "virlog.h"
+#include "virutil.h"
 #include "virfile.h"
+#include "virthread.h"
 
 #define VIR_FROM_THIS VIR_FROM_RPC
-#define virNetError(code, ...)                                    \
-    virReportErrorHelper(VIR_FROM_THIS, code, __FILE__,           \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
+
+VIR_LOG_INIT("rpc.netclientprogram");
 
 struct _virNetClientProgram {
-    int refs;
+    virObject object;
 
     unsigned program;
     unsigned version;
@@ -48,6 +48,23 @@ struct _virNetClientProgram {
     size_t nevents;
     void *eventOpaque;
 };
+
+static virClassPtr virNetClientProgramClass;
+static void virNetClientProgramDispose(void *obj);
+
+static int virNetClientProgramOnceInit(void)
+{
+    if (!(virNetClientProgramClass = virClassNew(virClassForObject(),
+                                                 "virNetClientProgram",
+                                                 sizeof(virNetClientProgram),
+                                                 virNetClientProgramDispose)))
+        return -1;
+
+    return 0;
+}
+
+VIR_ONCE_GLOBAL_INIT(virNetClientProgram)
+
 
 virNetClientProgramPtr virNetClientProgramNew(unsigned program,
                                               unsigned version,
@@ -57,12 +74,12 @@ virNetClientProgramPtr virNetClientProgramNew(unsigned program,
 {
     virNetClientProgramPtr prog;
 
-    if (VIR_ALLOC(prog) < 0) {
-        virReportOOMError();
+    if (virNetClientProgramInitialize() < 0)
         return NULL;
-    }
 
-    prog->refs = 1;
+    if (!(prog = virObjectNew(virNetClientProgramClass)))
+        return NULL;
+
     prog->program = program;
     prog->version = version;
     prog->events = events;
@@ -73,22 +90,8 @@ virNetClientProgramPtr virNetClientProgramNew(unsigned program,
 }
 
 
-void virNetClientProgramRef(virNetClientProgramPtr prog)
+void virNetClientProgramDispose(void *obj ATTRIBUTE_UNUSED)
 {
-    prog->refs++;
-}
-
-
-void virNetClientProgramFree(virNetClientProgramPtr prog)
-{
-    if (!prog)
-        return;
-
-    prog->refs--;
-    if (prog->refs > 0)
-        return;
-
-    VIR_FREE(prog);
 }
 
 
@@ -185,7 +188,7 @@ virNetClientProgramDispatchError(virNetClientProgramPtr prog ATTRIBUTE_UNUSED,
 
     ret = 0;
 
-cleanup:
+ cleanup:
     xdr_free((xdrproc_t)xdr_virNetMessageError, (void*)&err);
     return ret;
 }
@@ -194,9 +197,9 @@ cleanup:
 static virNetClientProgramEventPtr virNetClientProgramGetEvent(virNetClientProgramPtr prog,
                                                                int procedure)
 {
-    int i;
+    size_t i;
 
-    for (i = 0 ; i < prog->nevents ; i++) {
+    for (i = 0; i < prog->nevents; i++) {
         if (prog->events[i].proc == procedure)
             return &prog->events[i];
     }
@@ -249,10 +252,8 @@ int virNetClientProgramDispatch(virNetClientProgramPtr prog,
         return -1;
     }
 
-    if (VIR_ALLOC_N(evdata, event->msg_len) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC_N(evdata, event->msg_len) < 0)
         return -1;
-    }
 
     if (virNetMessageDecodePayload(msg, event->msg_filter, evdata) < 0)
         goto cleanup;
@@ -261,7 +262,7 @@ int virNetClientProgramDispatch(virNetClientProgramPtr prog,
 
     xdr_free(event->msg_filter, evdata);
 
-cleanup:
+ cleanup:
     VIR_FREE(evdata);
     return 0;
 }
@@ -296,13 +297,11 @@ int virNetClientProgramCall(virNetClientProgramPtr prog,
     msg->header.serial = serial;
     msg->header.proc = proc;
     msg->nfds = noutfds;
-    if (VIR_ALLOC_N(msg->fds, msg->nfds) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC_N(msg->fds, msg->nfds) < 0)
         goto error;
-    }
-    for (i = 0 ; i < msg->nfds ; i++)
+    for (i = 0; i < msg->nfds; i++)
         msg->fds[i] = -1;
-    for (i = 0 ; i < msg->nfds ; i++) {
+    for (i = 0; i < msg->nfds; i++) {
         if ((msg->fds[i] = dup(outfds[i])) < 0) {
             virReportSystemError(errno,
                                  _("Cannot duplicate FD %d"),
@@ -336,20 +335,20 @@ int virNetClientProgramCall(virNetClientProgramPtr prog,
      */
     if (msg->header.type != VIR_NET_REPLY &&
         msg->header.type != VIR_NET_REPLY_WITH_FDS) {
-        virNetError(VIR_ERR_INTERNAL_ERROR,
-                    _("Unexpected message type %d"), msg->header.type);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unexpected message type %d"), msg->header.type);
         goto error;
     }
     if (msg->header.proc != proc) {
-        virNetError(VIR_ERR_INTERNAL_ERROR,
-                    _("Unexpected message proc %d != %d"),
-                    msg->header.proc, proc);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unexpected message proc %d != %d"),
+                       msg->header.proc, proc);
         goto error;
     }
     if (msg->header.serial != serial) {
-        virNetError(VIR_ERR_INTERNAL_ERROR,
-                    _("Unexpected message serial %d != %d"),
-                    msg->header.serial, serial);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unexpected message serial %d != %d"),
+                       msg->header.serial, serial);
         goto error;
     }
 
@@ -357,23 +356,21 @@ int virNetClientProgramCall(virNetClientProgramPtr prog,
     case VIR_NET_OK:
         if (infds && ninfds) {
             *ninfds = msg->nfds;
-            if (VIR_ALLOC_N(*infds, *ninfds) < 0) {
-                virReportOOMError();
+            if (VIR_ALLOC_N(*infds, *ninfds) < 0)
                 goto error;
-            }
-            for (i = 0 ; i < *ninfds ; i++)
-                *infds[i] = -1;
-            for (i = 0 ; i < *ninfds ; i++) {
-                if ((*infds[i] = dup(msg->fds[i])) < 0) {
+            for (i = 0; i < *ninfds; i++)
+                (*infds)[i] = -1;
+            for (i = 0; i < *ninfds; i++) {
+                if (((*infds)[i] = dup(msg->fds[i])) < 0) {
                     virReportSystemError(errno,
                                          _("Cannot duplicate FD %d"),
                                          msg->fds[i]);
                     goto error;
                 }
-                if (virSetInherit(*infds[i], false) < 0) {
+                if (virSetInherit((*infds)[i], false) < 0) {
                     virReportSystemError(errno,
                                          _("Cannot set close-on-exec %d"),
-                                         *infds[i]);
+                                         (*infds)[i]);
                     goto error;
                 }
             }
@@ -388,8 +385,8 @@ int virNetClientProgramCall(virNetClientProgramPtr prog,
         goto error;
 
     default:
-        virNetError(VIR_ERR_RPC,
-                    _("Unexpected message status %d"), msg->header.status);
+        virReportError(VIR_ERR_RPC,
+                       _("Unexpected message status %d"), msg->header.status);
         goto error;
     }
 
@@ -397,11 +394,11 @@ int virNetClientProgramCall(virNetClientProgramPtr prog,
 
     return 0;
 
-error:
+ error:
     virNetMessageFree(msg);
     if (infds && ninfds) {
-        for (i = 0 ; i < *ninfds ; i++)
-            VIR_FORCE_CLOSE(*infds[i]);
+        for (i = 0; i < *ninfds; i++)
+            VIR_FORCE_CLOSE((*infds)[i]);
     }
     return -1;
 }

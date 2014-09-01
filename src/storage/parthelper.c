@@ -10,7 +10,7 @@
  * in a reliable fashion if merely after a list of partitions & sizes,
  * though it is fine for creating partitions.
  *
- * Copyright (C) 2007-2008, 2010 Red Hat, Inc.
+ * Copyright (C) 2007-2008, 2010, 2013 Red Hat, Inc.
  * Copyright (C) 2007-2008 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -24,8 +24,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -41,9 +41,11 @@
 #include <unistd.h>
 #include <locale.h>
 
-#include "util.h"
+#include "virutil.h"
+#include "virfile.h"
 #include "c-ctype.h"
 #include "configmake.h"
+#include "virstring.h"
 
 /* we don't need to include the full internal.h just for this */
 #define STREQ(a,b) (strcmp(a,b) == 0)
@@ -86,10 +88,8 @@ int main(int argc, char **argv)
     path = argv[1];
     if (virIsDevMapperDevice(path)) {
         partsep = "p";
-        canonical_path = strdup(path);
-        if (canonical_path == NULL) {
+        if (VIR_STRDUP_QUIET(canonical_path, path) < 0)
             return 2;
-        }
     } else {
         if (virFileResolveLink(path, &canonical_path) != 0) {
             return 2;
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
     }
 
     /* return the geometry of the disk and then exit */
-    if(cmd == DISK_GEOMETRY) {
+    if (cmd == DISK_GEOMETRY) {
         printf("%d%c%d%c%d%c",
                dev->hw_geom.cylinders, '\0',
                dev->hw_geom.heads, '\0',
@@ -129,6 +129,7 @@ int main(int argc, char **argv)
                 content = "free";
             else if (part->type & PED_PARTITION_METADATA)
                 content = "metadata";
+            /* coverity[dead_error_condition] - not true if defined */
             else if (part->type & PED_PARTITION_PROTECTED)
                 content = "protected";
             else
@@ -142,6 +143,7 @@ int main(int argc, char **argv)
                 content = "free";
             else if (part->type & PED_PARTITION_METADATA)
                 content = "metadata";
+            /* coverity[dead_error_condition] - not true if defined */
             else if (part->type & PED_PARTITION_PROTECTED)
                 content = "protected";
             else
@@ -158,7 +160,7 @@ int main(int argc, char **argv)
                    type, '\0',
                    content, '\0',
                    part->geom.start * dev->sector_size, '\0',
-                   (part->geom.end + 1 ) * dev->sector_size, '\0',
+                   (part->geom.end + 1) * dev->sector_size, '\0',
                    part->geom.length * dev->sector_size, '\0');
         } else {
             printf("%s%c%s%c%s%c%llu%c%llu%c%llu%c",
@@ -166,7 +168,7 @@ int main(int argc, char **argv)
                    type, '\0',
                    content, '\0',
                    part->geom.start * dev->sector_size, '\0',
-                   (part->geom.end + 1 ) * dev->sector_size, '\0',
+                   (part->geom.end + 1) * dev->sector_size, '\0',
                    part->geom.length * dev->sector_size, '\0');
         }
         part = ped_disk_next_partition(disk, part);

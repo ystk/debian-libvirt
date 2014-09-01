@@ -1,4 +1,0 @@
-daemon/libvirtd.conf
-daemon/libvirtd.policy-0
-daemon/libvirtd.policy-1
-daemon/libvirtd.sasl

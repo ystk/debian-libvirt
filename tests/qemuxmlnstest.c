@@ -8,24 +8,27 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
+#include "testutils.h"
+
 #ifdef WITH_QEMU
 
 # include "internal.h"
-# include "testutils.h"
 # include "qemu/qemu_capabilities.h"
 # include "qemu/qemu_command.h"
 # include "qemu/qemu_domain.h"
 # include "datatypes.h"
 # include "cpu/cpu_map.h"
-
 # include "testutilsqemu.h"
+# include "virstring.h"
+
+# define VIR_FROM_THIS VIR_FROM_QEMU
 
 static const char *abs_top_srcdir;
-static struct qemud_driver driver;
+static virQEMUDriver driver;
 
 static int testCompareXMLToArgvFiles(const char *xml,
                                      const char *cmdline,
-                                     virBitmapPtr extraFlags,
+                                     virQEMUCapsPtr extraFlags,
                                      const char *migrateFrom,
                                      int migrateFd,
                                      bool json,
@@ -51,10 +54,15 @@ static int testCompareXMLToArgvFiles(const char *xml,
     if (len && expectargv[len - 1] == '\n')
         expectargv[len - 1] = '\0';
 
-    if (!(vmdef = virDomainDefParseFile(driver.caps, xml,
+    if (!(vmdef = virDomainDefParseFile(xml, driver.caps, driver.xmlopt,
                                         QEMU_EXPECTED_VIRT_TYPES,
                                         VIR_DOMAIN_XML_INACTIVE)))
         goto fail;
+
+    if (!virDomainDefCheckABIStability(vmdef, vmdef)) {
+        fprintf(stderr, "ABI stability check failed on %s", xml);
+        goto fail;
+    }
 
     /*
      * For test purposes, we may want to fake emulator's output by providing
@@ -67,7 +75,7 @@ static int testCompareXMLToArgvFiles(const char *xml,
      * detects such paths, strips the extra '/' and makes the path absolute.
      */
     if (vmdef->emulator && STRPREFIX(vmdef->emulator, "/.")) {
-        if (!(emulator = strdup(vmdef->emulator + 1)))
+        if (VIR_STRDUP(emulator, vmdef->emulator + 1) < 0)
             goto fail;
         VIR_FREE(vmdef->emulator);
         vmdef->emulator = NULL;
@@ -76,7 +84,7 @@ static int testCompareXMLToArgvFiles(const char *xml,
             goto fail;
     }
 
-    if (qemuCapsGet(extraFlags, QEMU_CAPS_DOMID))
+    if (virQEMUCapsGet(extraFlags, QEMU_CAPS_DOMID))
         vmdef->id = 6;
     else
         vmdef->id = -1;
@@ -86,38 +94,22 @@ static int testCompareXMLToArgvFiles(const char *xml,
     monitor_chr.data.nix.path = (char *)"/tmp/test-monitor";
     monitor_chr.data.nix.listen = true;
 
-    qemuCapsSetList(extraFlags,
-                    QEMU_CAPS_VNC_COLON,
-                    QEMU_CAPS_NO_REBOOT,
-                    QEMU_CAPS_NO_ACPI,
-                    QEMU_CAPS_LAST);
+    virQEMUCapsSetList(extraFlags,
+                       QEMU_CAPS_VNC_COLON,
+                       QEMU_CAPS_NO_REBOOT,
+                       QEMU_CAPS_NO_ACPI,
+                       QEMU_CAPS_LAST);
 
-    if (qemudCanonicalizeMachine(&driver, vmdef) < 0)
-        goto fail;
-
-    if (qemuCapsGet(extraFlags, QEMU_CAPS_DEVICE)) {
-        qemuDomainPCIAddressSetPtr pciaddrs;
-        if (!(pciaddrs = qemuDomainPCIAddressSetCreate(vmdef)))
-            goto fail;
-
-        if (qemuAssignDevicePCISlots(vmdef, pciaddrs) < 0)
-            goto fail;
-
-        qemuDomainPCIAddressSetFree(pciaddrs);
-    }
-
+    if (virQEMUCapsGet(extraFlags, QEMU_CAPS_DEVICE))
+        qemuDomainAssignAddresses(vmdef, extraFlags, NULL);
 
     log = virtTestLogContentAndReset();
     VIR_FREE(log);
     virResetLastError();
 
-    /* We do not call qemuCapsExtractVersionInfo() before calling
-     * qemuBuildCommandLine(), so we should set QEMU_CAPS_PCI_MULTIBUS for
-     * x86_64 and i686 architectures here.
-     */
-    if (STREQLEN(vmdef->os.arch, "x86_64", 6) ||
-        STREQLEN(vmdef->os.arch, "i686", 4)) {
-        qemuCapsSet(extraFlags, QEMU_CAPS_PCI_MULTIBUS);
+    if (vmdef->os.arch == VIR_ARCH_X86_64 ||
+        vmdef->os.arch == VIR_ARCH_I686) {
+        virQEMUCapsSet(extraFlags, QEMU_CAPS_PCI_MULTIBUS);
     }
 
     if (qemuAssignDeviceAliases(vmdef, extraFlags) < 0)
@@ -126,18 +118,21 @@ static int testCompareXMLToArgvFiles(const char *xml,
     if (!(cmd = qemuBuildCommandLine(conn, &driver,
                                      vmdef, &monitor_chr, json, extraFlags,
                                      migrateFrom, migrateFd, NULL,
-                                     VIR_NETDEV_VPORT_PROFILE_OP_NO_OP)))
+                                     VIR_NETDEV_VPORT_PROFILE_OP_NO_OP,
+                                     &testCallbacks, false)))
         goto fail;
 
-    if (!!virGetLastError() != expectError) {
-        if (virTestGetDebug() && (log = virtTestLogContentAndReset()))
-            fprintf(stderr, "\n%s", log);
-        goto fail;
-    }
+    if (!virtTestOOMActive()) {
+        if (!!virGetLastError() != expectError) {
+            if (virTestGetDebug() && (log = virtTestLogContentAndReset()))
+                fprintf(stderr, "\n%s", log);
+            goto fail;
+        }
 
-    if (expectError) {
-        /* need to suppress the errors */
-        virResetLastError();
+        if (expectError) {
+            /* need to suppress the errors */
+            virResetLastError();
+        }
     }
 
     if (!(actualargv = virCommandToString(cmd)))
@@ -166,14 +161,14 @@ static int testCompareXMLToArgvFiles(const char *xml,
     VIR_FREE(actualargv);
     virCommandFree(cmd);
     virDomainDefFree(vmdef);
-    virUnrefConnect(conn);
+    virObjectUnref(conn);
     return ret;
 }
 
 
 struct testInfo {
     const char *name;
-    virBitmapPtr extraFlags;
+    virQEMUCapsPtr extraFlags;
     const char *migrateFrom;
     int migrateFd;
     bool json;
@@ -198,7 +193,7 @@ testCompareXMLToArgvHelper(const void *data)
                                        info->migrateFrom, info->migrateFd,
                                        info->json, info->expectError);
 
-cleanup:
+ cleanup:
     VIR_FREE(xml);
     VIR_FREE(args);
     return result;
@@ -210,44 +205,30 @@ static int
 mymain(void)
 {
     int ret = 0;
-    char *map = NULL;
     bool json = false;
 
     abs_top_srcdir = getenv("abs_top_srcdir");
     if (!abs_top_srcdir)
-        abs_top_srcdir = "..";
+        abs_top_srcdir = abs_srcdir "/..";
 
+    driver.config = virQEMUDriverConfigNew(false);
     if ((driver.caps = testQemuCapsInit()) == NULL)
         return EXIT_FAILURE;
-    if ((driver.stateDir = strdup("/nowhere")) == NULL)
+    if (!(driver.xmlopt = virQEMUDriverCreateXMLConf(&driver)))
         return EXIT_FAILURE;
-    if ((driver.hugetlbfs_mount = strdup("/dev/hugepages")) == NULL)
-        return EXIT_FAILURE;
-    if ((driver.hugepage_path = strdup("/dev/hugepages/libvirt/qemu")) == NULL)
-        return EXIT_FAILURE;
-    driver.spiceTLS = 1;
-    if (!(driver.spiceTLSx509certdir = strdup("/etc/pki/libvirt-spice")))
-        return EXIT_FAILURE;
-    if (!(driver.spicePassword = strdup("123456")))
-        return EXIT_FAILURE;
-    if (virAsprintf(&map, "%s/src/cpu/cpu_map.xml", abs_top_srcdir) < 0 ||
-        cpuMapOverride(map) < 0) {
-        VIR_FREE(map);
-        return EXIT_FAILURE;
-    }
 
 # define DO_TEST_FULL(name, migrateFrom, migrateFd, expectError, ...)   \
     do {                                                                \
         struct testInfo info = {                                        \
             name, NULL, migrateFrom, migrateFd, json, expectError       \
         };                                                              \
-        if (!(info.extraFlags = qemuCapsNew()))                         \
+        if (!(info.extraFlags = virQEMUCapsNew()))                      \
             return EXIT_FAILURE;                                        \
-        qemuCapsSetList(info.extraFlags, __VA_ARGS__, QEMU_CAPS_LAST);  \
+        virQEMUCapsSetList(info.extraFlags, __VA_ARGS__, QEMU_CAPS_LAST);\
         if (virtTestRun("QEMU XML-2-ARGV " name,                        \
-                        1, testCompareXMLToArgvHelper, &info) < 0)      \
+                        testCompareXMLToArgvHelper, &info) < 0)         \
             ret = -1;                                                   \
-        qemuCapsFree(info.extraFlags);                                  \
+        virObjectUnref(info.extraFlags);                                \
     } while (0)
 
 # define DO_TEST(name, expectError, ...)                                \
@@ -276,17 +257,16 @@ mymain(void)
     DO_TEST("qemu-ns-commandline-ns0", false, NONE);
     DO_TEST("qemu-ns-commandline-ns1", false, NONE);
 
-    VIR_FREE(driver.stateDir);
-    virCapabilitiesFree(driver.caps);
-    VIR_FREE(map);
+    virObjectUnref(driver.config);
+    virObjectUnref(driver.caps);
+    virObjectUnref(driver.xmlopt);
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)
 
 #else
-# include "testutils.h"
 
 int main(void)
 {

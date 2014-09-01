@@ -3,7 +3,19 @@
  *
  * Copyright (C) 2006, 2010-2012 Red Hat, Inc.
  *
- * See COPYING.LIB for the License of this software
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Daniel Veillard <veillard@redhat.com>
  */
@@ -14,32 +26,14 @@
 # include "internal.h"
 # include "driver.h"
 
-extern struct xenUnifiedDriver xenStoreDriver;
-int xenStoreInit (void);
-
-virDrvOpenStatus	xenStoreOpen	(virConnectPtr conn,
+int		xenStoreOpen		(virConnectPtr conn,
                                          virConnectAuthPtr auth,
                                          unsigned int flags);
 int		xenStoreClose		(virConnectPtr conn);
-int		xenStoreGetDomainInfo	(virDomainPtr domain,
-                                         virDomainInfoPtr info);
-int		xenStoreDomainGetState	(virDomainPtr domain,
-                                         int *state,
-                                         int *reason,
-                                         unsigned int flags);
 int		xenStoreNumOfDomains	(virConnectPtr conn);
 int		xenStoreListDomains	(virConnectPtr conn,
                                          int *ids,
                                          int maxids);
-virDomainPtr	xenStoreLookupByName(virConnectPtr conn,
-                                         const char *name);
-unsigned long	xenStoreGetMaxMemory	(virDomainPtr domain);
-int		xenStoreDomainSetMemory	(virDomainPtr domain,
-                                         unsigned long memory);
-unsigned long long xenStoreDomainGetMaxMemory(virDomainPtr domain);
-int		xenStoreDomainShutdown	(virDomainPtr domain);
-int		xenStoreDomainReboot	(virDomainPtr domain,
-                                         unsigned int flags);
 
 int             xenStoreDomainGetVNCPort(virConnectPtr conn,
                                          int domid);
@@ -77,7 +71,7 @@ typedef struct _xenStoreWatch xenStoreWatch;
 typedef xenStoreWatch *xenStoreWatchPtr;
 
 struct _xenStoreWatchList {
-    unsigned int count;
+    size_t count;
     xenStoreWatchPtr *watches;
 };
 typedef struct _xenStoreWatchList xenStoreWatchList;

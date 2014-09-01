@@ -1,45 +1,40 @@
-From: =?UTF-8?q?Laurent=20L=C3=A9onard?= <laurent@open-minds.org>
+From: =?utf-8?q?Laurent_L=C3=A9onard?= <laurent@open-minds.org>
 Date: Thu, 9 Dec 2010 22:36:29 +0100
 Subject: Debianize libvirt-guests
 
 Origin: vendor
-
-
-
 ---
- tools/libvirt-guests.init.sh |   41 +++++++++++++----------------------------
- tools/libvirt-guests.sysconf |    4 ++--
- 2 files changed, 15 insertions(+), 30 deletions(-)
+ tools/libvirt-guests.sh.in   | 45 +++++++++++++++++++++++++++-----------------
+ tools/libvirt-guests.sysconf |  4 ++--
+ 2 files changed, 30 insertions(+), 19 deletions(-)
 
-diff --git a/tools/libvirt-guests.init.sh b/tools/libvirt-guests.init.sh
-index aafb4d4..386ee91 100644
---- a/tools/libvirt-guests.init.sh
-+++ b/tools/libvirt-guests.init.sh
-@@ -4,8 +4,8 @@
- #
- ### BEGIN INIT INFO
- # Provides: libvirt-guests
--# Required-Start: libvirtd
--# Required-Stop: libvirtd
-+# Required-Start: $remote_fs libvirt-bin
-+# Required-Stop: $remote_fs libvirt-bin
- # Default-Start: 2 3 4 5
- # Default-Stop: 0 1 6
- # Short-Description: suspend/resume libvirt guests on shutdown/boot
-@@ -14,43 +14,29 @@
- #              See http://libvirt.org
- ### END INIT INFO
- 
--# the following is chkconfig init header
--#
--# libvirt-guests:   suspend/resume libvirt guests on shutdown/boot
--#
--# chkconfig: 345 99 01
--# description:  This is a script for suspending active libvirt guests \
--#               on shutdown and resuming them on next boot \
--#               See http://libvirt.org
--#
+diff --git a/tools/libvirt-guests.sh.in b/tools/libvirt-guests.sh.in
+index 1b17bbe..0ee0210 100644
+--- a/tools/libvirt-guests.sh.in
++++ b/tools/libvirt-guests.sh.in
+@@ -1,5 +1,17 @@
+ #!/bin/sh
 -
++#
++### BEGIN INIT INFO
++# Provides: libvirt-guests
++# Required-Start: $remote_fs libvirtd
++# Required-Stop: $remote_fs libvirtd
++# Default-Start: 2 3 4 5
++# Default-Stop: 0 1 6
++# Short-Description: suspend/resume libvirt guests on shutdown/boot
++# Description: This is a script for suspending active libvirt guests
++#              on shutdown and resuming them on next boot
++#              See http://libvirt.org
++### END INIT INFO
++#
+ # Copyright (C) 2011-2014 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+@@ -16,23 +28,23 @@
+ # License along with this library.  If not, see
+ # <http://www.gnu.org/licenses/>.
+ 
 -sysconfdir="@sysconfdir@"
 -localstatedir="@localstatedir@"
 -libvirtd="@sbindir@"/libvirtd
@@ -55,6 +50,10 @@ index aafb4d4..386ee91 100644
  # Make sure this file is recognized as having translations: _("dummy")
 -. "@bindir@"/gettext.sh
 +. /usr/bin/gettext.sh
++
++# Make sure calls to this script get redirected to systemctl when
++# using systemd
++. /lib/lsb/init-functions
  
 -export TEXTDOMAIN="@PACKAGE@" TEXTDOMAINDIR="@localedir@"
 +export TEXTDOMAIN="libvirt" TEXTDOMAINDIR="/usr/share/locale"
@@ -67,7 +66,9 @@ index aafb4d4..386ee91 100644
  SHUTDOWN_TIMEOUT=300
  PARALLEL_SHUTDOWN=0
  START_DELAY=0
- BYPASS_CACHE=0
+@@ -40,11 +52,11 @@ BYPASS_CACHE=0
+ CONNECT_RETRIES=10
+ RETRIES_SLEEP=1
  
 -test -f "$sysconfdir"/sysconfig/libvirt-guests &&
 -    . "$sysconfdir"/sysconfig/libvirt-guests
@@ -80,7 +81,7 @@ index aafb4d4..386ee91 100644
  
  RETVAL=0
  
-@@ -499,8 +485,7 @@ gueststatus() {
+@@ -540,8 +552,7 @@ gueststatus() {
  
  # rh_status
  # Display current status: whether saved state exists, and whether start

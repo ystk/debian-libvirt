@@ -1,4 +1,3 @@
-
 /*
  * esx_private.h: private driver struct for the VMware ESX driver
  *
@@ -15,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,13 +23,10 @@
 # define __ESX_PRIVATE_H__
 
 # include "internal.h"
-# include "virterror_internal.h"
+# include "virerror.h"
 # include "capabilities.h"
+# include "domain_conf.h"
 # include "esx_vi.h"
-
-# define ESX_ERROR(code, ...)                                                 \
-    virReportErrorHelper(VIR_FROM_ESX, code, __FILE__, __FUNCTION__,          \
-                         __LINE__, __VA_ARGS__)
 
 typedef struct _esxPrivate {
     esxVI_Context *primary; /* points to host or vCenter */
@@ -38,6 +34,7 @@ typedef struct _esxPrivate {
     esxVI_Context *vCenter;
     esxUtil_ParsedUri *parsedUri;
     virCapsPtr caps;
+    virDomainXMLOptionPtr xmlopt;
     int32_t maxVcpus;
     esxVI_Boolean supportsVMotion;
     esxVI_Boolean supportsLongMode; /* aka x86_64 */

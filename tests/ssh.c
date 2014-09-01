@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Red Hat, Inc.
+ * Copyright (C) 2011, 2013 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -12,8 +12,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -22,21 +22,22 @@
 
 #include <stdio.h>
 #include "internal.h"
+#define NO_LIBVIRT /* This file intentionally does not link to libvirt */
 #include "testutils.h"
 
 #ifndef WIN32
 
 int main(int argc, char **argv)
 {
-    int i;
-    int failConnect = 0; /* Exit -1, with no data on stdout, msg on stderr */
-    int dieEarly = 0;    /* Exit -1, with partial data on stdout, msg on stderr */
+    size_t i;
+    bool failConnect = false; /* Exit -1, with no data on stdout, msg on stderr */
+    bool dieEarly = false;    /* Exit -1, with partial data on stdout, msg on stderr */
 
-    for (i = 1 ; i < argc ; i++) {
+    for (i = 1; i < argc; i++) {
         if (STREQ(argv[i], "nosuchhost"))
-            failConnect = 1;
+            failConnect = true;
         else if (STREQ(argv[i], "crashinghost"))
-            dieEarly = 1;
+            dieEarly = true;
     }
 
     if (failConnect) {
@@ -50,7 +51,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    for (i = 1 ; i < argc ; i++)
+    for (i = 1; i < argc; i++)
         printf("%s%c", argv[i], i == (argc -1) ? '\n' : ' ');
 
     return 0;

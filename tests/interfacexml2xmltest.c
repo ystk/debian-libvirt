@@ -12,7 +12,9 @@
 #include "testutils.h"
 #include "interface_conf.h"
 #include "testutilsqemu.h"
+#include "virstring.h"
 
+#define VIR_FROM_THIS VIR_FROM_NONE
 
 static int
 testCompareXMLToXMLFiles(const char *xml)
@@ -67,9 +69,9 @@ mymain(void)
 {
     int ret = 0;
 
-#define DO_TEST(name) \
-    if (virtTestRun("Interface XML-2-XML " name, \
-                    1, testCompareXMLToXMLHelper, (name)) < 0) \
+#define DO_TEST(name)                                           \
+    if (virtTestRun("Interface XML-2-XML " name,                \
+                    testCompareXMLToXMLHelper, (name)) < 0)     \
         ret = -1
 
     DO_TEST("ethernet-dhcp");
@@ -92,7 +94,7 @@ mymain(void)
     DO_TEST("ipv6-static-multi");
     DO_TEST("ipv6-static");
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

@@ -57,6 +57,10 @@
               <span class="active">Bug reports</span>
               <ul class="l1"><li>
                   <div>
+                    <a title="Security bug reporting and resolution process" class="inactive" href="securityprocess.html">Security Process</a>
+                  </div>
+                </li><li>
+                  <div>
                     <a title="Main feature request list" class="inactive" href="todo.html">Todo list</a>
                   </div>
                 </li><li>
@@ -86,6 +90,8 @@
       <div id="content">
         <h1>Bug reporting</h1>
         <ul><li>
+            <a href="#security">Security Issues</a>
+          </li><li>
             <a href="#bugzilla">Bug Tracking</a>
           </li><li>
             <a href="#general">General libvirt bug reports</a>
@@ -95,7 +101,21 @@
             <a href="#quality">How to file high quality bug reports</a>
           </li></ul>
         <h2>
-          <a name="bugzilla" id="bugzilla">Bug Tracking</a>
+          <a name="security" shape="rect" id="security">Security Issues</a>
+          <a class="headerlink" href="#security" title="Permalink to this headline">¶</a>
+        </h2>
+        <p>
+      If you think that an issue with libvirt may have security
+      implications, <strong>please do not</strong> publically
+      report it in the bug tracker, mailing lists, or irc. Libvirt
+      has <a href="securityprocess.html" shape="rect">a dedicated process for handling (potential) security issues</a>
+      that should be used instead. So if your issue has security
+      implications, ignore the rest of this page and follow the
+      <a href="securityprocess.html" shape="rect">security process</a> instead.
+    </p>
+        <h2>
+          <a name="bugzilla" shape="rect" id="bugzilla">Bug Tracking</a>
+          <a class="headerlink" href="#bugzilla" title="Permalink to this headline">¶</a>
         </h2>
         <p>
       If you are using libvirt binaries from a Linux distribution
@@ -103,10 +123,11 @@
       first.
     </p>
         <h2>
-          <a name="general" id="general">General libvirt bug reports</a>
+          <a name="general" shape="rect" id="general">General libvirt bug reports</a>
+          <a class="headerlink" href="#general" title="Permalink to this headline">¶</a>
         </h2>
         <p>
-      The <a href="http://bugzilla.redhat.com">Red Hat Bugzilla Server</a>
+      The <a href="http://bugzilla.redhat.com" shape="rect">Red Hat Bugzilla Server</a>
       should be used to report bugs and request features in libvirt.
       Before submitting a ticket, check the existing tickets to see if
       the bug/feature is already tracked.
@@ -122,7 +143,7 @@
       problem, and the bug number provides a quick way of referring to
       the problem.  However, not everybody in the community pays
       attention to bugzilla, so after you file a bug, asking questions
-      and submitting patches on <a href="contact.html">the libvirt
+      and submitting patches on <a href="contact.html" shape="rect">the libvirt
       mailing lists</a> will increase your bug's visibility and
       encourage people to think about your problem.  Don't hesitate to
       ask questions on the list, as others may know of existing
@@ -132,28 +153,30 @@
     </p>
         <p>
       If you decide to write code, though, before you begin please
-      read the <a href="hacking.html">contributor guidelines</a>,
+      read the <a href="hacking.html" shape="rect">contributor guidelines</a>,
       especially the first point: "Discuss any large changes on the
       mailing list first. Post patches early and listen to feedback."
       Few development experiences are more discouraging than spending
       a bunch of time writing a patch only to have someone point out a
       better approach on list.
     </p>
-        <ul><li><a href="http://bugzilla.redhat.com/buglist.cgi?component=libvirt&amp;product=Virtualization%20Tools">View libvirt tickets</a></li><li><a href="http://bugzilla.redhat.com/bugzilla/enter_bug.cgi?product=Virtualization%20Tools&amp;component=libvirt">New libvirt ticket</a></li></ul>
+        <ul><li><a href="http://bugzilla.redhat.com/buglist.cgi?component=libvirt&amp;product=Virtualization%20Tools" shape="rect">View libvirt tickets</a></li><li><a href="http://bugzilla.redhat.com/bugzilla/enter_bug.cgi?product=Virtualization%20Tools&amp;component=libvirt" shape="rect">New libvirt ticket</a></li></ul>
         <h2>
-          <a name="distribution" id="distribution">Linux Distribution specific bug reports</a>
+          <a name="distribution" shape="rect" id="distribution">Linux Distribution specific bug reports</a>
+          <a class="headerlink" href="#distribution" title="Permalink to this headline">¶</a>
         </h2>
         <ul><li>
         If you are using binaries from <strong>Fedora</strong>, enter
         tickets against the <code>Fedora</code> product and
         the <code>libvirt</code> component.
-        <ul><li><a href="http://bugzilla.redhat.com/buglist.cgi?component=libvirt&amp;product=Fedora">View Fedora libvirt tickets</a></li><li><a href="http://bugzilla.redhat.com/bugzilla/enter_bug.cgi?product=Fedora&amp;component=libvirt">New Fedora libvirt ticket</a></li></ul></li><li>
+        <ul><li><a href="http://bugzilla.redhat.com/buglist.cgi?component=libvirt&amp;product=Fedora" shape="rect">View Fedora libvirt tickets</a></li><li><a href="http://bugzilla.redhat.com/bugzilla/enter_bug.cgi?product=Fedora&amp;component=libvirt" shape="rect">New Fedora libvirt ticket</a></li></ul>
+      </li><li>
         <p>
           If you are using binaries from <strong>Red Hat Enterprise
           Linux</strong>, enter tickets against the Red Hat Enterprise
           Linux product that you're using (e.g., Red Hat Enterprise
           Linux 6) and the <code>libvirt</code> component.  Red Hat
-          bugzilla has <a href="http://bugzilla.redhat.com">additional guidance</a> about getting support if
+          bugzilla has <a href="http://bugzilla.redhat.com" shape="rect">additional guidance</a> about getting support if
           you are a Red Hat customer.
         </p>
       </li><li>
@@ -170,7 +193,8 @@
         </p>
       </li></ul>
         <h2>
-          <a name="quality" id="quality">How to file high quality bug reports</a>
+          <a name="quality" shape="rect" id="quality">How to file high quality bug reports</a>
+          <a class="headerlink" href="#quality" title="Permalink to this headline">¶</a>
         </h2>
         <p>
       To increase the likelihood of your bug report being addressed it is
@@ -186,26 +210,26 @@
       crash, the simplest is to run the program under gdb, reproduce the
       steps leading to the crash and then issue a gdb "bt -a" command to
       get the stack trace, attach it to the bug. Note that for the
-      data to be really useful libvirt debug informations must be present
+      data to be really useful libvirt debug information must be present
       for example by installing libvirt debuginfo package on Fedora or
       Red Hat Enterprise Linux (with debuginfo-install libvirt) prior
       to running gdb.</p>
         <p>
       It may also happen that the libvirt daemon itself crashes or gets stuck,
       in the first case run it (as root) under gdb, and reproduce the sequence
-      leading to the crash, similary to a normal program provide the
+      leading to the crash, similarly to a normal program provide the
       "bt" backtrace information to where gdb will have stopped.<br />
       But if libvirtd gets stuck, for example seems to stop processing
       commands, try to attach to the faulty daemon and issue a gdb command
       "thread apply all bt" to show all the threads backtraces, as in:</p>
-        <pre> #  ps -o etime,pid `pgrep libvirt`
+        <pre xml:space="preserve"> #  ps -o etime,pid `pgrep libvirt`
 ... note the process id from the output
 # gdb /usr/sbin/libvirtd
-.... some informations about gdb and loading debug data
-(gdb) attach $the_damon_process_id
+.... some information about gdb and loading debug data
+(gdb) attach $the_daemon_process_id
 ....
 (gdb) thread apply all bt
-.... informations to attach to the bug
+.... information to attach to the bug
 (gdb)
 </pre>
       </div>

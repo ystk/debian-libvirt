@@ -38,7 +38,7 @@
   <on_reboot>restart</on_reboot>
   <on_crash>restart</on_crash>
   <devices>
-    <emulator>/./qemu.sh</emulator>
+    <emulator>/usr/bin/qemu</emulator>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
       <source file='/var/lib/libvirt/images/f14.img'/>
@@ -59,9 +59,11 @@
       <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
     </controller>
     <controller type='usb' index='0'/>
+    <controller type='pci' index='0' model='pci-root'/>
     <interface type='ethernet'>
       <mac address='52:54:00:71:70:89'/>
       <script path='/etc/qemu-ifup'/>
+      <model type='rtl8139'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0'/>
     </interface>
     <serial type='pty'>
@@ -72,6 +74,7 @@
     </console>
     <input type='tablet' bus='usb'/>
     <input type='mouse' bus='ps2'/>
+    <input type='keyboard' bus='ps2'/>
     <graphics type='spice' port='5900' autoport='no' passwd='sercet' passwdValidTo='2011-05-31T16:11:22' connected='disconnect'/>
     <sound model='ac97'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>

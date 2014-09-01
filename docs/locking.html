@@ -64,6 +64,10 @@
                         </div>
                       </li><li>
                         <div>
+                          <a title="Configure access control libvirt APIs" class="inactive" href="acl.html">Access control</a>
+                        </div>
+                      </li><li>
+                        <div>
                           <a title="Migrating guests between machines" class="inactive" href="migration.html">Migration</a>
                         </div>
                       </li><li>
@@ -76,11 +80,19 @@
                         </div>
                       </li><li>
                         <div>
+                          <a title="Audit trail logs for host operations" class="inactive" href="auditlog.html">Audit log</a>
+                        </div>
+                      </li><li>
+                        <div>
                           <a title="Firewall and network filter configuration" class="inactive" href="firewall.html">Firewall</a>
                         </div>
                       </li><li>
                         <div>
                           <span class="active">Disk locking</span>
+                        </div>
+                      </li><li>
+                        <div>
+                          <a title="Control groups integration" class="inactive" href="cgroups.html">CGroups</a>
                         </div>
                       </li><li>
                         <div>
@@ -119,6 +131,10 @@
                 </li><li>
                   <div>
                     <a title="Command reference for virsh" class="inactive" href="virshcmdref.html">Virsh Commands</a>
+                  </div>
+                </li><li>
+                  <div>
+                    <a title="Project governance and code of conduct" class="inactive" href="governance.html">Governance</a>
                   </div>
                 </li></ul>
             </div>
@@ -164,6 +180,8 @@
             <a href="#sanlockstorage">libvirt sanlock storage configuration</a>
           </li><li>
             <a href="#qemuconfig">QEMU/KVM driver configuration</a>
+          </li><li>
+            <a href="#domainconfig">Domain configuration</a>
           </li></ul>
         <p>
       This page describes how to ensure a single disk cannot be
@@ -172,7 +190,8 @@
       of guest files systems that are not cluster aware.
     </p>
         <h2>
-          <a name="plugins" id="plugins">Lock manager plugins</a>
+          <a name="plugins" shape="rect" id="plugins">Lock manager plugins</a>
+          <a class="headerlink" href="#plugins" title="Permalink to this headline">¶</a>
         </h2>
         <p>
       libvirt includes a pluggable framework for lock managers,
@@ -180,11 +199,12 @@
       guest domain disks, and potentially other resources.
       At this time there are only two plugin implementations,
       a "no op" implementation which does absolutely nothing,
-      and a <a href="https://fedorahosted.org/sanlock/">sanlock</a> implementation which uses
+      and a <a href="https://fedorahosted.org/sanlock/" shape="rect">sanlock</a> implementation which uses
       the Disk Paxos algorithm to ensure safety.
     </p>
         <h2>
-          <a name="sanlock" id="sanlock">Sanlock daemon setup</a>
+          <a name="sanlock" shape="rect" id="sanlock">Sanlock daemon setup</a>
+          <a class="headerlink" href="#sanlock" title="Permalink to this headline">¶</a>
         </h2>
         <p>
       On many operating systems, the <strong>sanlock</strong> plugin
@@ -192,7 +212,7 @@
       separately from the main libvirt RPM. On a Fedora/RHEL host
       this can be done with the <code>yum</code> command
     </p>
-        <pre>
+        <pre xml:space="preserve">
       $ su - root
       # yum install libvirt-lock-sanlock
     </pre>
@@ -204,7 +224,7 @@
       To start the watchdog daemon on a Fedora/RHEL host
       the following commands can be run:
     </p>
-        <pre>
+        <pre xml:space="preserve">
       $ su - root
       # chkconfig wdmd on
       # service wdmd start
@@ -213,7 +233,7 @@
       Once the watchdog is running, sanlock can be started
       as follows
     </p>
-        <pre>
+        <pre xml:space="preserve">
       # chkconfig sanlock on
       # service sanlock start
     </pre>
@@ -222,7 +242,7 @@
       watchdog, add the following line to <code>/etc/sysconfig/sanlock</code>
       before starting it
     </p>
-        <pre>
+        <pre xml:space="preserve">
       SANLOCKOPTS="-w 0"
     </pre>
         <p>
@@ -231,7 +251,8 @@
       steps as necessary.
     </p>
         <h2>
-          <a name="sanlockplugin" id="sanlockplugin">libvirt sanlock plugin configuration</a>
+          <a name="sanlockplugin" shape="rect" id="sanlockplugin">libvirt sanlock plugin configuration</a>
+          <a class="headerlink" href="#sanlockplugin" title="Permalink to this headline">¶</a>
         </h2>
         <p>
       Once the sanlock daemon is running, the next step is to
@@ -243,7 +264,7 @@
       1 and 2000, which must be set to a <strong>unique</strong>
       value on each host running virtual machines.
     </p>
-        <pre>
+        <pre xml:space="preserve">
       $ su - root
       # augtool -s set /files/etc/libvirt/qemu-sanlock.conf/host_id 1
     </pre>
@@ -252,7 +273,8 @@
       unique value for the host.
     </p>
         <h2>
-          <a name="sanlockstorage" id="sanlockstorage">libvirt sanlock storage configuration</a>
+          <a name="sanlockstorage" shape="rect" id="sanlockstorage">libvirt sanlock storage configuration</a>
+          <a class="headerlink" href="#sanlockstorage" title="Permalink to this headline">¶</a>
         </h2>
         <p>
       The sanlock plugin needs to create leases in a directory
@@ -263,11 +285,30 @@
       so update the host's <code>/etc/fstab</code> to mount
       a suitable shared/cluster filesystem at that location
     </p>
-        <pre>
+        <pre xml:space="preserve">
       $ su - root
       # echo "some.nfs.server:/export/sanlock /var/lib/libvirt/sanlock nfs hard,nointr 0 0" &gt;&gt; /etc/fstab
       # mount /var/lib/libvirt/sanlock
     </pre>
+        <p>
+      If your sanlock daemon happen to run under non-root
+      privileges, you need to tell this to libvirt so it
+      chowns created files correctly. This can be done by
+      setting <code>user</code> and/or <code>group</code>
+      variables in the configuration file. Accepted values
+      range is specified in description to the same
+      variables in <code>/etc/libvirt/qemu.conf</code>. For
+      example:
+    </p>
+        <pre xml:space="preserve">
+      augtool -s set /files/etc/libvirt/qemu-sanlock.conf/user sanlock
+      augtool -s set /files/etc/libvirt/qemu-sanlock.conf/group sanlock
+    </pre>
+        <p>
+      But remember, that if this is NFS share, you need a
+      no_root_squash-ed one for chown (and chmod possibly)
+      to succeed.
+    </p>
         <p>
       In terms of storage requirements, if the filesystem
       uses 512 byte sectors, you need to allow for <code>1MB</code>
@@ -287,7 +328,8 @@
       it should be sufficient to run the cleanup once a week.
     </p>
         <h2>
-          <a name="qemuconfig" id="qemuconfig">QEMU/KVM driver configuration</a>
+          <a name="qemuconfig" shape="rect" id="qemuconfig">QEMU/KVM driver configuration</a>
+          <a class="headerlink" href="#qemuconfig" title="Permalink to this headline">¶</a>
         </h2>
         <p>
       The QEMU/KVM driver is fully integrated with the lock
@@ -301,7 +343,7 @@
       and changing the <code>lock_manager</code> configuration
       tunable.
     </p>
-        <pre>
+        <pre xml:space="preserve">
       $ su - root
       # augtool -s  set /files/etc/libvirt/qemu.conf/lock_manager sanlock
       # service libvirtd restart
@@ -309,9 +351,9 @@
         <p>
       If all went well, libvirtd will have talked to sanlock
       and created the basic lockspace. This can be checked
-      by looking for existance of the following file
+      by looking for existence of the following file
     </p>
-        <pre>
+        <pre xml:space="preserve">
       # ls /var/lib/libvirt/sanlock/
       __LIBVIRT__DISKS__
     </pre>
@@ -335,7 +377,7 @@
       stable paths across hosts. An example iSCSI configuration
       which ensures this is:
     </p>
-        <pre>
+        <pre xml:space="preserve">
 &lt;pool type='iscsi'&gt;
   &lt;name&gt;myiscsipool&lt;/name&gt;
   &lt;source&gt;
@@ -346,6 +388,32 @@
     &lt;path&gt;/dev/disk/by-path&lt;/path&gt;
   &lt;/target&gt;
 &lt;/pool&gt;
+    </pre>
+        <h2>
+          <a name="domainconfig" shape="rect" id="domainconfig">Domain configuration</a>
+          <a class="headerlink" href="#domainconfig" title="Permalink to this headline">¶</a>
+        </h2>
+        <p>
+      In case sanlock loses access to disk locks for some reason, it will
+      kill all domains that lost their locks. This default behavior may
+      be changed using
+      <a href="formatdomain.html#elementsEvents" shape="rect">on_lockfailure
+      element</a> in domain XML. When this element is present, sanlock
+      will call <code>sanlock_helper</code> (provided by libvirt) with
+      the specified action. This helper binary will connect to libvirtd
+      and thus it may need to authenticate if libvirtd was configured to
+      require that on the read-write UNIX socket. To provide the
+      appropriate credentials to sanlock_helper, a
+      <a href="auth.html#Auth_client_config" shape="rect">client authentication
+      file</a> needs to contain something like the following:
+    </p>
+        <pre xml:space="preserve">
+[auth-libvirt-localhost]
+credentials=sanlock
+
+[credentials-sanlock]
+authname=login
+password=password
     </pre>
       </div>
     </div>

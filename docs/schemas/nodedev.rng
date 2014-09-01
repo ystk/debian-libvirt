@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <!-- A Relax NG schema for the libvirt node device XML format -->
 <grammar xmlns="http://relaxng.org/ns/structure/1.0"
     datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
@@ -12,7 +13,16 @@
          and in virsh -->
       <element name="name"><text/></element>
       <optional>
+        <element name="path"><text/></element>
+      </optional>
+      <optional>
         <element name="parent"><text/></element>
+      </optional>
+
+      <optional>
+        <element name="driver">
+          <element name="name"><text/></element>
+        </element>
       </optional>
 
       <zeroOrMore>
@@ -115,6 +125,78 @@
       </choice>
     </element>
 
+    <optional>
+      <element name='capability'>
+        <attribute name='type'>
+          <value>phys_function</value>
+        </attribute>
+        <optional>
+          <ref name='address'/>
+        </optional>
+      </element>
+    </optional>
+
+    <optional>
+      <element name='capability'>
+        <attribute name='type'>
+          <value>virt_functions</value>
+        </attribute>
+        <optional>
+          <ref name='address'/>
+        </optional>
+      </element>
+    </optional>
+
+    <optional>
+      <element name='iommuGroup'>
+        <attribute name='number'>
+          <ref name='unsignedInt'/>
+        </attribute>
+        <oneOrMore>
+          <ref name='address'/>
+        </oneOrMore>
+      </element>
+    </optional>
+
+    <optional>
+      <element name='numa'>
+        <optional>
+          <attribute name='node'>
+            <data type='int'/>
+          </attribute>
+        </optional>
+      </element>
+    </optional>
+
+    <optional>
+      <element name='pci-express'>
+        <zeroOrMore>
+          <element name='link'>
+            <attribute name='validity'>
+              <choice>
+                <value>cap</value>
+                <value>sta</value>
+              </choice>
+            </attribute>
+            <optional>
+              <attribute name='port'>
+                <ref name='unsignedInt'/>
+              </attribute>
+            </optional>
+            <optional>
+              <attribute name='speed'>
+                <data type="string">
+                  <param name="pattern">[0-9]+(.[0-9]+)?</param>
+                </data>
+              </attribute>
+            </optional>
+            <attribute name='width'>
+              <ref name='unsignedInt'/>
+            </attribute>
+          </element>
+        </zeroOrMore>
+      </element>
+    </optional>
   </define>
 
   <define name='capusbdev'>
@@ -190,6 +272,7 @@
         <ref name='mac'/>
       </element>
     </optional>
+    <ref name="link-speed-state"/>
 
     <zeroOrMore>
       <ref name='subcapnet'/>
@@ -217,12 +300,6 @@
     </attribute>
   </define>
 
-  <define name='wwn'>
-    <data type='string'>
-      <param name='pattern'>(0-9a-fA-F){16}</param>
-    </data>
-  </define>
-
   <define name='capsfchost'>
     <attribute name='type'>
       <value>fc_host</value>
@@ -245,6 +322,12 @@
     <attribute name='type'>
       <value>vports_ops</value>
     </attribute>
+    <element name='max_vports'>
+      <ref name='unsignedInt'/>
+    </element>
+    <element name='vports'>
+      <ref name='unsignedInt'/>
+    </element>
   </define>
 
   <define name='capscsihost'>
@@ -255,6 +338,12 @@
     <element name='host'>
       <ref name='unsignedLong'/>
     </element>
+
+    <optional>
+      <element name='unique_id'>
+        <ref name='positiveInteger'/>
+      </element>
+    </optional>
 
     <optional>
       <zeroOrMore>
@@ -366,6 +455,15 @@
   <define name='capstoragefixed'>
     <element name='size'>
       <ref name='unsignedLong'/>
+    </element>
+  </define>
+
+  <define name='address'>
+    <element name='address'>
+      <attribute name='domain'><ref name='hexuint'/></attribute>
+      <attribute name='bus'><ref name='hexuint'/></attribute>
+      <attribute name='slot'><ref name='hexuint'/></attribute>
+      <attribute name='function'><ref name='hexuint'/></attribute>
     </element>
   </define>
 

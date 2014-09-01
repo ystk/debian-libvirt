@@ -1,7 +1,7 @@
 /*
- * cpu_conf.h: CPU XML handling
+ * cpu_conf.c: CPU XML handling
  *
- * Copyright (C) 2009-2011 Red Hat, Inc.
+ * Copyright (C) 2009-2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *      Jiri Denemark <jdenemar@redhat.com>
@@ -23,18 +23,14 @@
 
 #include <config.h>
 
-#include "virterror_internal.h"
-#include "memory.h"
-#include "util.h"
-#include "buf.h"
+#include "virerror.h"
+#include "viralloc.h"
+#include "virbuffer.h"
 #include "cpu_conf.h"
 #include "domain_conf.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_CPU
-
-#define virCPUReportError(code, ...)                              \
-    virReportErrorHelper(VIR_FROM_CPU, code, __FILE__,            \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
 
 VIR_ENUM_IMPL(virCPU, VIR_CPU_TYPE_LAST,
               "host", "guest", "auto")
@@ -64,10 +60,11 @@ VIR_ENUM_IMPL(virCPUFeaturePolicy, VIR_CPU_FEATURE_LAST,
 void ATTRIBUTE_NONNULL(1)
 virCPUDefFreeModel(virCPUDefPtr def)
 {
-    unsigned int i;
+    size_t i;
 
     VIR_FREE(def->model);
     VIR_FREE(def->vendor);
+    VIR_FREE(def->vendor_id);
 
     for (i = 0; i < def->nfeatures; i++)
         VIR_FREE(def->features[i].name);
@@ -77,19 +74,19 @@ virCPUDefFreeModel(virCPUDefPtr def)
 void
 virCPUDefFree(virCPUDefPtr def)
 {
-    unsigned int i;
+    size_t i;
 
     if (!def)
         return;
 
-    VIR_FREE(def->arch);
     virCPUDefFreeModel(def);
 
-    for (i = 0 ; i < def->ncells ; i++) {
-        VIR_FREE(def->cells[i].cpumask);
+    for (i = 0; i < def->ncells; i++) {
+        virBitmapFree(def->cells[i].cpumask);
         VIR_FREE(def->cells[i].cpustr);
     }
     VIR_FREE(def->cells);
+    VIR_FREE(def->vendor_id);
 
     VIR_FREE(def);
 }
@@ -97,15 +94,16 @@ virCPUDefFree(virCPUDefPtr def)
 
 int ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2)
 virCPUDefCopyModel(virCPUDefPtr dst,
-                   const virCPUDefPtr src,
+                   const virCPUDef *src,
                    bool resetPolicy)
 {
-    unsigned int i;
+    size_t i;
 
-    if ((src->model && !(dst->model = strdup(src->model)))
-        || (src->vendor && !(dst->vendor = strdup(src->vendor)))
-        || VIR_ALLOC_N(dst->features, src->nfeatures) < 0)
-        goto no_memory;
+    if (VIR_STRDUP(dst->model, src->model) < 0 ||
+        VIR_STRDUP(dst->vendor, src->vendor) < 0 ||
+        VIR_STRDUP(dst->vendor_id, src->vendor_id) < 0 ||
+        VIR_ALLOC_N(dst->features, src->nfeatures) < 0)
+        return -1;
     dst->nfeatures_max = dst->nfeatures = src->nfeatures;
 
     for (i = 0; i < dst->nfeatures; i++) {
@@ -120,28 +118,21 @@ virCPUDefCopyModel(virCPUDefPtr dst,
             dst->features[i].policy = src->features[i].policy;
         }
 
-        if (!(dst->features[i].name = strdup(src->features[i].name)))
-            goto no_memory;
+        if (VIR_STRDUP(dst->features[i].name, src->features[i].name) < 0)
+            return -1;
     }
 
     return 0;
-
-no_memory:
-    virReportOOMError();
-    return -1;
 }
 
 virCPUDefPtr
-virCPUDefCopy(const virCPUDefPtr cpu)
+virCPUDefCopy(const virCPUDef *cpu)
 {
     virCPUDefPtr copy;
-    unsigned int i;
+    size_t i;
 
-    if (!cpu)
+    if (!cpu || VIR_ALLOC(copy) < 0)
         return NULL;
-
-    if (VIR_ALLOC(copy) < 0)
-        goto no_memory;
 
     copy->type = cpu->type;
     copy->mode = cpu->mode;
@@ -150,72 +141,65 @@ virCPUDefCopy(const virCPUDefPtr cpu)
     copy->sockets = cpu->sockets;
     copy->cores = cpu->cores;
     copy->threads = cpu->threads;
-
-    if (cpu->arch && !(copy->arch = strdup(cpu->arch)))
-        goto no_memory;
+    copy->arch = cpu->arch;
 
     if (virCPUDefCopyModel(copy, cpu, false) < 0)
         goto error;
 
     if (cpu->ncells) {
         if (VIR_ALLOC_N(copy->cells, cpu->ncells) < 0)
-            goto no_memory;
+            goto error;
         copy->ncells_max = copy->ncells = cpu->ncells;
 
         for (i = 0; i < cpu->ncells; i++) {
-            copy->cells[i].cellid = cpu->cells[i].cellid;
             copy->cells[i].mem = cpu->cells[i].mem;
 
-            if (VIR_ALLOC_N(copy->cells[i].cpumask,
-                            VIR_DOMAIN_CPUMASK_LEN) < 0)
-                goto no_memory;
-            memcpy(copy->cells[i].cpumask, cpu->cells[i].cpumask,
-                   VIR_DOMAIN_CPUMASK_LEN);
+            copy->cells[i].cpumask = virBitmapNewCopy(cpu->cells[i].cpumask);
 
-            if (!(copy->cells[i].cpustr = strdup(cpu->cells[i].cpustr)))
-                goto no_memory;
+            if (!copy->cells[i].cpumask)
+                goto error;
+
+            if (VIR_STRDUP(copy->cells[i].cpustr, cpu->cells[i].cpustr) < 0)
+                goto error;
         }
         copy->cells_cpus = cpu->cells_cpus;
     }
 
     return copy;
 
-no_memory:
-    virReportOOMError();
-error:
+ error:
     virCPUDefFree(copy);
     return NULL;
 }
 
 virCPUDefPtr
-virCPUDefParseXML(const xmlNodePtr node,
+virCPUDefParseXML(xmlNodePtr node,
                   xmlXPathContextPtr ctxt,
-                  enum virCPUType mode)
+                  virCPUType mode)
 {
     virCPUDefPtr def;
     xmlNodePtr *nodes = NULL;
     int n;
-    unsigned int i;
+    size_t i;
     char *cpuMode;
+    char *fallback = NULL;
+    char *vendor_id = NULL;
 
     if (!xmlStrEqual(node->name, BAD_CAST "cpu")) {
-        virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                          "%s",
-                          _("XML does not contain expected 'cpu' element"));
+        virReportError(VIR_ERR_XML_ERROR, "%s",
+                       _("XML does not contain expected 'cpu' element"));
         return NULL;
     }
 
-    if (VIR_ALLOC(def) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(def) < 0)
         return NULL;
-    }
 
     if (mode == VIR_CPU_TYPE_AUTO) {
         if (virXPathBoolean("boolean(./arch)", ctxt)) {
             if (virXPathBoolean("boolean(./@match)", ctxt)) {
-                virCPUReportError(VIR_ERR_XML_ERROR, "%s",
-                        _("'arch' element element cannot be used inside 'cpu'"
-                          " element with 'match' attribute'"));
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("'arch' element element cannot be used inside 'cpu'"
+                                 " element with 'match' attribute'"));
                 goto error;
             }
             def->type = VIR_CPU_TYPE_HOST;
@@ -229,18 +213,20 @@ virCPUDefParseXML(const xmlNodePtr node,
     if ((cpuMode = virXMLPropString(node, "mode"))) {
         if (def->type == VIR_CPU_TYPE_HOST) {
             VIR_FREE(cpuMode);
-            virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
-                              _("Attribute mode is only allowed for guest CPU"));
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("Attribute mode is only allowed for guest CPU"));
             goto error;
         } else {
             def->mode = virCPUModeTypeFromString(cpuMode);
-            VIR_FREE(cpuMode);
 
             if (def->mode < 0) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR, "%s",
-                                  _("Invalid mode attribute"));
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                               _("Invalid mode attribute '%s'"),
+                               cpuMode);
+                VIR_FREE(cpuMode);
                 goto error;
             }
+            VIR_FREE(cpuMode);
         }
     } else {
         if (def->type == VIR_CPU_TYPE_HOST)
@@ -262,50 +248,73 @@ virCPUDefParseXML(const xmlNodePtr node,
             VIR_FREE(match);
 
             if (def->match < 0) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                        "%s", _("Invalid match attribute for CPU specification"));
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                               _("Invalid match attribute for CPU "
+                                 "specification"));
                 goto error;
             }
         }
     }
 
     if (def->type == VIR_CPU_TYPE_HOST) {
-        def->arch = virXPathString("string(./arch[1])", ctxt);
-        if (!def->arch) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("Missing CPU architecture"));
+        char *arch = virXPathString("string(./arch[1])", ctxt);
+        if (!arch) {
+            virReportError(VIR_ERR_XML_ERROR, "%s",
+                           _("Missing CPU architecture"));
             goto error;
         }
+        if ((def->arch = virArchFromString(arch)) == VIR_ARCH_NONE) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                           _("Unknown architecture %s"), arch);
+            VIR_FREE(arch);
+            goto error;
+        }
+        VIR_FREE(arch);
     }
 
     if (!(def->model = virXPathString("string(./model[1])", ctxt)) &&
         def->type == VIR_CPU_TYPE_HOST) {
-        virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                "%s", _("Missing CPU model name"));
+        virReportError(VIR_ERR_XML_ERROR, "%s",
+                        _("Missing CPU model name"));
         goto error;
     }
 
     if (def->type == VIR_CPU_TYPE_GUEST &&
-        def->mode != VIR_CPU_MODE_HOST_PASSTHROUGH &&
-        virXPathBoolean("boolean(./model[1]/@fallback)", ctxt)) {
-        const char *fallback;
+        def->mode != VIR_CPU_MODE_HOST_PASSTHROUGH) {
 
-        fallback = virXPathString("string(./model[1]/@fallback)", ctxt);
-        if (fallback) {
-            def->fallback = virCPUFallbackTypeFromString(fallback);
-            VIR_FREE(fallback);
-            if (def->fallback < 0) {
-                virCPUReportError(VIR_ERR_XML_ERROR, "%s",
-                                  _("Invalid fallback attribute"));
+        if ((fallback = virXPathString("string(./model[1]/@fallback)", ctxt))) {
+            if ((def->fallback = virCPUFallbackTypeFromString(fallback)) < 0) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                               _("Invalid fallback attribute"));
                 goto error;
             }
+        }
+
+        if ((vendor_id = virXPathString("string(./model[1]/@vendor_id)",
+                                        ctxt))) {
+            if (strlen(vendor_id) != VIR_CPU_VENDOR_ID_LENGTH) {
+                virReportError(VIR_ERR_XML_ERROR,
+                               _("vendor_id must be exactly %d characters long"),
+                               VIR_CPU_VENDOR_ID_LENGTH);
+                goto error;
+            }
+
+            /* ensure that the string can be passed to qemu*/
+            if (strchr(vendor_id, ',')) {
+                    virReportError(VIR_ERR_XML_ERROR, "%s",
+                                   _("vendor id is invalid"));
+                    goto error;
+            }
+
+            def->vendor_id = vendor_id;
+            vendor_id = NULL;
         }
     }
 
     def->vendor = virXPathString("string(./vendor[1])", ctxt);
     if (def->vendor && !def->model) {
-        virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                "%s", _("CPU vendor specified without CPU model"));
+        virReportError(VIR_ERR_XML_ERROR, "%s",
+                       _("CPU vendor specified without CPU model"));
         goto error;
     }
 
@@ -316,8 +325,8 @@ virCPUDefParseXML(const xmlNodePtr node,
         ret = virXPathULong("string(./topology[1]/@sockets)",
                             ctxt, &ul);
         if (ret < 0) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("Missing 'sockets' attribute in CPU topology"));
+            virReportError(VIR_ERR_XML_ERROR, "%s",
+                           _("Missing 'sockets' attribute in CPU topology"));
             goto error;
         }
         def->sockets = (unsigned int) ul;
@@ -325,8 +334,8 @@ virCPUDefParseXML(const xmlNodePtr node,
         ret = virXPathULong("string(./topology[1]/@cores)",
                             ctxt, &ul);
         if (ret < 0) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("Missing 'cores' attribute in CPU topology"));
+            virReportError(VIR_ERR_XML_ERROR, "%s",
+                           _("Missing 'cores' attribute in CPU topology"));
             goto error;
         }
         def->cores = (unsigned int) ul;
@@ -334,40 +343,41 @@ virCPUDefParseXML(const xmlNodePtr node,
         ret = virXPathULong("string(./topology[1]/@threads)",
                             ctxt, &ul);
         if (ret < 0) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("Missing 'threads' attribute in CPU topology"));
+            virReportError(VIR_ERR_XML_ERROR, "%s",
+                           _("Missing 'threads' attribute in CPU topology"));
             goto error;
         }
         def->threads = (unsigned int) ul;
 
         if (!def->sockets || !def->cores || !def->threads) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("Invalid CPU topology"));
+            virReportError(VIR_ERR_XML_ERROR, "%s",
+                           _("Invalid CPU topology"));
             goto error;
         }
     }
 
-    n = virXPathNodeSet("./feature", ctxt, &nodes);
-    if (n < 0)
+    if ((n = virXPathNodeSet("./feature", ctxt, &nodes)) < 0)
         goto error;
 
     if (n > 0) {
-        if (!def->model) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("Non-empty feature list specified without CPU model"));
+        if (!def->model && def->mode != VIR_CPU_MODE_HOST_MODEL) {
+            virReportError(VIR_ERR_XML_ERROR, "%s",
+                           _("Non-empty feature list specified without "
+                             "CPU model"));
             goto error;
         }
 
         if (VIR_RESIZE_N(def->features, def->nfeatures_max,
                          def->nfeatures, n) < 0)
-            goto no_memory;
+            goto error;
+
         def->nfeatures = n;
     }
 
-    for (i = 0 ; i < n ; i++) {
+    for (i = 0; i < n; i++) {
         char *name;
         int policy; /* enum virDomainCPUFeaturePolicy */
-        unsigned int j;
+        size_t j;
 
         if (def->type == VIR_CPU_TYPE_GUEST) {
             char *strpolicy;
@@ -380,8 +390,8 @@ virCPUDefParseXML(const xmlNodePtr node,
             VIR_FREE(strpolicy);
 
             if (policy < 0) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                        "%s", _("Invalid CPU feature policy"));
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                               _("Invalid CPU feature policy"));
                 goto error;
             }
         } else {
@@ -390,16 +400,16 @@ virCPUDefParseXML(const xmlNodePtr node,
 
         if (!(name = virXMLPropString(nodes[i], "name")) || *name == 0) {
             VIR_FREE(name);
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("Invalid CPU feature name"));
+            virReportError(VIR_ERR_XML_ERROR, "%s",
+                           _("Invalid CPU feature name"));
             goto error;
         }
 
-        for (j = 0 ; j < i ; j++) {
+        for (j = 0; j < i; j++) {
             if (STREQ(name, def->features[j].name)) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                        _("CPU feature `%s' specified more than once"),
-                        name);
+                virReportError(VIR_ERR_XML_ERROR,
+                               _("CPU feature `%s' specified more than once"),
+                               name);
                 VIR_FREE(name);
                 goto error;
             }
@@ -413,51 +423,78 @@ virCPUDefParseXML(const xmlNodePtr node,
         VIR_FREE(nodes);
         n = virXPathNodeSet("./numa[1]/cell", ctxt, &nodes);
         if (n <= 0) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("NUMA topology defined without NUMA cells"));
+            virReportError(VIR_ERR_XML_ERROR, "%s",
+                           _("NUMA topology defined without NUMA cells"));
             goto error;
         }
 
         if (VIR_RESIZE_N(def->cells, def->ncells_max,
                          def->ncells, n) < 0)
-            goto no_memory;
+            goto error;
 
         def->ncells = n;
 
-        for (i = 0 ; i < n ; i++) {
+        for (i = 0; i < n; i++) {
             char *cpus, *memory;
-            int cpumasklen = VIR_DOMAIN_CPUMASK_LEN;
             int ret, ncpus = 0;
+            unsigned int cur_cell;
+            char *tmp = NULL;
 
-            def->cells[i].cellid = i;
-            cpus = virXMLPropString(nodes[i], "cpus");
-            if (!cpus) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("Missing 'cpus' attribute in NUMA cell"));
+            tmp = virXMLPropString(nodes[i], "id");
+            if (!tmp) {
+                cur_cell = i;
+            } else {
+                ret  = virStrToLong_ui(tmp, NULL, 10, &cur_cell);
+                if (ret == -1) {
+                    virReportError(VIR_ERR_XML_ERROR,
+                                   _("Invalid 'id' attribute in NUMA cell: %s"),
+                                   tmp);
+                    VIR_FREE(tmp);
+                    goto error;
+                }
+                VIR_FREE(tmp);
+            }
+
+            if (cur_cell >= n) {
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Exactly one 'cell' element per guest "
+                                 "NUMA cell allowed, non-contiguous ranges or "
+                                 "ranges not starting from 0 are not allowed"));
                 goto error;
             }
-            def->cells[i].cpustr = cpus;
 
-            if (VIR_ALLOC_N(def->cells[i].cpumask, cpumasklen) < 0)
-                goto no_memory;
+            if (def->cells[cur_cell].cpustr) {
+                virReportError(VIR_ERR_XML_ERROR,
+                               _("Duplicate NUMA cell info for cell id '%u'"),
+                               cur_cell);
+                goto error;
+            }
 
-            ncpus = virDomainCpuSetParse(cpus, 0, def->cells[i].cpumask,
-                                         cpumasklen);
+            cpus = virXMLPropString(nodes[i], "cpus");
+            if (!cpus) {
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Missing 'cpus' attribute in NUMA cell"));
+                goto error;
+            }
+            def->cells[cur_cell].cpustr = cpus;
+
+            ncpus = virBitmapParse(cpus, 0, &def->cells[cur_cell].cpumask,
+                                   VIR_DOMAIN_CPUMASK_LEN);
             if (ncpus <= 0)
                 goto error;
             def->cells_cpus += ncpus;
 
             memory = virXMLPropString(nodes[i], "memory");
             if (!memory) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("Missing 'memory' attribute in NUMA cell"));
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Missing 'memory' attribute in NUMA cell"));
                 goto error;
             }
 
-            ret  = virStrToLong_ui(memory, NULL, 10, &def->cells[i].mem);
+            ret  = virStrToLong_ui(memory, NULL, 10, &def->cells[cur_cell].mem);
             if (ret == -1) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    "%s", _("Invalid 'memory' attribute in NUMA cell"));
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Invalid 'memory' attribute in NUMA cell"));
                 VIR_FREE(memory);
                 goto error;
             }
@@ -465,14 +502,13 @@ virCPUDefParseXML(const xmlNodePtr node,
         }
     }
 
-cleanup:
+ cleanup:
+    VIR_FREE(fallback);
+    VIR_FREE(vendor_id);
     VIR_FREE(nodes);
     return def;
 
-no_memory:
-    virReportOOMError();
-
-error:
+ error:
     virCPUDefFree(def);
     def = NULL;
     goto cleanup;
@@ -488,14 +524,12 @@ virCPUDefFormat(virCPUDefPtr def,
     if (virCPUDefFormatBufFull(&buf, def, flags) < 0)
         goto cleanup;
 
-    if (virBufferError(&buf))
-        goto no_memory;
+    if (virBufferCheckError(&buf) < 0)
+        goto cleanup;
 
     return virBufferContentAndReset(&buf);
 
-no_memory:
-    virReportOOMError();
-cleanup:
+ cleanup:
     virBufferFreeAndReset(&buf);
     return NULL;
 }
@@ -515,8 +549,8 @@ virCPUDefFormatBufFull(virBufferPtr buf,
 
         if (def->mode != VIR_CPU_MODE_CUSTOM || def->model) {
             if (!(tmp = virCPUModeTypeToString(def->mode))) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                                  _("Unexpected CPU mode %d"), def->mode);
+                virReportError(VIR_ERR_INTERNAL_ERROR,
+                               _("Unexpected CPU mode %d"), def->mode);
                 return -1;
             }
             virBufferAsprintf(buf, " mode='%s'", tmp);
@@ -526,20 +560,20 @@ virCPUDefFormatBufFull(virBufferPtr buf,
             (def->mode == VIR_CPU_MODE_CUSTOM ||
              (flags & VIR_DOMAIN_XML_UPDATE_CPU))) {
             if (!(tmp = virCPUMatchTypeToString(def->match))) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                                  _("Unexpected CPU match policy %d"),
-                                  def->match);
+                virReportError(VIR_ERR_INTERNAL_ERROR,
+                               _("Unexpected CPU match policy %d"),
+                               def->match);
                 return -1;
             }
             virBufferAsprintf(buf, " match='%s'", tmp);
         }
     }
     virBufferAddLit(buf, ">\n");
+    virBufferAdjustIndent(buf, 2);
 
     if (def->arch)
-        virBufferAsprintf(buf, "  <arch>%s</arch>\n", def->arch);
-
-    virBufferAdjustIndent(buf, 2);
+        virBufferAsprintf(buf, "<arch>%s</arch>\n",
+                          virArchToString(def->arch));
     if (virCPUDefFormatBuf(buf, def, flags) < 0)
         return -1;
     virBufferAdjustIndent(buf, -2);
@@ -554,7 +588,7 @@ virCPUDefFormatBuf(virBufferPtr buf,
                    virCPUDefPtr def,
                    unsigned int flags)
 {
-    unsigned int i;
+    size_t i;
     bool formatModel;
     bool formatFallback;
 
@@ -567,9 +601,11 @@ virCPUDefFormatBuf(virBufferPtr buf,
                       (def->mode == VIR_CPU_MODE_HOST_MODEL ||
                        (def->mode == VIR_CPU_MODE_CUSTOM && def->model)));
 
-    if (!def->model && def->nfeatures) {
-        virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                "%s", _("Non-empty feature list specified without CPU model"));
+    if (!def->model &&
+        def->mode != VIR_CPU_MODE_HOST_MODEL &&
+        def->nfeatures) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("Non-empty feature list specified without CPU model"));
         return -1;
     }
 
@@ -580,12 +616,14 @@ virCPUDefFormatBuf(virBufferPtr buf,
 
             fallback = virCPUFallbackTypeToString(def->fallback);
             if (!fallback) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                                  _("Unexpected CPU fallback value: %d"),
-                                  def->fallback);
+                virReportError(VIR_ERR_INTERNAL_ERROR,
+                               _("Unexpected CPU fallback value: %d"),
+                               def->fallback);
                 return -1;
             }
             virBufferAsprintf(buf, " fallback='%s'", fallback);
+            if (def->vendor_id)
+                virBufferAsprintf(buf, " vendor_id='%s'", def->vendor_id);
         }
         if (formatModel && def->model) {
             virBufferAsprintf(buf, ">%s</model>\n", def->model);
@@ -605,82 +643,102 @@ virCPUDefFormatBuf(virBufferPtr buf,
         virBufferAddLit(buf, "/>\n");
     }
 
-    if (formatModel) {
-        for (i = 0 ; i < def->nfeatures ; i++) {
-            virCPUFeatureDefPtr feature = def->features + i;
+    for (i = 0; i < def->nfeatures; i++) {
+        virCPUFeatureDefPtr feature = def->features + i;
 
-            if (!feature->name) {
-                virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                        "%s", _("Missing CPU feature name"));
+        if (!feature->name) {
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("Missing CPU feature name"));
+            return -1;
+        }
+
+        if (def->type == VIR_CPU_TYPE_GUEST) {
+            const char *policy;
+
+            policy = virCPUFeaturePolicyTypeToString(feature->policy);
+            if (!policy) {
+                virReportError(VIR_ERR_INTERNAL_ERROR,
+                               _("Unexpected CPU feature policy %d"),
+                               feature->policy);
                 return -1;
             }
-
-            if (def->type == VIR_CPU_TYPE_GUEST) {
-                const char *policy;
-
-                policy = virCPUFeaturePolicyTypeToString(feature->policy);
-                if (!policy) {
-                    virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                                      _("Unexpected CPU feature policy %d"),
-                                      feature->policy);
-                    return -1;
-                }
-                virBufferAsprintf(buf, "<feature policy='%s' name='%s'/>\n",
-                                  policy, feature->name);
-            } else {
-                virBufferAsprintf(buf, "<feature name='%s'/>\n",
-                                  feature->name);
-            }
+            virBufferAsprintf(buf, "<feature policy='%s' name='%s'/>\n",
+                              policy, feature->name);
+        } else {
+            virBufferAsprintf(buf, "<feature name='%s'/>\n",
+                              feature->name);
         }
     }
 
     if (def->ncells) {
         virBufferAddLit(buf, "<numa>\n");
+        virBufferAdjustIndent(buf, 2);
         for (i = 0; i < def->ncells; i++) {
-            virBufferAddLit(buf, "  <cell");
+            virBufferAddLit(buf, "<cell");
+            virBufferAsprintf(buf, " id='%zu'", i);
             virBufferAsprintf(buf, " cpus='%s'", def->cells[i].cpustr);
             virBufferAsprintf(buf, " memory='%d'", def->cells[i].mem);
             virBufferAddLit(buf, "/>\n");
         }
+        virBufferAdjustIndent(buf, -2);
         virBufferAddLit(buf, "</numa>\n");
     }
     return 0;
 }
 
-
-int
-virCPUDefAddFeature(virCPUDefPtr def,
-                    const char *name,
-                    int policy)
+static int
+virCPUDefUpdateFeatureInternal(virCPUDefPtr def,
+                               const char *name,
+                               int policy,
+                               bool update)
 {
-    int i;
+    size_t i;
 
-    for (i = 0 ; i < def->nfeatures ; i++) {
+    if (def->type == VIR_CPU_TYPE_HOST)
+        policy = -1;
+
+    for (i = 0; i < def->nfeatures; i++) {
         if (STREQ(name, def->features[i].name)) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    _("CPU feature `%s' specified more than once"), name);
+            if (update) {
+                def->features[i].policy = policy;
+                return 0;
+            }
+
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("CPU feature `%s' specified more than once"),
+                           name);
+
             return -1;
         }
     }
 
     if (VIR_RESIZE_N(def->features, def->nfeatures_max,
                      def->nfeatures, 1) < 0)
-        goto no_memory;
+        return -1;
 
-    if (def->type == VIR_CPU_TYPE_HOST)
-        policy = -1;
-
-    if (!(def->features[def->nfeatures].name = strdup(name)))
-        goto no_memory;
+    if (VIR_STRDUP(def->features[def->nfeatures].name, name) < 0)
+        return -1;
 
     def->features[def->nfeatures].policy = policy;
     def->nfeatures++;
 
     return 0;
+}
 
-no_memory:
-    virReportOOMError();
-    return -1;
+int
+virCPUDefUpdateFeature(virCPUDefPtr def,
+                       const char *name,
+                       int policy)
+{
+    return virCPUDefUpdateFeatureInternal(def, name, policy, true);
+}
+
+int
+virCPUDefAddFeature(virCPUDefPtr def,
+                    const char *name,
+                    int policy)
+{
+    return virCPUDefUpdateFeatureInternal(def, name, policy, false);
 }
 
 bool
@@ -688,101 +746,109 @@ virCPUDefIsEqual(virCPUDefPtr src,
                  virCPUDefPtr dst)
 {
     bool identical = false;
-    int i;
+    size_t i;
 
     if (!src && !dst)
         return true;
 
     if ((src && !dst) || (!src && dst)) {
-        virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
-                          _("Target CPU does not match source"));
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                       _("Target CPU does not match source"));
         goto cleanup;
     }
 
     if (src->type != dst->type) {
-        virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                          _("Target CPU type %s does not match source %s"),
-                          virCPUTypeToString(dst->type),
-                          virCPUTypeToString(src->type));
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target CPU type %s does not match source %s"),
+                       virCPUTypeToString(dst->type),
+                       virCPUTypeToString(src->type));
         goto cleanup;
     }
 
     if (src->mode != dst->mode) {
-        virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                          _("Target CPU mode %s does not match source %s"),
-                          virCPUModeTypeToString(dst->mode),
-                          virCPUModeTypeToString(src->mode));
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target CPU mode %s does not match source %s"),
+                       virCPUModeTypeToString(dst->mode),
+                       virCPUModeTypeToString(src->mode));
         goto cleanup;
     }
 
-    if (STRNEQ_NULLABLE(src->arch, dst->arch)) {
-        virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                          _("Target CPU arch %s does not match source %s"),
-                          NULLSTR(dst->arch), NULLSTR(src->arch));
+    if (src->arch != dst->arch) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target CPU arch %s does not match source %s"),
+                       virArchToString(dst->arch),
+                       virArchToString(src->arch));
         goto cleanup;
     }
 
     if (STRNEQ_NULLABLE(src->model, dst->model)) {
-        virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                          _("Target CPU model %s does not match source %s"),
-                          NULLSTR(dst->model), NULLSTR(src->model));
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target CPU model %s does not match source %s"),
+                       NULLSTR(dst->model), NULLSTR(src->model));
         goto cleanup;
     }
 
     if (STRNEQ_NULLABLE(src->vendor, dst->vendor)) {
-        virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                          _("Target CPU vendor %s does not match source %s"),
-                          NULLSTR(dst->vendor), NULLSTR(src->vendor));
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target CPU vendor %s does not match source %s"),
+                       NULLSTR(dst->vendor), NULLSTR(src->vendor));
+        goto cleanup;
+    }
+
+    if (STRNEQ_NULLABLE(src->vendor_id, dst->vendor_id)) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target CPU vendor id %s does not match source %s"),
+                       NULLSTR(dst->vendor_id), NULLSTR(src->vendor_id));
         goto cleanup;
     }
 
     if (src->sockets != dst->sockets) {
-        virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                          _("Target CPU sockets %d does not match source %d"),
-                          dst->sockets, src->sockets);
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target CPU sockets %d does not match source %d"),
+                       dst->sockets, src->sockets);
         goto cleanup;
     }
 
     if (src->cores != dst->cores) {
-        virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                          _("Target CPU cores %d does not match source %d"),
-                          dst->cores, src->cores);
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target CPU cores %d does not match source %d"),
+                       dst->cores, src->cores);
         goto cleanup;
     }
 
     if (src->threads != dst->threads) {
-        virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                          _("Target CPU threads %d does not match source %d"),
-                          dst->threads, src->threads);
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target CPU threads %d does not match source %d"),
+                       dst->threads, src->threads);
         goto cleanup;
     }
 
     if (src->nfeatures != dst->nfeatures) {
-        virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                          _("Target CPU feature count %zu does not match source %zu"),
-                          dst->nfeatures, src->nfeatures);
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target CPU feature count %zu does not match source %zu"),
+                       dst->nfeatures, src->nfeatures);
         goto cleanup;
     }
 
-    for (i = 0 ; i < src->nfeatures ; i++) {
+    for (i = 0; i < src->nfeatures; i++) {
         if (STRNEQ(src->features[i].name, dst->features[i].name)) {
-            virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                              _("Target CPU feature %s does not match source %s"),
-                              dst->features[i].name, src->features[i].name);
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                           _("Target CPU feature %s does not match source %s"),
+                           dst->features[i].name, src->features[i].name);
             goto cleanup;
         }
 
         if (src->features[i].policy != dst->features[i].policy) {
-            virCPUReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                              _("Target CPU feature policy %s does not match source %s"),
-                              virCPUFeaturePolicyTypeToString(dst->features[i].policy),
-                              virCPUFeaturePolicyTypeToString(src->features[i].policy));
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                           _("Target CPU feature policy %s does not match source %s"),
+                           virCPUFeaturePolicyTypeToString(dst->features[i].policy),
+                           virCPUFeaturePolicyTypeToString(src->features[i].policy));
             goto cleanup;
         }
     }
 
     identical = true;
 
-cleanup:
+ cleanup:
     return identical;
 }

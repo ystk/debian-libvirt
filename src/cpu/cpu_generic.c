@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *      Jiri Denemark <jdenemar@redhat.com>
@@ -24,11 +24,11 @@
 
 #include <config.h>
 
-#include "memory.h"
+#include "viralloc.h"
 #include "virhash.h"
 #include "cpu.h"
 #include "cpu_generic.h"
-
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_CPU
 
@@ -37,7 +37,7 @@ static virHashTablePtr
 genericHashFeatures(virCPUDefPtr cpu)
 {
     virHashTablePtr hash;
-    unsigned int i;
+    size_t i;
 
     if ((hash = virHashCreate(cpu->nfeatures, NULL)) == NULL)
         return NULL;
@@ -57,21 +57,23 @@ genericHashFeatures(virCPUDefPtr cpu)
 
 static virCPUCompareResult
 genericCompare(virCPUDefPtr host,
-               virCPUDefPtr cpu)
+               virCPUDefPtr cpu,
+               bool failIncompatible)
 {
-    virHashTablePtr hash;
+    virHashTablePtr hash = NULL;
     virCPUCompareResult ret = VIR_CPU_COMPARE_ERROR;
-    unsigned int i;
+    size_t i;
     unsigned int reqfeatures;
 
-    if ((cpu->arch && STRNEQ(host->arch, cpu->arch)) ||
-        STRNEQ(host->model, cpu->model))
-        return VIR_CPU_COMPARE_INCOMPATIBLE;
-
-    if ((hash = genericHashFeatures(host)) == NULL) {
-        virReportOOMError();
+    if ((cpu->arch != VIR_ARCH_NONE &&
+         host->arch != cpu->arch) ||
+        STRNEQ(host->model, cpu->model)) {
+        ret = VIR_CPU_COMPARE_INCOMPATIBLE;
         goto cleanup;
     }
+
+    if ((hash = genericHashFeatures(host)) == NULL)
+        goto cleanup;
 
     reqfeatures = 0;
     for (i = 0; i < cpu->nfeatures; i++) {
@@ -84,13 +86,10 @@ genericCompare(virCPUDefPtr host,
                 goto cleanup;
             }
             reqfeatures++;
-        }
-        else {
-            if (cpu->type == VIR_CPU_TYPE_HOST ||
-                cpu->features[i].policy == VIR_CPU_FEATURE_REQUIRE) {
-                ret = VIR_CPU_COMPARE_INCOMPATIBLE;
-                goto cleanup;
-            }
+        } else if (cpu->type == VIR_CPU_TYPE_HOST ||
+                   cpu->features[i].policy == VIR_CPU_FEATURE_REQUIRE) {
+            ret = VIR_CPU_COMPARE_INCOMPATIBLE;
+            goto cleanup;
         }
     }
 
@@ -100,12 +99,16 @@ genericCompare(virCPUDefPtr host,
             ret = VIR_CPU_COMPARE_INCOMPATIBLE;
         else
             ret = VIR_CPU_COMPARE_SUPERSET;
-    }
-    else
+    } else {
         ret = VIR_CPU_COMPARE_IDENTICAL;
+    }
 
-cleanup:
+ cleanup:
     virHashFree(hash);
+    if (failIncompatible && ret == VIR_CPU_COMPARE_INCOMPATIBLE) {
+        ret = VIR_CPU_COMPARE_ERROR;
+        virReportError(VIR_ERR_CPU_INCOMPATIBLE, NULL);
+    }
     return ret;
 }
 
@@ -114,36 +117,30 @@ static virCPUDefPtr
 genericBaseline(virCPUDefPtr *cpus,
                 unsigned int ncpus,
                 const char **models,
-                unsigned int nmodels)
+                unsigned int nmodels,
+                unsigned int flags)
 {
     virCPUDefPtr cpu = NULL;
     virCPUFeatureDefPtr features = NULL;
     unsigned int nfeatures;
     unsigned int count;
-    unsigned int i, j;
+    size_t i, j;
 
-    if (models) {
-        bool found = false;
-        for (i = 0; i < nmodels; i++) {
-            if (STREQ(cpus[0]->model, models[i])) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    _("CPU model '%s' is not support by hypervisor"),
-                    cpus[0]->model);
-            goto error;
-        }
+    virCheckFlags(VIR_CONNECT_BASELINE_CPU_EXPAND_FEATURES, NULL);
+
+    if (!cpuModelIsAllowed(cpus[0]->model, models, nmodels)) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("CPU model %s is not supported by hypervisor"),
+                       cpus[0]->model);
+        goto error;
     }
 
     if (VIR_ALLOC(cpu) < 0 ||
-        !(cpu->arch = strdup(cpus[0]->arch)) ||
-        !(cpu->model = strdup(cpus[0]->model)) ||
+        VIR_STRDUP(cpu->model, cpus[0]->model) < 0 ||
         VIR_ALLOC_N(features, cpus[0]->nfeatures) < 0)
-        goto no_memory;
+        goto error;
 
+    cpu->arch = cpus[0]->arch;
     cpu->type = VIR_CPU_TYPE_HOST;
 
     count = nfeatures = cpus[0]->nfeatures;
@@ -153,22 +150,23 @@ genericBaseline(virCPUDefPtr *cpus,
     for (i = 1; i < ncpus; i++) {
         virHashTablePtr hash;
 
-        if (STRNEQ(cpu->arch, cpus[i]->arch)) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    _("CPUs have incompatible architectures: '%s' != '%s'"),
-                    cpu->arch, cpus[i]->arch);
+        if (cpu->arch != cpus[i]->arch) {
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("CPUs have incompatible architectures: '%s' != '%s'"),
+                           virArchToString(cpu->arch),
+                           virArchToString(cpus[i]->arch));
             goto error;
         }
 
         if (STRNEQ(cpu->model, cpus[i]->model)) {
-            virCPUReportError(VIR_ERR_INTERNAL_ERROR,
-                    _("CPU models don't match: '%s' != '%s'"),
-                    cpu->model, cpus[i]->model);
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("CPU models don't match: '%s' != '%s'"),
+                           cpu->model, cpus[i]->model);
             goto error;
         }
 
         if (!(hash = genericHashFeatures(cpus[i])))
-            goto no_memory;
+            goto error;
 
         for (j = 0; j < nfeatures; j++) {
             if (features[j].name &&
@@ -182,7 +180,7 @@ genericBaseline(virCPUDefPtr *cpus,
     }
 
     if (VIR_ALLOC_N(cpu->features, count) < 0)
-        goto no_memory;
+        goto error;
     cpu->nfeatures = count;
 
     j = 0;
@@ -190,18 +188,16 @@ genericBaseline(virCPUDefPtr *cpus,
         if (!features[i].name)
             continue;
 
-        if (!(cpu->features[j++].name = strdup(features[i].name)))
-            goto no_memory;
+        if (VIR_STRDUP(cpu->features[j++].name, features[i].name) < 0)
+            goto error;
     }
 
-cleanup:
+ cleanup:
     VIR_FREE(features);
 
     return cpu;
 
-no_memory:
-    virReportOOMError();
-error:
+ error:
     virCPUDefFree(cpu);
     cpu = NULL;
     goto cleanup;

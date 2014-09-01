@@ -1,7 +1,7 @@
 /*
  * cpu_conf.h: CPU XML handling
  *
- * Copyright (C) 2009-2011 Red Hat, Inc.
+ * Copyright (C) 2009-2011, 2013, 2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *      Jiri Denemark <jdenemar@redhat.com>
@@ -24,50 +24,54 @@
 #ifndef __VIR_CPU_CONF_H__
 # define __VIR_CPU_CONF_H__
 
-# include "util.h"
-# include "buf.h"
-# include "xml.h"
+# include "virutil.h"
+# include "virbuffer.h"
+# include "virxml.h"
+# include "virbitmap.h"
+# include "virarch.h"
 
-enum virCPUType {
+# define VIR_CPU_VENDOR_ID_LENGTH 12
+
+typedef enum {
     VIR_CPU_TYPE_HOST,
     VIR_CPU_TYPE_GUEST,
     VIR_CPU_TYPE_AUTO,
 
     VIR_CPU_TYPE_LAST
-};
+} virCPUType;
 
 VIR_ENUM_DECL(virCPU)
 
-enum virCPUMode {
+typedef enum {
     VIR_CPU_MODE_CUSTOM,
     VIR_CPU_MODE_HOST_MODEL,
     VIR_CPU_MODE_HOST_PASSTHROUGH,
 
     VIR_CPU_MODE_LAST
-};
+} virCPUMode;
 
 VIR_ENUM_DECL(virCPUMode)
 
-enum virCPUMatch {
+typedef enum {
     VIR_CPU_MATCH_MINIMUM,
     VIR_CPU_MATCH_EXACT,
     VIR_CPU_MATCH_STRICT,
 
     VIR_CPU_MATCH_LAST
-};
+} virCPUMatch;
 
 VIR_ENUM_DECL(virCPUMatch)
 
-enum virCPUFallback {
+typedef enum {
     VIR_CPU_FALLBACK_ALLOW,
     VIR_CPU_FALLBACK_FORBID,
 
     VIR_CPU_FALLBACK_LAST
-};
+} virCPUFallback;
 
 VIR_ENUM_DECL(virCPUFallback)
 
-enum virCPUFeaturePolicy {
+typedef enum {
     VIR_CPU_FEATURE_FORCE,
     VIR_CPU_FEATURE_REQUIRE,
     VIR_CPU_FEATURE_OPTIONAL,
@@ -75,7 +79,7 @@ enum virCPUFeaturePolicy {
     VIR_CPU_FEATURE_FORBID,
 
     VIR_CPU_FEATURE_LAST
-};
+} virCPUFeaturePolicy;
 
 VIR_ENUM_DECL(virCPUFeaturePolicy)
 
@@ -89,8 +93,7 @@ struct _virCPUFeatureDef {
 typedef struct _virCellDef virCellDef;
 typedef virCellDef *virCellDefPtr;
 struct _virCellDef {
-   int cellid;
-   char *cpumask;	/* CPUs that are part of this node */
+   virBitmapPtr cpumask;	/* CPUs that are part of this node */
    char *cpustr;	/* CPUs stored in string form for dumpxml */
    unsigned int mem;	/* Node memory in kB */
 };
@@ -101,8 +104,9 @@ struct _virCPUDef {
     int type;           /* enum virCPUType */
     int mode;           /* enum virCPUMode */
     int match;          /* enum virCPUMatch */
-    char *arch;
+    virArch arch;
     char *model;
+    char *vendor_id;    /* vendor id returned by CPUID in the guest */
     int fallback;       /* enum virCPUFallback */
     char *vendor;
     unsigned int sockets;
@@ -126,16 +130,16 @@ virCPUDefFree(virCPUDefPtr def);
 
 int ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2)
 virCPUDefCopyModel(virCPUDefPtr dst,
-                   const virCPUDefPtr src,
+                   const virCPUDef *src,
                    bool resetPolicy);
 
 virCPUDefPtr
-virCPUDefCopy(const virCPUDefPtr cpu);
+virCPUDefCopy(const virCPUDef *cpu);
 
 virCPUDefPtr
-virCPUDefParseXML(const xmlNodePtr node,
+virCPUDefParseXML(xmlNodePtr node,
                   xmlXPathContextPtr ctxt,
-                  enum virCPUType mode);
+                  virCPUType mode);
 
 bool
 virCPUDefIsEqual(virCPUDefPtr src,
@@ -158,5 +162,10 @@ int
 virCPUDefAddFeature(virCPUDefPtr cpu,
                     const char *name,
                     int policy);
+
+int
+virCPUDefUpdateFeature(virCPUDefPtr cpu,
+                       const char *name,
+                       int policy);
 
 #endif /* __VIR_CPU_CONF_H__ */

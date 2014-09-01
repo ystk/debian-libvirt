@@ -1,5 +1,5 @@
 /*
- * libvirtd.c: daemon start of day, guest process & i/o management
+ * libvirtd-config.h: daemon start of day, guest process & i/o management
  *
  * Copyright (C) 2006-2012 Red Hat, Inc.
  * Copyright (C) 2006 Daniel P. Berrange
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -45,6 +45,8 @@ struct daemonConfig {
     int auth_tcp;
     int auth_tls;
 
+    char **access_drivers;
+
     int mdns_adv;
     char *mdns_name;
 
@@ -61,6 +63,8 @@ struct daemonConfig {
     int min_workers;
     int max_workers;
     int max_clients;
+    int max_queued_clients;
+    int max_anonymous_clients;
 
     int prio_workers;
 
@@ -70,7 +74,6 @@ struct daemonConfig {
     int log_level;
     char *log_filters;
     char *log_outputs;
-    int log_buffer_size;
 
     int audit_level;
     int audit_logging;

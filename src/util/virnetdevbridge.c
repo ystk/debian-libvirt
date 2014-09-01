@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2011 Red Hat, Inc.
+ * Copyright (C) 2007-2013 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -12,8 +12,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *     Mark McLoughlin <markmc@redhat.com>
@@ -23,72 +23,94 @@
 #include <config.h>
 
 #include "virnetdevbridge.h"
-#include "virterror_internal.h"
-#include "util.h"
+#include "virnetdev.h"
+#include "virerror.h"
+#include "virutil.h"
 #include "virfile.h"
-#include "memory.h"
+#include "viralloc.h"
 #include "intprops.h"
+#include "virstring.h"
 
 #include <sys/ioctl.h>
-#ifdef HAVE_NET_IF_H
-# include <net/if.h>
-#endif
+#include <sys/socket.h>
+#include <net/if.h>
+#include <netinet/in.h>
+
 #ifdef __linux__
 # include <linux/sockios.h>
 # include <linux/param.h>     /* HZ                 */
+# if NETINET_LINUX_WORKAROUND
+/* Depending on the version of kernel vs. glibc, there may be a collision
+ * between <net/in.h> and kernel IPv6 structures.  The different types
+ * are ABI compatible, but choke the C type system; work around it by
+ * using temporary redefinitions.  */
+#  define in6_addr in6_addr_
+#  define sockaddr_in6 sockaddr_in6_
+#  define ipv6_mreq ipv6_mreq_
+#  define in6addr_any in6addr_any_
+#  define in6addr_loopback in6addr_loopback_
+# endif
+# include <linux/in6.h>
 # include <linux/if_bridge.h> /* SYSFS_BRIDGE_ATTR  */
+# if NETINET_LINUX_WORKAROUND
+#  undef in6_addr
+#  undef sockaddr_in6
+#  undef ipv6_mreq
+#  undef in6addr_any
+#  undef in6addr_loopback
+# endif
 
 # define JIFFIES_TO_MS(j) (((j)*1000)/HZ)
 # define MS_TO_JIFFIES(ms) (((ms)*HZ)/1000)
 #endif
 
+#if defined(HAVE_BSD_BRIDGE_MGMT)
+# include <net/ethernet.h>
+# include <net/if_bridgevar.h>
+#endif
+
 #define VIR_FROM_THIS VIR_FROM_NONE
 
 
-#if defined(HAVE_NET_IF_H) && defined(SIOCBRADDBR)
-static int virNetDevSetupControlFull(const char *ifname,
-                                     struct ifreq *ifr,
-                                     int domain,
-                                     int type)
+#if defined(HAVE_BSD_BRIDGE_MGMT)
+static int virNetDevBridgeCmd(const char *brname,
+                              u_long op,
+                              void *arg,
+                              size_t argsize)
 {
-    int fd;
+    int s;
+    int ret = -1;
+    struct ifdrv ifd;
 
-    if (ifname && ifr) {
-        memset(ifr, 0, sizeof(*ifr));
+    memset(&ifd, 0, sizeof(ifd));
 
-        if (virStrcpyStatic(ifr->ifr_name, ifname) == NULL) {
-            virReportSystemError(ERANGE,
-                                 _("Network interface name '%s' is too long"),
-                                 ifname);
-            return -1;
-        }
-    }
-
-    if ((fd = socket(domain, type, 0)) < 0) {
+    if ((s = socket(AF_LOCAL, SOCK_DGRAM, 0)) < 0) {
         virReportSystemError(errno, "%s",
                              _("Cannot open network interface control socket"));
         return -1;
     }
 
-    if (virSetInherit(fd, false) < 0) {
-        virReportSystemError(errno, "%s",
-                             _("Cannot set close-on-exec flag for socket"));
-        VIR_FORCE_CLOSE(fd);
-        return -1;
+    if (virStrcpyStatic(ifd.ifd_name, brname) == NULL) {
+       virReportSystemError(ERANGE,
+                            _("Network interface name '%s' is too long"),
+                            brname);
+       goto cleanup;
     }
 
-    return fd;
-}
+    ifd.ifd_cmd = op;
+    ifd.ifd_len = argsize;
+    ifd.ifd_data = arg;
 
+    ret = ioctl(s, SIOCSDRVSPEC, &ifd);
 
-static int virNetDevSetupControl(const char *ifname,
-                                 struct ifreq *ifr)
-{
-    return virNetDevSetupControlFull(ifname, ifr, AF_PACKET, SOCK_DGRAM);
+ cleanup:
+    VIR_FORCE_CLOSE(s);
+
+    return ret;
 }
 #endif
 
-#ifdef __linux__
+#if defined(HAVE_STRUCT_IFREQ) && defined(__linux__)
 # define SYSFS_NET_DIR "/sys/class/net"
 /*
  * Bridge parameters can be set via sysfs on newish kernels,
@@ -105,10 +127,8 @@ static int virNetDevBridgeSet(const char *brname,
     char *path = NULL;
     int ret = -1;
 
-    if (virAsprintf(&path, "%s/%s/bridge/%s", SYSFS_NET_DIR, brname, paramname) < 0) {
-        virReportOOMError();
+    if (virAsprintf(&path, "%s/%s/bridge/%s", SYSFS_NET_DIR, brname, paramname) < 0)
         return -1;
-    }
 
     if (virFileExists(path)) {
         char valuestr[INT_BUFSIZE_BOUND(value)];
@@ -139,7 +159,7 @@ static int virNetDevBridgeSet(const char *brname,
     }
 
     ret = 0;
-cleanup:
+ cleanup:
     VIR_FREE(path);
     return ret;
 }
@@ -154,10 +174,8 @@ static int virNetDevBridgeGet(const char *brname,
     char *path = NULL;
     int ret = -1;
 
-    if (virAsprintf(&path, "%s/%s/bridge/%s", SYSFS_NET_DIR, brname, paramname) < 0) {
-        virReportOOMError();
+    if (virAsprintf(&path, "%s/%s/bridge/%s", SYSFS_NET_DIR, brname, paramname) < 0)
         return -1;
-    }
 
     if (virFileExists(path)) {
         char *valuestr;
@@ -195,7 +213,7 @@ static int virNetDevBridgeGet(const char *brname,
     }
 
     ret = 0;
-cleanup:
+ cleanup:
     VIR_FREE(path);
     return ret;
 }
@@ -210,7 +228,7 @@ cleanup:
  *
  * Returns 0 in case of success or -1 on failure
  */
-#ifdef SIOCBRADDBR
+#if defined(HAVE_STRUCT_IFREQ) && defined(SIOCBRADDBR)
 int virNetDevBridgeCreate(const char *brname)
 {
     int fd = -1;
@@ -227,8 +245,33 @@ int virNetDevBridgeCreate(const char *brname)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     VIR_FORCE_CLOSE(fd);
+    return ret;
+}
+#elif defined(HAVE_STRUCT_IFREQ) && defined(SIOCIFCREATE2)
+int virNetDevBridgeCreate(const char *brname)
+{
+    int s;
+    struct ifreq ifr;
+    int ret = - 1;
+
+    if ((s = virNetDevSetupControl("bridge", &ifr)) < 0)
+        return -1;
+
+    if (ioctl(s, SIOCIFCREATE2, &ifr) < 0) {
+        virReportSystemError(errno, "%s",
+                             _("Unable to create bridge device"));
+        goto cleanup;
+    }
+
+    if (virNetDevSetName(ifr.ifr_name, brname) == -1) {
+        goto cleanup;
+    }
+
+    ret = 0;
+ cleanup:
+    VIR_FORCE_CLOSE(s);
     return ret;
 }
 #else
@@ -248,7 +291,7 @@ int virNetDevBridgeCreate(const char *brname)
  *
  * Returns 0 in case of success or an errno code in case of failure.
  */
-#ifdef SIOCBRDELBR
+#if defined(HAVE_STRUCT_IFREQ) && defined(SIOCBRDELBR)
 int virNetDevBridgeDelete(const char *brname)
 {
     int fd = -1;
@@ -265,8 +308,30 @@ int virNetDevBridgeDelete(const char *brname)
 
     ret = 0;
 
-cleanup:
+ cleanup:
     VIR_FORCE_CLOSE(fd);
+    return ret;
+}
+#elif defined(HAVE_STRUCT_IFREQ) && defined(SIOCIFDESTROY)
+int virNetDevBridgeDelete(const char *brname)
+{
+    int s;
+    struct ifreq ifr;
+    int ret = -1;
+
+    if ((s = virNetDevSetupControl(brname, &ifr)) < 0)
+        return -1;
+
+    if (ioctl(s, SIOCIFDESTROY, &ifr) < 0) {
+        virReportSystemError(errno,
+                             _("Unable to remove bridge %s"),
+                             brname);
+        goto cleanup;
+    }
+
+    ret = 0;
+ cleanup:
+    VIR_FORCE_CLOSE(s);
     return ret;
 }
 #else
@@ -287,7 +352,7 @@ int virNetDevBridgeDelete(const char *brname ATTRIBUTE_UNUSED)
  *
  * Returns 0 in case of success or an errno code in case of failure.
  */
-#ifdef SIOCBRADDIF
+#if defined(HAVE_STRUCT_IFREQ) && defined(SIOCBRADDIF)
 int virNetDevBridgeAddPort(const char *brname,
                            const char *ifname)
 {
@@ -311,9 +376,31 @@ int virNetDevBridgeAddPort(const char *brname,
     }
 
     ret = 0;
-cleanup:
+ cleanup:
     VIR_FORCE_CLOSE(fd);
     return ret;
+}
+#elif defined(HAVE_BSD_BRIDGE_MGMT)
+int virNetDevBridgeAddPort(const char *brname,
+                           const char *ifname)
+{
+    struct ifbreq req;
+
+    memset(&req, 0, sizeof(req));
+    if (virStrcpyStatic(req.ifbr_ifsname, ifname) == NULL) {
+        virReportSystemError(ERANGE,
+                             _("Network interface name '%s' is too long"),
+                             ifname);
+        return -1;
+    }
+
+    if (virNetDevBridgeCmd(brname, BRDGADD, &req, sizeof(req)) < 0) {
+        virReportSystemError(errno,
+                             _("Unable to add bridge %s port %s"), brname, ifname);
+        return -1;
+    }
+
+    return 0;
 }
 #else
 int virNetDevBridgeAddPort(const char *brname,
@@ -334,7 +421,7 @@ int virNetDevBridgeAddPort(const char *brname,
  *
  * Returns 0 in case of success or an errno code in case of failure.
  */
-#ifdef SIOCBRDELIF
+#if defined(HAVE_STRUCT_IFREQ) && defined(SIOCBRDELIF)
 int virNetDevBridgeRemovePort(const char *brname,
                               const char *ifname)
 {
@@ -359,9 +446,31 @@ int virNetDevBridgeRemovePort(const char *brname,
     }
 
     ret = 0;
-cleanup:
+ cleanup:
     VIR_FORCE_CLOSE(fd);
     return ret;
+}
+#elif defined(HAVE_BSD_BRIDGE_MGMT)
+int virNetDevBridgeRemovePort(const char *brname,
+                           const char *ifname)
+{
+    struct ifbreq req;
+
+    memset(&req, 0, sizeof(req));
+    if (virStrcpyStatic(req.ifbr_ifsname, ifname) == NULL) {
+        virReportSystemError(ERANGE,
+                             _("Network interface name '%s' is too long"),
+                             ifname);
+        return -1;
+    }
+
+    if (virNetDevBridgeCmd(brname, BRDGDEL, &req, sizeof(req)) < 0) {
+        virReportSystemError(errno,
+                             _("Unable to remove bridge %s port %s"), brname, ifname);
+       return -1;
+    }
+
+    return 0;
 }
 #else
 int virNetDevBridgeRemovePort(const char *brname,
@@ -374,11 +483,11 @@ int virNetDevBridgeRemovePort(const char *brname,
 #endif
 
 
-#ifdef __linux__
+#if defined(HAVE_STRUCT_IFREQ) && defined(__linux__)
 /**
  * virNetDevBridgeSetSTPDelay:
  * @brname: the bridge name
- * @delay: delay in seconds
+ * @delay: delay in milliseconds
  *
  * Set the bridge forward delay
  *
@@ -398,7 +507,7 @@ int virNetDevBridgeSetSTPDelay(const char *brname,
     ret = virNetDevBridgeSet(brname, "forward_delay", MS_TO_JIFFIES(delay),
                              fd, &ifr);
 
-cleanup:
+ cleanup:
     VIR_FORCE_CLOSE(fd);
     return ret;
 }
@@ -421,16 +530,16 @@ int virNetDevBridgeGetSTPDelay(const char *brname,
     int fd = -1;
     int ret = -1;
     struct ifreq ifr;
-    unsigned long i;
+    unsigned long val;
 
     if ((fd = virNetDevSetupControl(brname, &ifr)) < 0)
         goto cleanup;
 
-    ret = virNetDevBridgeGet(brname, "forward_delay", &i,
+    ret = virNetDevBridgeGet(brname, "forward_delay", &val,
                              fd, &ifr);
-    *delayms = JIFFIES_TO_MS(i);
+    *delayms = JIFFIES_TO_MS(val);
 
-cleanup:
+ cleanup:
     VIR_FORCE_CLOSE(fd);
     return ret;
 }
@@ -459,7 +568,7 @@ int virNetDevBridgeSetSTP(const char *brname,
     ret = virNetDevBridgeSet(brname, "stp_state", enable ? 1 : 0,
                              fd, &ifr);
 
-cleanup:
+ cleanup:
     VIR_FORCE_CLOSE(fd);
     return ret;
 }
@@ -481,20 +590,64 @@ int virNetDevBridgeGetSTP(const char *brname,
     int fd = -1;
     int ret = -1;
     struct ifreq ifr;
-    unsigned long i;
+    unsigned long val;
 
     if ((fd = virNetDevSetupControl(brname, &ifr)) < 0)
         goto cleanup;
 
-    ret = virNetDevBridgeGet(brname, "stp_state", &i,
+    ret = virNetDevBridgeGet(brname, "stp_state", &val,
                              fd, &ifr);
-    *enabled = i ? true : false;
+    *enabled = val ? true : false;
 
-cleanup:
+ cleanup:
     VIR_FORCE_CLOSE(fd);
     return ret;
 }
-#else /* !__linux__ */
+#elif defined(HAVE_BSD_BRIDGE_MGMT)
+int virNetDevBridgeSetSTPDelay(const char *brname,
+                               int delay)
+{
+    struct ifbrparam param;
+    u_long delay_seconds = delay / 1000;
+
+    /* FreeBSD doesn't allow setting STP delay < 4 */
+    delay_seconds = delay_seconds < 4 ? 4 : delay_seconds;
+    param.ifbrp_fwddelay = delay_seconds & 0xff;
+
+    if (virNetDevBridgeCmd(brname, BRDGSFD, &param, sizeof(param)) < 0) {
+        virReportSystemError(errno,
+                             _("Unable to set STP delay on %s"), brname);
+        return -1;
+    }
+
+    return 0;
+}
+int virNetDevBridgeGetSTPDelay(const char *brname,
+                               int *delay ATTRIBUTE_UNUSED)
+{
+    virReportSystemError(ENOSYS,
+                         _("Unable to get STP delay on %s on this platform"),
+                         brname);
+    return -1;
+}
+
+int virNetDevBridgeSetSTP(const char *brname ATTRIBUTE_UNUSED,
+                          bool enable ATTRIBUTE_UNUSED)
+
+{
+    /* FreeBSD doesn't allow to set STP per bridge,
+     * only per-device in bridge */
+    return 0;
+}
+int virNetDevBridgeGetSTP(const char *brname,
+                          bool *enable ATTRIBUTE_UNUSED)
+{
+    virReportSystemError(ENOSYS,
+                         _("Unable to get STP on %s on this platform"),
+                         brname);
+    return -1;
+}
+#else
 int virNetDevBridgeSetSTPDelay(const char *brname,
                                int delay ATTRIBUTE_UNUSED)
 {
@@ -529,4 +682,4 @@ int virNetDevBridgeGetSTP(const char *brname,
                          brname);
     return -1;
 }
-#endif /* __linux__ */
+#endif

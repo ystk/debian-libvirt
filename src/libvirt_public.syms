@@ -534,4 +534,140 @@ LIBVIRT_0.9.11 {
         virDomainPMWakeup;
 } LIBVIRT_0.9.10;
 
+LIBVIRT_0.9.13 {
+    global:
+        virConnectListAllDomains;
+        virDomainListAllSnapshots;
+        virDomainSnapshotHasMetadata;
+        virDomainSnapshotIsCurrent;
+        virDomainSnapshotListAllChildren;
+        virDomainSnapshotRef;
+} LIBVIRT_0.9.11;
+
+LIBVIRT_0.10.0 {
+    global:
+        virDomainGetHostname;
+        virConnectRegisterCloseCallback;
+        virConnectUnregisterCloseCallback;
+        virDomainGetSecurityLabelList;
+        virDomainPinEmulator;
+        virDomainGetEmulatorPinInfo;
+} LIBVIRT_0.9.13;
+
+LIBVIRT_0.10.2 {
+    global:
+        virConnectListAllInterfaces;
+        virConnectListAllNetworks;
+        virConnectListAllNodeDevices;
+        virConnectListAllNWFilters;
+        virConnectListAllSecrets;
+        virConnectListAllStoragePools;
+        virDomainBlockCommit;
+        virNetworkUpdate;
+        virNodeGetMemoryParameters;
+        virNodeSetMemoryParameters;
+        virStoragePoolListAllVolumes;
+} LIBVIRT_0.10.0;
+
+LIBVIRT_1.0.0 {
+    global:
+        virNodeGetCPUMap;
+} LIBVIRT_0.10.2;
+
+LIBVIRT_1.0.1 {
+    global:
+        virDomainFSTrim;
+        virDomainSendProcessSignal;
+} LIBVIRT_1.0.0;
+
+LIBVIRT_1.0.2 {
+    global:
+        virDomainOpenChannel;
+        virTypedParamsAddBoolean;
+        virTypedParamsAddDouble;
+        virTypedParamsAddFromString;
+        virTypedParamsAddInt;
+        virTypedParamsAddLLong;
+        virTypedParamsAddString;
+        virTypedParamsAddUInt;
+        virTypedParamsAddULLong;
+        virTypedParamsClear;
+        virTypedParamsFree;
+        virTypedParamsGet;
+        virTypedParamsGetBoolean;
+        virTypedParamsGetDouble;
+        virTypedParamsGetInt;
+        virTypedParamsGetLLong;
+        virTypedParamsGetString;
+        virTypedParamsGetUInt;
+        virTypedParamsGetULLong;
+} LIBVIRT_1.0.1;
+
+LIBVIRT_1.0.3 {
+    global:
+        virDomainGetJobStats;
+        virDomainMigrateGetCompressionCache;
+        virDomainMigrateSetCompressionCache;
+        virNodeDeviceLookupSCSIHostByWWN;
+} LIBVIRT_1.0.2;
+
+LIBVIRT_1.0.5 {
+    global:
+        virNodeDeviceDetachFlags;
+} LIBVIRT_1.0.3;
+
+LIBVIRT_1.0.6 {
+    global:
+        virGetLastErrorMessage;
+} LIBVIRT_1.0.5;
+
+LIBVIRT_1.1.0 {
+    global:
+        virDomainMigrate3;
+        virDomainMigrateToURI3;
+} LIBVIRT_1.0.6;
+
+LIBVIRT_1.1.1 {
+    global:
+        virDomainCreateWithFiles;
+        virDomainCreateXMLWithFiles;
+        virDomainSetMemoryStatsPeriod;
+} LIBVIRT_1.1.0;
+
+LIBVIRT_1.1.3 {
+    global:
+        virConnectGetCPUModelNames;
+} LIBVIRT_1.1.1;
+
+LIBVIRT_1.2.1 {
+    global:
+        virConnectNetworkEventRegisterAny;
+        virConnectNetworkEventDeregisterAny;
+} LIBVIRT_1.1.3;
+
+LIBVIRT_1.2.3 {
+    global:
+        virDomainCoreDumpWithFormat;
+} LIBVIRT_1.2.1;
+
+LIBVIRT_1.2.5 {
+    global:
+        virDomainFSFreeze;
+        virDomainFSThaw;
+        virDomainGetTime;
+        virDomainSetTime;
+} LIBVIRT_1.2.3;
+
+LIBVIRT_1.2.6 {
+    global:
+        virNodeGetFreePages;
+        virNetworkDHCPLeaseFree;
+        virNetworkGetDHCPLeases;
+} LIBVIRT_1.2.5;
+
+LIBVIRT_1.2.7 {
+    global:
+        virConnectGetDomainCapabilities;
+} LIBVIRT_1.2.6;
+
 # .... define new API here using predicted next version number ....

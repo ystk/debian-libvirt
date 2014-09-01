@@ -1,7 +1,7 @@
 /*
- * datatypes.h: management of structs for public data types
+ * datatypes.c: management of structs for public data types
  *
- * Copyright (C) 2006-2011 Red Hat, Inc.
+ * Copyright (C) 2006-2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -23,95 +23,135 @@
 #include <unistd.h>
 
 #include "datatypes.h"
-#include "virterror_internal.h"
-#include "logging.h"
-#include "memory.h"
-#include "uuid.h"
-#include "util.h"
+#include "virerror.h"
+#include "virlog.h"
+#include "viralloc.h"
+#include "viruuid.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_NONE
 
-#define virLibConnError(code, ...)                                \
-    virReportErrorHelper(VIR_FROM_THIS, code, __FILE__,           \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
+VIR_LOG_INIT("datatypes");
 
-/************************************************************************
- *									*
- *			Domain and Connections allocations		*
- *									*
- ************************************************************************/
+virClassPtr virConnectClass;
+virClassPtr virConnectCloseCallbackDataClass;
+virClassPtr virDomainClass;
+virClassPtr virDomainSnapshotClass;
+virClassPtr virInterfaceClass;
+virClassPtr virNetworkClass;
+virClassPtr virNodeDeviceClass;
+virClassPtr virNWFilterClass;
+virClassPtr virSecretClass;
+virClassPtr virStreamClass;
+virClassPtr virStorageVolClass;
+virClassPtr virStoragePoolClass;
 
+static void virConnectDispose(void *obj);
+static void virConnectCloseCallbackDataDispose(void *obj);
+static void virDomainDispose(void *obj);
+static void virDomainSnapshotDispose(void *obj);
+static void virInterfaceDispose(void *obj);
+static void virNetworkDispose(void *obj);
+static void virNodeDeviceDispose(void *obj);
+static void virNWFilterDispose(void *obj);
+static void virSecretDispose(void *obj);
+static void virStreamDispose(void *obj);
+static void virStorageVolDispose(void *obj);
+static void virStoragePoolDispose(void *obj);
+
+static int
+virDataTypesOnceInit(void)
+{
+#define DECLARE_CLASS_COMMON(basename, parent)                   \
+    if (!(basename ## Class = virClassNew(parent,                \
+                                          #basename,             \
+                                          sizeof(basename),      \
+                                          basename ## Dispose))) \
+        return -1;
+#define DECLARE_CLASS(basename)                                  \
+    DECLARE_CLASS_COMMON(basename, virClassForObject())
+#define DECLARE_CLASS_LOCKABLE(basename)                         \
+    DECLARE_CLASS_COMMON(basename, virClassForObjectLockable())
+
+    DECLARE_CLASS(virConnect);
+    DECLARE_CLASS_LOCKABLE(virConnectCloseCallbackData);
+    DECLARE_CLASS(virDomain);
+    DECLARE_CLASS(virDomainSnapshot);
+    DECLARE_CLASS(virInterface);
+    DECLARE_CLASS(virNetwork);
+    DECLARE_CLASS(virNodeDevice);
+    DECLARE_CLASS(virNWFilter);
+    DECLARE_CLASS(virSecret);
+    DECLARE_CLASS(virStream);
+    DECLARE_CLASS(virStorageVol);
+    DECLARE_CLASS(virStoragePool);
+
+#undef DECLARE_CLASS_COMMON
+#undef DECLARE_CLASS_LOCKABLE
+#undef DECLARE_CLASS
+
+    return 0;
+}
+
+VIR_ONCE_GLOBAL_INIT(virDataTypes)
 
 /**
  * virGetConnect:
  *
- * Allocates a new hypervisor connection structure
+ * Allocates a new hypervisor connection object.
  *
- * Returns a new pointer or NULL in case of error.
+ * Returns a pointer to the connection object, or NULL on error.
  */
 virConnectPtr
-virGetConnect(void) {
+virGetConnect(void)
+{
     virConnectPtr ret;
 
-    if (VIR_ALLOC(ret) < 0) {
-        virReportOOMError();
-        goto failed;
-    }
-    if (virMutexInit(&ret->lock) < 0) {
-        VIR_FREE(ret);
-        goto failed;
-    }
+    if (virDataTypesInitialize() < 0)
+        return NULL;
 
-    ret->magic = VIR_CONNECT_MAGIC;
-    ret->driver = NULL;
-    ret->networkDriver = NULL;
-    ret->privateData = NULL;
-    ret->networkPrivateData = NULL;
-    ret->interfacePrivateData = NULL;
+    if (!(ret = virObjectNew(virConnectClass)))
+        return NULL;
 
-    ret->refs = 1;
+    if (!(ret->closeCallback = virObjectNew(virConnectCloseCallbackDataClass)))
+        goto error;
+
+    if (virMutexInit(&ret->lock) < 0)
+        goto error;
+
     return ret;
 
-failed:
-    if (ret != NULL) {
-        virMutexDestroy(&ret->lock);
-        VIR_FREE(ret);
-    }
+ error:
+    virObjectUnref(ret);
     return NULL;
 }
 
 /**
- * virReleaseConnect:
- * @conn: the hypervisor connection to release
+ * virConnectDispose:
+ * @obj: the hypervisor connection to release
  *
  * Unconditionally release all memory associated with a connection.
- * The conn.lock mutex must be held prior to calling this, and will
- * be released prior to this returning. The connection obj must not
- * be used once this method returns.
+ * The connection object must not be used once this method returns.
  */
 static void
-virReleaseConnect(virConnectPtr conn) {
-    VIR_DEBUG("release connection %p", conn);
-
-    /* make sure to release the connection lock before we call the
-     * close callbacks, otherwise we will deadlock if an error
-     * is raised by any of the callbacks */
-    virMutexUnlock(&conn->lock);
+virConnectDispose(void *obj)
+{
+    virConnectPtr conn = obj;
 
     if (conn->networkDriver)
-        conn->networkDriver->close(conn);
+        conn->networkDriver->networkClose(conn);
     if (conn->interfaceDriver)
-        conn->interfaceDriver->close(conn);
+        conn->interfaceDriver->interfaceClose(conn);
     if (conn->storageDriver)
-        conn->storageDriver->close(conn);
-    if (conn->deviceMonitor)
-        conn->deviceMonitor->close(conn);
+        conn->storageDriver->storageClose(conn);
+    if (conn->nodeDeviceDriver)
+        conn->nodeDeviceDriver->nodeDeviceClose(conn);
     if (conn->secretDriver)
-        conn->secretDriver->close(conn);
+        conn->secretDriver->secretClose(conn);
     if (conn->nwfilterDriver)
-        conn->nwfilterDriver->close(conn);
+        conn->nwfilterDriver->nwfilterClose(conn);
     if (conn->driver)
-        conn->driver->close(conn);
+        conn->driver->connectClose(conn);
 
     virMutexLock(&conn->lock);
 
@@ -119,40 +159,38 @@ virReleaseConnect(virConnectPtr conn) {
 
     virURIFree(conn->uri);
 
+    if (conn->closeCallback) {
+        virObjectLock(conn->closeCallback);
+        conn->closeCallback->callback = NULL;
+        virObjectUnlock(conn->closeCallback);
+
+        virObjectUnref(conn->closeCallback);
+    }
+
     virMutexUnlock(&conn->lock);
     virMutexDestroy(&conn->lock);
-    VIR_FREE(conn);
 }
+
 
 /**
- * virUnrefConnect:
- * @conn: the hypervisor connection to unreference
+ * virConnectCloseCallbackDataDispose:
+ * @obj: the close callback data to release
  *
- * Unreference the connection. If the use count drops to zero, the structure is
- * actually freed.
- *
- * Returns the reference count or -1 in case of failure.
+ * Release resources bound to the connection close callback.
  */
-int
-virUnrefConnect(virConnectPtr conn) {
-    int refs;
+static void
+virConnectCloseCallbackDataDispose(void *obj)
+{
+    virConnectCloseCallbackDataPtr cb = obj;
 
-    if ((!VIR_IS_CONNECT(conn))) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("no connection"));
-        return -1;
-    }
-    virMutexLock(&conn->lock);
-    VIR_DEBUG("unref connection %p %d", conn, conn->refs);
-    conn->refs--;
-    refs = conn->refs;
-    if (refs == 0) {
-        virReleaseConnect(conn);
-        /* Already unlocked mutex */
-        return 0;
-    }
-    virMutexUnlock(&conn->lock);
-    return refs;
+    virObjectLock(cb);
+
+    if (cb->freeCallback)
+        cb->freeCallback(cb->opaque);
+
+    virObjectUnlock(cb);
 }
+
 
 /**
  * virGetDomain:
@@ -160,131 +198,63 @@ virUnrefConnect(virConnectPtr conn) {
  * @name: pointer to the domain name
  * @uuid: pointer to the uuid
  *
- * Lookup if the domain is already registered for that connection,
- * if yes return a new pointer to it, if no allocate a new structure,
- * and register it in the table. In any case a corresponding call to
- * virUnrefDomain() is needed to not leak data.
+ * Allocates a new domain object. When the object is no longer needed,
+ * virObjectUnref() must be called in order to not leak data.
  *
- * Returns a pointer to the domain, or NULL in case of failure
+ * Returns a pointer to the domain object, or NULL on error.
  */
 virDomainPtr
-virGetDomain(virConnectPtr conn, const char *name, const unsigned char *uuid) {
+virGetDomain(virConnectPtr conn, const char *name, const unsigned char *uuid)
+{
     virDomainPtr ret = NULL;
-    char uuidstr[VIR_UUID_STRING_BUFLEN];
 
-    if (!VIR_IS_CONNECT(conn)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("no connection"));
+    if (virDataTypesInitialize() < 0)
         return NULL;
-    }
-    if (name == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing name"));
-        return NULL;
-    }
-    if (uuid == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing uuid"));
-        return NULL;
-    }
-    virMutexLock(&conn->lock);
 
-    virUUIDFormat(uuid, uuidstr);
+    virCheckConnectGoto(conn, error);
+    virCheckNonNullArgGoto(name, error);
+    virCheckNonNullArgGoto(uuid, error);
 
-    if (VIR_ALLOC(ret) < 0) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
+    if (!(ret = virObjectNew(virDomainClass)))
         goto error;
-    }
-    ret->name = strdup(name);
-    if (ret->name == NULL) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
+
+    if (VIR_STRDUP(ret->name, name) < 0)
         goto error;
-    }
-    ret->magic = VIR_DOMAIN_MAGIC;
-    ret->conn = conn;
+
+    ret->conn = virObjectRef(conn);
     ret->id = -1;
     memcpy(&(ret->uuid[0]), uuid, VIR_UUID_BUFLEN);
 
-    conn->refs++;
-    ret->refs++;
-    virMutexUnlock(&conn->lock);
     return ret;
 
  error:
-    if (ret != NULL) {
-        VIR_FREE(ret->name);
-        VIR_FREE(ret);
-    }
+    virObjectUnref(ret);
     return NULL;
 }
 
 /**
- * virReleaseDomain:
- * @domain: the domain to release
+ * virDomainDispose:
+ * @obj: the domain to release
  *
  * Unconditionally release all memory associated with a domain.
- * The conn.lock mutex must be held prior to calling this, and will
- * be released prior to this returning. The domain obj must not
- * be used once this method returns.
+ * The domain object must not be used once this method returns.
  *
  * It will also unreference the associated connection object,
  * which may also be released if its ref count hits zero.
  */
 static void
-virReleaseDomain(virDomainPtr domain) {
-    virConnectPtr conn = domain->conn;
+virDomainDispose(void *obj)
+{
+    virDomainPtr domain = obj;
     char uuidstr[VIR_UUID_STRING_BUFLEN];
 
     virUUIDFormat(domain->uuid, uuidstr);
     VIR_DEBUG("release domain %p %s %s", domain, domain->name, uuidstr);
 
-    domain->magic = -1;
-    domain->id = -1;
     VIR_FREE(domain->name);
-    VIR_FREE(domain);
-
-    if (conn) {
-        VIR_DEBUG("unref connection %p %d", conn, conn->refs);
-        conn->refs--;
-        if (conn->refs == 0) {
-            virReleaseConnect(conn);
-            /* Already unlocked mutex */
-            return;
-        }
-        virMutexUnlock(&conn->lock);
-    }
+    virObjectUnref(domain->conn);
 }
 
-
-/**
- * virUnrefDomain:
- * @domain: the domain to unreference
- *
- * Unreference the domain. If the use count drops to zero, the structure is
- * actually freed.
- *
- * Returns the reference count or -1 in case of failure.
- */
-int
-virUnrefDomain(virDomainPtr domain) {
-    int refs;
-
-    if (!VIR_IS_CONNECTED_DOMAIN(domain)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("bad domain or no connection"));
-        return -1;
-    }
-    virMutexLock(&domain->conn->lock);
-    VIR_DEBUG("unref domain %p %s %d", domain, domain->name, domain->refs);
-    domain->refs--;
-    refs = domain->refs;
-    if (refs == 0) {
-        virReleaseDomain(domain);
-        /* Already unlocked mutex */
-        return 0;
-    }
-
-    virMutexUnlock(&domain->conn->lock);
-    return refs;
-}
 
 /**
  * virGetNetwork:
@@ -292,129 +262,60 @@ virUnrefDomain(virDomainPtr domain) {
  * @name: pointer to the network name
  * @uuid: pointer to the uuid
  *
- * Lookup if the network is already registered for that connection,
- * if yes return a new pointer to it, if no allocate a new structure,
- * and register it in the table. In any case a corresponding call to
- * virUnrefNetwork() is needed to not leak data.
+ * Allocates a new network object. When the object is no longer needed,
+ * virObjectUnref() must be called in order to not leak data.
  *
- * Returns a pointer to the network, or NULL in case of failure
+ * Returns a pointer to the network object, or NULL on error.
  */
 virNetworkPtr
-virGetNetwork(virConnectPtr conn, const char *name, const unsigned char *uuid) {
+virGetNetwork(virConnectPtr conn, const char *name, const unsigned char *uuid)
+{
     virNetworkPtr ret = NULL;
-    char uuidstr[VIR_UUID_STRING_BUFLEN];
 
-    if (!VIR_IS_CONNECT(conn)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("no connection"));
+    if (virDataTypesInitialize() < 0)
         return NULL;
-    }
-    if (name == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing name"));
-        return NULL;
-    }
-    if (uuid == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing uuid"));
-        return NULL;
-    }
-    virMutexLock(&conn->lock);
 
-    virUUIDFormat(uuid, uuidstr);
+    virCheckConnectGoto(conn, error);
+    virCheckNonNullArgGoto(name, error);
+    virCheckNonNullArgGoto(uuid, error);
 
-    if (VIR_ALLOC(ret) < 0) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
+    if (!(ret = virObjectNew(virNetworkClass)))
         goto error;
-    }
-    ret->name = strdup(name);
-    if (ret->name == NULL) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
+
+    if (VIR_STRDUP(ret->name, name) < 0)
         goto error;
-    }
-    ret->magic = VIR_NETWORK_MAGIC;
-    ret->conn = conn;
+
+    ret->conn = virObjectRef(conn);
     memcpy(&(ret->uuid[0]), uuid, VIR_UUID_BUFLEN);
 
-    conn->refs++;
-    ret->refs++;
-    virMutexUnlock(&conn->lock);
     return ret;
 
  error:
-    if (ret != NULL) {
-        VIR_FREE(ret->name);
-        VIR_FREE(ret);
-    }
+    virObjectUnref(ret);
     return NULL;
 }
 
 /**
- * virReleaseNetwork:
- * @network: the network to release
+ * virNetworkDispose:
+ * @obj: the network to release
  *
  * Unconditionally release all memory associated with a network.
- * The conn.lock mutex must be held prior to calling this, and will
- * be released prior to this returning. The network obj must not
- * be used once this method returns.
+ * The network object must not be used once this method returns.
  *
  * It will also unreference the associated connection object,
  * which may also be released if its ref count hits zero.
  */
 static void
-virReleaseNetwork(virNetworkPtr network) {
-    virConnectPtr conn = network->conn;
+virNetworkDispose(void *obj)
+{
+    virNetworkPtr network = obj;
     char uuidstr[VIR_UUID_STRING_BUFLEN];
 
     virUUIDFormat(network->uuid, uuidstr);
     VIR_DEBUG("release network %p %s %s", network, network->name, uuidstr);
 
-    network->magic = -1;
     VIR_FREE(network->name);
-    VIR_FREE(network);
-
-    if (conn) {
-        VIR_DEBUG("unref connection %p %d", conn, conn->refs);
-        conn->refs--;
-        if (conn->refs == 0) {
-            virReleaseConnect(conn);
-            /* Already unlocked mutex */
-            return;
-        }
-        virMutexUnlock(&conn->lock);
-    }
-}
-
-
-/**
- * virUnrefNetwork:
- * @network: the network to unreference
- *
- * Unreference the network. If the use count drops to zero, the structure is
- * actually freed.
- *
- * Returns the reference count or -1 in case of failure.
- */
-int
-virUnrefNetwork(virNetworkPtr network) {
-    int refs;
-
-    if (!VIR_IS_CONNECTED_NETWORK(network)) {
-        virLibConnError(VIR_ERR_INVALID_ARG,
-                        _("bad network or no connection"));
-        return -1;
-    }
-    virMutexLock(&network->conn->lock);
-    VIR_DEBUG("unref network %p %s %d", network, network->name, network->refs);
-    network->refs--;
-    refs = network->refs;
-    if (refs == 0) {
-        virReleaseNetwork(network);
-        /* Already unlocked mutex */
-        return 0;
-    }
-
-    virMutexUnlock(&network->conn->lock);
-    return refs;
+    virObjectUnref(network->conn);
 }
 
 
@@ -424,133 +325,61 @@ virUnrefNetwork(virNetworkPtr network) {
  * @name: pointer to the interface name
  * @mac: pointer to the mac
  *
- * Lookup if the interface is already registered for that connection,
- * if yes return a new pointer to it (possibly updating the MAC
- * address), if no allocate a new structure, and register it in the
- * table. In any case a corresponding call to virUnrefInterface() is
- * needed to not leak data.
+ * Allocates a new interface object. When the object is no longer needed,
+ * virObjectUnref() must be called in order to not leak data.
  *
- * Returns a pointer to the interface, or NULL in case of failure
+ * Returns a pointer to the interface object, or NULL on error.
  */
 virInterfacePtr
-virGetInterface(virConnectPtr conn, const char *name, const char *mac) {
+virGetInterface(virConnectPtr conn, const char *name, const char *mac)
+{
     virInterfacePtr ret = NULL;
 
-    if (!VIR_IS_CONNECT(conn)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("no connection"));
+    if (virDataTypesInitialize() < 0)
         return NULL;
-    }
-    if (name == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing name"));
-        return NULL;
-    }
+
+    virCheckConnectGoto(conn, error);
+    virCheckNonNullArgGoto(name, error);
 
     /* a NULL mac from caller is okay. Treat it as blank */
     if (mac == NULL)
        mac = "";
 
-    virMutexLock(&conn->lock);
-
-    if (VIR_ALLOC(ret) < 0) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
+    if (!(ret = virObjectNew(virInterfaceClass)))
         goto error;
-    }
-    ret->name = strdup(name);
-    if (ret->name == NULL) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
-        goto error;
-    }
-    ret->mac = strdup(mac);
-    if (ret->mac == NULL) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
-        goto error;
-    }
 
-    ret->magic = VIR_INTERFACE_MAGIC;
-    ret->conn = conn;
+    if (VIR_STRDUP(ret->name, name) < 0 ||
+        VIR_STRDUP(ret->mac, mac) < 0)
+        goto error;
 
-    conn->refs++;
-    ret->refs++;
-    virMutexUnlock(&conn->lock);
+    ret->conn = virObjectRef(conn);
+
     return ret;
 
  error:
-    if (ret != NULL) {
-        VIR_FREE(ret->name);
-        VIR_FREE(ret->mac);
-        VIR_FREE(ret);
-    }
+    virObjectUnref(ret);
     return NULL;
 }
 
 /**
- * virReleaseInterface:
- * @interface: the interface to release
+ * virInterfaceDispose:
+ * @obj: the interface to release
  *
  * Unconditionally release all memory associated with an interface.
- * The conn.lock mutex must be held prior to calling this, and will
- * be released prior to this returning. The interface obj must not
- * be used once this method returns.
+ * The interface object must not be used once this method returns.
  *
  * It will also unreference the associated connection object,
  * which may also be released if its ref count hits zero.
  */
 static void
-virReleaseInterface(virInterfacePtr iface) {
-    virConnectPtr conn = iface->conn;
+virInterfaceDispose(void *obj)
+{
+    virInterfacePtr iface = obj;
     VIR_DEBUG("release interface %p %s", iface, iface->name);
 
-    iface->magic = -1;
     VIR_FREE(iface->name);
     VIR_FREE(iface->mac);
-    VIR_FREE(iface);
-
-    if (conn) {
-        VIR_DEBUG("unref connection %p %d", conn, conn->refs);
-        conn->refs--;
-        if (conn->refs == 0) {
-            virReleaseConnect(conn);
-            /* Already unlocked mutex */
-            return;
-        }
-        virMutexUnlock(&conn->lock);
-    }
-}
-
-
-/**
- * virUnrefInterface:
- * @interface: the interface to unreference
- *
- * Unreference the interface. If the use count drops to zero, the structure is
- * actually freed.
- *
- * Returns the reference count or -1 in case of failure.
- */
-int
-virUnrefInterface(virInterfacePtr iface) {
-    int refs;
-
-    if (!VIR_IS_CONNECTED_INTERFACE(iface)) {
-        virLibConnError(VIR_ERR_INVALID_ARG,
-                        _("bad interface or no connection"));
-        return -1;
-    }
-    virMutexLock(&iface->conn->lock);
-    VIR_DEBUG("unref interface %p %s %d", iface, iface->name, iface->refs);
-    iface->refs--;
-    refs = iface->refs;
-    if (refs == 0) {
-        virReleaseInterface(iface);
-        /* Already unlocked mutex */
-        return 0;
-    }
-
-    virMutexUnlock(&iface->conn->lock);
-    return refs;
+    virObjectUnref(iface->conn);
 }
 
 
@@ -559,132 +388,74 @@ virUnrefInterface(virInterfacePtr iface) {
  * @conn: the hypervisor connection
  * @name: pointer to the storage pool name
  * @uuid: pointer to the uuid
+ * @privateData: pointer to driver specific private data
+ * @freeFunc: private data cleanup function pointer specfic to driver
  *
- * Lookup if the storage pool is already registered for that connection,
- * if yes return a new pointer to it, if no allocate a new structure,
- * and register it in the table. In any case a corresponding call to
- * virUnrefStoragePool() is needed to not leak data.
+ * Allocates a new storage pool object. When the object is no longer needed,
+ * virObjectUnref() must be called in order to not leak data.
  *
- * Returns a pointer to the network, or NULL in case of failure
+ * Returns a pointer to the storage pool object, or NULL on error.
  */
 virStoragePoolPtr
 virGetStoragePool(virConnectPtr conn, const char *name,
-                  const unsigned char *uuid) {
+                  const unsigned char *uuid,
+                  void *privateData, virFreeCallback freeFunc)
+{
     virStoragePoolPtr ret = NULL;
-    char uuidstr[VIR_UUID_STRING_BUFLEN];
 
-    if (!VIR_IS_CONNECT(conn)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("no connection"));
+    if (virDataTypesInitialize() < 0)
         return NULL;
-    }
-    if (name == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing name"));
-        return NULL;
-    }
-    if (uuid == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing uuid"));
-        return NULL;
-    }
-    virMutexLock(&conn->lock);
 
-    virUUIDFormat(uuid, uuidstr);
+    virCheckConnectGoto(conn, error);
+    virCheckNonNullArgGoto(name, error);
+    virCheckNonNullArgGoto(uuid, error);
 
-    if (VIR_ALLOC(ret) < 0) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
+    if (!(ret = virObjectNew(virStoragePoolClass)))
         goto error;
-    }
-    ret->name = strdup(name);
-    if (ret->name == NULL) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
+
+    if (VIR_STRDUP(ret->name, name) < 0)
         goto error;
-    }
-    ret->magic = VIR_STORAGE_POOL_MAGIC;
-    ret->conn = conn;
+
+    ret->conn = virObjectRef(conn);
     memcpy(&(ret->uuid[0]), uuid, VIR_UUID_BUFLEN);
 
-    conn->refs++;
-    ret->refs++;
-    virMutexUnlock(&conn->lock);
+    /* set the driver specific data */
+    ret->privateData = privateData;
+    ret->privateDataFreeFunc = freeFunc;
+
     return ret;
 
-error:
-    if (ret != NULL) {
-        VIR_FREE(ret->name);
-        VIR_FREE(ret);
-    }
+ error:
+    virObjectUnref(ret);
     return NULL;
 }
 
 
 /**
- * virReleaseStoragePool:
- * @pool: the pool to release
+ * virStoragePoolDispose:
+ * @obj: the storage pool to release
  *
  * Unconditionally release all memory associated with a pool.
- * The conn.lock mutex must be held prior to calling this, and will
- * be released prior to this returning. The pool obj must not
- * be used once this method returns.
+ * The pool object must not be used once this method returns.
  *
  * It will also unreference the associated connection object,
  * which may also be released if its ref count hits zero.
  */
 static void
-virReleaseStoragePool(virStoragePoolPtr pool) {
-    virConnectPtr conn = pool->conn;
+virStoragePoolDispose(void *obj)
+{
+    virStoragePoolPtr pool = obj;
     char uuidstr[VIR_UUID_STRING_BUFLEN];
 
     virUUIDFormat(pool->uuid, uuidstr);
     VIR_DEBUG("release pool %p %s %s", pool, pool->name, uuidstr);
 
-    pool->magic = -1;
+    if (pool->privateDataFreeFunc) {
+        pool->privateDataFreeFunc(pool->privateData);
+    }
+
     VIR_FREE(pool->name);
-    VIR_FREE(pool);
-
-    if (conn) {
-        VIR_DEBUG("unref connection %p %d", conn, conn->refs);
-        conn->refs--;
-        if (conn->refs == 0) {
-            virReleaseConnect(conn);
-            /* Already unlocked mutex */
-            return;
-        }
-        virMutexUnlock(&conn->lock);
-    }
-}
-
-
-/**
- * virUnrefStoragePool:
- * @pool: the pool to unreference
- *
- * Unreference the pool. If the use count drops to zero, the structure is
- * actually freed.
- *
- * Returns the reference count or -1 in case of failure.
- */
-int
-virUnrefStoragePool(virStoragePoolPtr pool) {
-    int refs;
-
-    if (!VIR_IS_CONNECTED_STORAGE_POOL(pool)) {
-        virLibConnError(VIR_ERR_INVALID_ARG,
-                        _("bad storage pool or no connection"));
-        return -1;
-    }
-    virMutexLock(&pool->conn->lock);
-    VIR_DEBUG("unref pool %p %s %d", pool, pool->name, pool->refs);
-    pool->refs--;
-    refs = pool->refs;
-    if (refs == 0) {
-        virReleaseStoragePool(pool);
-        /* Already unlocked mutex */
-        return 0;
-    }
-
-    virMutexUnlock(&pool->conn->lock);
-    return refs;
+    virObjectUnref(pool->conn);
 }
 
 
@@ -694,141 +465,74 @@ virUnrefStoragePool(virStoragePoolPtr pool) {
  * @pool: pool owning the volume
  * @name: pointer to the storage vol name
  * @key: pointer to unique key of the volume
+ * @privateData: pointer to driver specific private data
+ * @freeFunc: private data cleanup function pointer specfic to driver
  *
- * Lookup if the storage vol is already registered for that connection,
- * if yes return a new pointer to it, if no allocate a new structure,
- * and register it in the table. In any case a corresponding call to
- * virUnrefStorageVol() is needed to not leak data.
+ * Allocates a new storage volume object. When the object is no longer needed,
+ * virObjectUnref() must be called in order to not leak data.
  *
- * Returns a pointer to the storage vol, or NULL in case of failure
+ * Returns a pointer to the storage volume object, or NULL on error.
  */
 virStorageVolPtr
 virGetStorageVol(virConnectPtr conn, const char *pool, const char *name,
-                 const char *key) {
+                 const char *key, void *privateData, virFreeCallback freeFunc)
+{
     virStorageVolPtr ret = NULL;
 
-    if (!VIR_IS_CONNECT(conn)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("no connection"));
+    if (virDataTypesInitialize() < 0)
         return NULL;
-    }
-    if (name == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing name"));
-        return NULL;
-    }
-    if (key == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing key"));
-        return NULL;
-    }
-    virMutexLock(&conn->lock);
 
-    if (VIR_ALLOC(ret) < 0) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
-        goto error;
-    }
-    ret->pool = strdup(pool);
-    if (ret->pool == NULL) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
-        goto error;
-    }
-    ret->name = strdup(name);
-    if (ret->name == NULL) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
-        goto error;
-    }
-    ret->key = strdup(key);
-    if (ret->key == NULL) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
-        goto error;
-    }
-    ret->magic = VIR_STORAGE_VOL_MAGIC;
-    ret->conn = conn;
+    virCheckConnectGoto(conn, error);
+    virCheckNonNullArgGoto(pool, error);
+    virCheckNonNullArgGoto(name, error);
+    virCheckNonNullArgGoto(key, error);
 
-    conn->refs++;
-    ret->refs++;
-    virMutexUnlock(&conn->lock);
+    if (!(ret = virObjectNew(virStorageVolClass)))
+        goto error;
+
+    if (VIR_STRDUP(ret->pool, pool) < 0 ||
+        VIR_STRDUP(ret->name, name) < 0 ||
+        VIR_STRDUP(ret->key, key) < 0)
+        goto error;
+
+    ret->conn = virObjectRef(conn);
+
+    /* set driver specific data */
+    ret->privateData = privateData;
+    ret->privateDataFreeFunc = freeFunc;
+
     return ret;
 
-error:
-    if (ret != NULL) {
-        VIR_FREE(ret->key);
-        VIR_FREE(ret->name);
-        VIR_FREE(ret->pool);
-        VIR_FREE(ret);
-    }
+ error:
+    virObjectUnref(ret);
     return NULL;
 }
 
 
 /**
- * virReleaseStorageVol:
- * @vol: the vol to release
+ * virStorageVolDispose:
+ * @obj: the storage volume to release
  *
- * Unconditionally release all memory associated with a vol.
- * The conn.lock mutex must be held prior to calling this, and will
- * be released prior to this returning. The vol obj must not
- * be used once this method returns.
+ * Unconditionally release all memory associated with a volume.
+ * The volume object must not be used once this method returns.
  *
  * It will also unreference the associated connection object,
  * which may also be released if its ref count hits zero.
  */
 static void
-virReleaseStorageVol(virStorageVolPtr vol) {
-    virConnectPtr conn = vol->conn;
+virStorageVolDispose(void *obj)
+{
+    virStorageVolPtr vol = obj;
     VIR_DEBUG("release vol %p %s", vol, vol->name);
 
-    vol->magic = -1;
+    if (vol->privateDataFreeFunc) {
+        vol->privateDataFreeFunc(vol->privateData);
+    }
+
     VIR_FREE(vol->key);
     VIR_FREE(vol->name);
     VIR_FREE(vol->pool);
-    VIR_FREE(vol);
-
-    if (conn) {
-        VIR_DEBUG("unref connection %p %d", conn, conn->refs);
-        conn->refs--;
-        if (conn->refs == 0) {
-            virReleaseConnect(conn);
-            /* Already unlocked mutex */
-            return;
-        }
-        virMutexUnlock(&conn->lock);
-    }
-}
-
-
-/**
- * virUnrefStorageVol:
- * @vol: the vol to unreference
- *
- * Unreference the vol. If the use count drops to zero, the structure is
- * actually freed.
- *
- * Returns the reference count or -1 in case of failure.
- */
-int
-virUnrefStorageVol(virStorageVolPtr vol) {
-    int refs;
-
-    if (!VIR_IS_CONNECTED_STORAGE_VOL(vol)) {
-        virLibConnError(VIR_ERR_INVALID_ARG,
-                        _("bad storage volume or no connection"));
-        return -1;
-    }
-    virMutexLock(&vol->conn->lock);
-    VIR_DEBUG("unref vol %p %s %d", vol, vol->name, vol->refs);
-    vol->refs--;
-    refs = vol->refs;
-    if (refs == 0) {
-        virReleaseStorageVol(vol);
-        /* Already unlocked mutex */
-        return 0;
-    }
-
-    virMutexUnlock(&vol->conn->lock);
-    return refs;
+    virObjectUnref(vol->conn);
 }
 
 
@@ -837,116 +541,57 @@ virUnrefStorageVol(virStorageVolPtr vol) {
  * @conn: the hypervisor connection
  * @name: device name (unique on node)
  *
- * Lookup if the device is already registered for that connection,
- * if yes return a new pointer to it, if no allocate a new structure,
- * and register it in the table. In any case a corresponding call to
- * virUnrefNodeDevice() is needed to not leak data.
+ * Allocates a new node device object. When the object is no longer needed,
+ * virObjectUnref() must be called in order to not leak data.
  *
- * Returns a pointer to the node device, or NULL in case of failure
+ * Returns a pointer to the node device object, or NULL on error.
  */
 virNodeDevicePtr
 virGetNodeDevice(virConnectPtr conn, const char *name)
 {
     virNodeDevicePtr ret = NULL;
 
-    if (!VIR_IS_CONNECT(conn)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("no connection"));
+    if (virDataTypesInitialize() < 0)
         return NULL;
-    }
-    if (name == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing name"));
-        return NULL;
-    }
-    virMutexLock(&conn->lock);
 
-    if (VIR_ALLOC(ret) < 0) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
-        goto error;
-    }
-    ret->magic = VIR_NODE_DEVICE_MAGIC;
-    ret->conn = conn;
-    ret->name = strdup(name);
-    if (ret->name == NULL) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
-        goto error;
-    }
+    virCheckConnectGoto(conn, error);
+    virCheckNonNullArgGoto(name, error);
 
-    conn->refs++;
-    ret->refs++;
-    virMutexUnlock(&conn->lock);
+    if (!(ret = virObjectNew(virNodeDeviceClass)))
+        goto error;
+
+    if (VIR_STRDUP(ret->name, name) < 0)
+        goto error;
+
+    ret->conn = virObjectRef(conn);
     return ret;
 
-error:
-    if (ret != NULL) {
-        VIR_FREE(ret->name);
-        VIR_FREE(ret);
-    }
+ error:
+    virObjectUnref(ret);
     return NULL;
 }
 
 
 /**
- * virReleaseNodeDevice:
- * @dev: the dev to release
+ * virNodeDeviceDispose:
+ * @obj: the node device to release
  *
- * Unconditionally release all memory associated with a dev.
- * The conn.lock mutex must be held prior to calling this, and will
- * be released prior to this returning. The dev obj must not
- * be used once this method returns.
+ * Unconditionally release all memory associated with a device.
+ * The device object must not be used once this method returns.
  *
  * It will also unreference the associated connection object,
  * which may also be released if its ref count hits zero.
  */
 static void
-virReleaseNodeDevice(virNodeDevicePtr dev) {
-    virConnectPtr conn = dev->conn;
+virNodeDeviceDispose(void *obj)
+{
+    virNodeDevicePtr dev = obj;
     VIR_DEBUG("release dev %p %s", dev, dev->name);
 
-    dev->magic = -1;
     VIR_FREE(dev->name);
     VIR_FREE(dev->parent);
-    VIR_FREE(dev);
 
-    if (conn) {
-        VIR_DEBUG("unref connection %p %d", conn, conn->refs);
-        conn->refs--;
-        if (conn->refs == 0) {
-            virReleaseConnect(conn);
-            /* Already unlocked mutex */
-            return;
-        }
-        virMutexUnlock(&conn->lock);
-    }
-}
-
-
-/**
- * virUnrefNodeDevice:
- * @dev: the dev to unreference
- *
- * Unreference the dev. If the use count drops to zero, the structure is
- * actually freed.
- *
- * Returns the reference count or -1 in case of failure.
- */
-int
-virUnrefNodeDevice(virNodeDevicePtr dev) {
-    int refs;
-
-    virMutexLock(&dev->conn->lock);
-    VIR_DEBUG("unref dev %p %s %d", dev, dev->name, dev->refs);
-    dev->refs--;
-    refs = dev->refs;
-    if (refs == 0) {
-        virReleaseNodeDevice(dev);
-        /* Already unlocked mutex */
-        return 0;
-    }
-
-    virMutexUnlock(&dev->conn->lock);
-    return refs;
+    virObjectUnref(dev->conn);
 }
 
 
@@ -955,185 +600,107 @@ virUnrefNodeDevice(virNodeDevicePtr dev) {
  * @conn: the hypervisor connection
  * @uuid: secret UUID
  *
- * Lookup if the secret is already registered for that connection, if so return
- * a pointer to it, otherwise allocate a new structure, and register it in the
- * table. In any case a corresponding call to virUnrefSecret() is needed to not
- * leak data.
+ * Allocates a new secret object. When the object is no longer needed,
+ * virObjectUnref() must be called in order to not leak data.
  *
- * Returns a pointer to the secret, or NULL in case of failure
+ * Returns a pointer to the secret object, or NULL on error.
  */
 virSecretPtr
 virGetSecret(virConnectPtr conn, const unsigned char *uuid,
              int usageType, const char *usageID)
 {
     virSecretPtr ret = NULL;
-    char uuidstr[VIR_UUID_STRING_BUFLEN];
 
-    if (!VIR_IS_CONNECT(conn)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("no connection"));
+    if (virDataTypesInitialize() < 0)
         return NULL;
-    }
-    if (uuid == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing uuid"));
-        return NULL;
-    }
-    if (usageID == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing usageID"));
-        return NULL;
-    }
-    virMutexLock(&conn->lock);
 
-    virUUIDFormat(uuid, uuidstr);
+    virCheckConnectGoto(conn, error);
+    virCheckNonNullArgGoto(uuid, error);
+    virCheckNonNullArgGoto(usageID, error);
 
-    if (VIR_ALLOC(ret) < 0) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
-        goto error;
-    }
-    ret->magic = VIR_SECRET_MAGIC;
-    ret->conn = conn;
+    if (!(ret = virObjectNew(virSecretClass)))
+        return NULL;
+
     memcpy(&(ret->uuid[0]), uuid, VIR_UUID_BUFLEN);
     ret->usageType = usageType;
-    if (!(ret->usageID = strdup(usageID))) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
+    if (VIR_STRDUP(ret->usageID, usageID) < 0)
         goto error;
-    }
-    conn->refs++;
-    ret->refs++;
-    virMutexUnlock(&conn->lock);
+
+    ret->conn = virObjectRef(conn);
+
     return ret;
 
-error:
-    if (ret != NULL) {
-        VIR_FREE(ret->usageID);
-        VIR_FREE(ret);
-    }
+ error:
+    virObjectUnref(ret);
     return NULL;
 }
 
 /**
- * virReleaseSecret:
- * @secret: the secret to release
+ * virSecretDispose:
+ * @obj: the secret to release
  *
- * Unconditionally release all memory associated with a secret.  The conn.lock
- * mutex must be held prior to calling this, and will be released prior to this
- * returning. The secret obj must not be used once this method returns.
+ * Unconditionally release all memory associated with a secret.
+ * The secret object must not be used once this method returns.
  *
- * It will also unreference the associated connection object, which may also be
- * released if its ref count hits zero.
+ * It will also unreference the associated connection object,
+ * which may also be released if its ref count hits zero.
  */
 static void
-virReleaseSecret(virSecretPtr secret) {
-    virConnectPtr conn = secret->conn;
+virSecretDispose(void *obj)
+{
+    virSecretPtr secret = obj;
     char uuidstr[VIR_UUID_STRING_BUFLEN];
 
     virUUIDFormat(secret->uuid, uuidstr);
     VIR_DEBUG("release secret %p %s", secret, uuidstr);
 
     VIR_FREE(secret->usageID);
-    secret->magic = -1;
-    VIR_FREE(secret);
+    virObjectUnref(secret->conn);
+}
 
-    if (conn) {
-        VIR_DEBUG("unref connection %p %d", conn, conn->refs);
-        conn->refs--;
-        if (conn->refs == 0) {
-            virReleaseConnect(conn);
-            /* Already unlocked mutex */
-            return;
-        }
-        virMutexUnlock(&conn->lock);
-    }
+
+/**
+ * virGetStream:
+ * @conn: the hypervisor connection
+ *
+ * Allocates a new stream object. When the object is no longer needed,
+ * virObjectUnref() must be called in order to not leak data.
+ *
+ * Returns a pointer to the stream object, or NULL on error.
+ */
+virStreamPtr
+virGetStream(virConnectPtr conn)
+{
+    virStreamPtr ret = NULL;
+
+    if (virDataTypesInitialize() < 0)
+        return NULL;
+
+    if (!(ret = virObjectNew(virStreamClass)))
+        return NULL;
+
+    ret->conn = virObjectRef(conn);
+
+    return ret;
 }
 
 /**
- * virUnrefSecret:
- * @secret: the secret to unreference
+ * virStreamDispose:
+ * @obj: the stream to release
  *
- * Unreference the secret. If the use count drops to zero, the structure is
- * actually freed.
+ * Unconditionally release all memory associated with a stream.
+ * The stream object must not be used once this method returns.
  *
- * Returns the reference count or -1 in case of failure.
+ * It will also unreference the associated connection object,
+ * which may also be released if its ref count hits zero.
  */
-int
-virUnrefSecret(virSecretPtr secret) {
-    int refs;
-
-    if (!VIR_IS_CONNECTED_SECRET(secret)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("bad secret or no connection"));
-        return -1;
-    }
-    virMutexLock(&secret->conn->lock);
-    VIR_DEBUG("unref secret %p %p %d", secret, secret->uuid, secret->refs);
-    secret->refs--;
-    refs = secret->refs;
-    if (refs == 0) {
-        virReleaseSecret(secret);
-        /* Already unlocked mutex */
-        return 0;
-    }
-
-    virMutexUnlock(&secret->conn->lock);
-    return refs;
-}
-
-virStreamPtr virGetStream(virConnectPtr conn) {
-    virStreamPtr ret = NULL;
-
-    virMutexLock(&conn->lock);
-
-    if (VIR_ALLOC(ret) < 0) {
-        virReportOOMError();
-        goto error;
-    }
-    ret->magic = VIR_STREAM_MAGIC;
-    ret->conn = conn;
-    conn->refs++;
-    ret->refs++;
-    virMutexUnlock(&conn->lock);
-    return ret;
-
-error:
-    virMutexUnlock(&conn->lock);
-    VIR_FREE(ret);
-    return NULL;
-}
-
 static void
-virReleaseStream(virStreamPtr st) {
-    virConnectPtr conn = st->conn;
+virStreamDispose(void *obj)
+{
+    virStreamPtr st = obj;
     VIR_DEBUG("release dev %p", st);
 
-    st->magic = -1;
-    VIR_FREE(st);
-
-    VIR_DEBUG("unref connection %p %d", conn, conn->refs);
-    conn->refs--;
-    if (conn->refs == 0) {
-        virReleaseConnect(conn);
-        /* Already unlocked mutex */
-        return;
-    }
-
-    virMutexUnlock(&conn->lock);
-}
-
-int virUnrefStream(virStreamPtr st) {
-    int refs;
-
-    virMutexLock(&st->conn->lock);
-    VIR_DEBUG("unref stream %p %d", st, st->refs);
-    st->refs--;
-    refs = st->refs;
-    if (refs == 0) {
-        virReleaseStream(st);
-        /* Already unlocked mutex */
-        return 0;
-    }
-
-    virMutexUnlock(&st->conn->lock);
-    return refs;
+    virObjectUnref(st->conn);
 }
 
 
@@ -1143,221 +710,118 @@ int virUnrefStream(virStreamPtr st) {
  * @name: pointer to the network filter pool name
  * @uuid: pointer to the uuid
  *
- * Lookup if the network filter is already registered for that connection,
- * if yes return a new pointer to it, if no allocate a new structure,
- * and register it in the table. In any case a corresponding call to
- * virUnrefNWFilter() is needed to not leak data.
+ * Allocates a new network filter object. When the object is no longer needed,
+ * virObjectUnref() must be called in order to not leak data.
  *
- * Returns a pointer to the network, or NULL in case of failure
+ * Returns a pointer to the network filter object, or NULL on error.
  */
 virNWFilterPtr
-virGetNWFilter(virConnectPtr conn, const char *name, const unsigned char *uuid) {
+virGetNWFilter(virConnectPtr conn, const char *name,
+               const unsigned char *uuid)
+{
     virNWFilterPtr ret = NULL;
-    char uuidstr[VIR_UUID_STRING_BUFLEN];
 
-    if (!VIR_IS_CONNECT(conn)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("no connection"));
+    if (virDataTypesInitialize() < 0)
         return NULL;
-    }
-    if (name == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing name"));
-        return NULL;
-    }
-    if (uuid == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing uuid"));
-        return NULL;
-    }
-    virMutexLock(&conn->lock);
 
-    virUUIDFormat(uuid, uuidstr);
+    virCheckConnectGoto(conn, error);
+    virCheckNonNullArgGoto(name, error);
+    virCheckNonNullArgGoto(uuid, error);
 
-    if (VIR_ALLOC(ret) < 0) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
+    if (!(ret = virObjectNew(virNWFilterClass)))
         goto error;
-    }
-    ret->name = strdup(name);
-    if (ret->name == NULL) {
-        virMutexUnlock(&conn->lock);
-        virReportOOMError();
+
+    if (VIR_STRDUP(ret->name, name) < 0)
         goto error;
-    }
-    ret->magic = VIR_NWFILTER_MAGIC;
-    ret->conn = conn;
+
     memcpy(&(ret->uuid[0]), uuid, VIR_UUID_BUFLEN);
 
-    conn->refs++;
-    ret->refs++;
-    virMutexUnlock(&conn->lock);
+    ret->conn = virObjectRef(conn);
+
     return ret;
 
-error:
-    if (ret != NULL) {
-        VIR_FREE(ret->name);
-        VIR_FREE(ret);
-    }
+ error:
+    virObjectUnref(ret);
     return NULL;
 }
 
 
 /**
- * virReleaseNWFilter:
- * @nwfilter: the nwfilter to release
+ * virNWFilterDispose:
+ * @obj: the network filter to release
  *
  * Unconditionally release all memory associated with a nwfilter.
- * The conn.lock mutex must be held prior to calling this, and will
- * be released prior to this returning. The nwfilter obj must not
- * be used once this method returns.
+ * The nwfilter object must not be used once this method returns.
  *
  * It will also unreference the associated connection object,
  * which may also be released if its ref count hits zero.
  */
 static void
-virReleaseNWFilter(virNWFilterPtr nwfilter)
+virNWFilterDispose(void *obj)
 {
-    virConnectPtr conn = nwfilter->conn;
+    virNWFilterPtr nwfilter = obj;
     char uuidstr[VIR_UUID_STRING_BUFLEN];
 
     virUUIDFormat(nwfilter->uuid, uuidstr);
     VIR_DEBUG("release nwfilter %p %s %s", nwfilter, nwfilter->name, uuidstr);
 
-    nwfilter->magic = -1;
     VIR_FREE(nwfilter->name);
-    VIR_FREE(nwfilter);
-
-    if (conn) {
-        VIR_DEBUG("unref connection %p %d", conn, conn->refs);
-        conn->refs--;
-        if (conn->refs == 0) {
-            virReleaseConnect(conn);
-            /* Already unlocked mutex */
-            return;
-        }
-        virMutexUnlock(&conn->lock);
-    }
+    virObjectUnref(nwfilter->conn);
 }
 
 
 /**
- * virUnrefNWFilter:
- * @nwfilter: the nwfilter to unreference
+ * virGetDomainSnapshot:
+ * @domain: the domain to snapshot
+ * @name: pointer to the domain snapshot name
  *
- * Unreference the networkf itler. If the use count drops to zero, the
- * structure is actually freed.
+ * Allocates a new domain snapshot object. When the object is no longer needed,
+ * virObjectUnref() must be called in order to not leak data.
  *
- * Returns the reference count or -1 in case of failure.
+ * Returns a pointer to the domain snapshot object, or NULL on error.
  */
-int
-virUnrefNWFilter(virNWFilterPtr nwfilter)
-{
-    int refs;
-
-    if (!VIR_IS_CONNECTED_NWFILTER(nwfilter)) {
-        virLibConnError(VIR_ERR_INVALID_ARG,
-                        _("bad nwfilter or no connection"));
-        return -1;
-    }
-    virMutexLock(&nwfilter->conn->lock);
-    VIR_DEBUG("unref nwfilter %p %s %d", nwfilter, nwfilter->name,
-              nwfilter->refs);
-    nwfilter->refs--;
-    refs = nwfilter->refs;
-    if (refs == 0) {
-        virReleaseNWFilter(nwfilter);
-        /* Already unlocked mutex */
-        return 0;
-    }
-
-    virMutexUnlock(&nwfilter->conn->lock);
-    return refs;
-}
-
-
 virDomainSnapshotPtr
 virGetDomainSnapshot(virDomainPtr domain, const char *name)
 {
     virDomainSnapshotPtr ret = NULL;
 
-    if (!VIR_IS_DOMAIN(domain)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("bad domain"));
+    if (virDataTypesInitialize() < 0)
         return NULL;
-    }
-    if (name == NULL) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("missing name"));
-        return NULL;
-    }
-    virMutexLock(&domain->conn->lock);
 
-    if (VIR_ALLOC(ret) < 0) {
-        virMutexUnlock(&domain->conn->lock);
-        virReportOOMError();
-        goto error;
-    }
-    ret->name = strdup(name);
-    if (ret->name == NULL) {
-        virMutexUnlock(&domain->conn->lock);
-        virReportOOMError();
-        goto error;
-    }
-    ret->magic = VIR_SNAPSHOT_MAGIC;
-    ret->domain = domain;
+    virCheckDomainGoto(domain, error);
+    virCheckNonNullArgGoto(name, error);
 
-    domain->refs++;
-    ret->refs++;
-    virMutexUnlock(&domain->conn->lock);
+    if (!(ret = virObjectNew(virDomainSnapshotClass)))
+        goto error;
+    if (VIR_STRDUP(ret->name, name) < 0)
+        goto error;
+
+    ret->domain = virObjectRef(domain);
+
     return ret;
 
  error:
-    if (ret != NULL) {
-        VIR_FREE(ret->name);
-        VIR_FREE(ret);
-    }
+    virObjectUnref(ret);
     return NULL;
 }
 
 
+/**
+ * virDomainSnapshotDispose:
+ * @obj: the domain snapshot to release
+ *
+ * Unconditionally release all memory associated with a snapshot.
+ * The snapshot object must not be used once this method returns.
+ *
+ * It will also unreference the associated connection object,
+ * which may also be released if its ref count hits zero.
+ */
 static void
-virReleaseDomainSnapshot(virDomainSnapshotPtr snapshot)
+virDomainSnapshotDispose(void *obj)
 {
-    virDomainPtr domain = snapshot->domain;
+    virDomainSnapshotPtr snapshot = obj;
     VIR_DEBUG("release snapshot %p %s", snapshot, snapshot->name);
 
-    snapshot->magic = -1;
     VIR_FREE(snapshot->name);
-    VIR_FREE(snapshot);
-
-    if (domain) {
-        VIR_DEBUG("unref domain %p %d", domain, domain->refs);
-        domain->refs--;
-        if (domain->refs == 0) {
-            virReleaseDomain(domain);
-            /* Already unlocked mutex */
-            return;
-        }
-        virMutexUnlock(&domain->conn->lock);
-    }
-}
-
-int
-virUnrefDomainSnapshot(virDomainSnapshotPtr snapshot)
-{
-    int refs;
-
-    if (!VIR_IS_DOMAIN_SNAPSHOT(snapshot)) {
-        virLibConnError(VIR_ERR_INVALID_ARG, _("not a snapshot"));
-        return -1;
-    }
-
-    virMutexLock(&snapshot->domain->conn->lock);
-    VIR_DEBUG("unref snapshot %p %s %d", snapshot, snapshot->name, snapshot->refs);
-    snapshot->refs--;
-    refs = snapshot->refs;
-    if (refs == 0) {
-        virReleaseDomainSnapshot(snapshot);
-        /* Already unlocked mutex */
-        return 0;
-    }
-
-    virMutexUnlock(&snapshot->domain->conn->lock);
-    return refs;
+    virObjectUnref(snapshot->domain);
 }

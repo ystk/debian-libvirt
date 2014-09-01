@@ -1,4 +1,4 @@
-From: =?UTF-8?q?Andreas=20Bie=C3=9Fmann?= <biessmann@corscience.de>
+From: =?utf-8?q?Andreas_Bie=C3=9Fmann?= <biessmann@corscience.de>
 Date: Thu, 18 Mar 2010 13:05:59 +0100
 Subject: patch qemuMonitorTextGetMigrationStatus to intercept unknown command
  'info migrate'
@@ -38,27 +38,27 @@ info migration  -- show migration information
 This patch triggers for 'info migration' in reply to 'info migrate' command
 to savely detect that the command 'info migrate' is not implemented.
 ---
- src/qemu/qemu_monitor_text.c |   10 +++++++++-
+ src/qemu/qemu_monitor_text.c | 10 +++++++++-
  1 file changed, 9 insertions(+), 1 deletion(-)
 
 diff --git a/src/qemu/qemu_monitor_text.c b/src/qemu/qemu_monitor_text.c
-index 9e2991b..96539b5 100644
+index fc54a11..0ddc5a9 100644
 --- a/src/qemu/qemu_monitor_text.c
 +++ b/src/qemu/qemu_monitor_text.c
-@@ -1654,7 +1654,15 @@ int qemuMonitorTextGetMigrationStatus(qemuMonitorPtr mon,
+@@ -1543,7 +1543,15 @@ int qemuMonitorTextGetMigrationStatus(qemuMonitorPtr mon,
              }
-             *total += disk_total * 1024;
+             status->disk_total *= 1024;
          }
 -    }
 +    } else if (strstr(reply, "info migration") != NULL) {
 +        /* 'info migrate' returned help for info commands and the help page
 +         * advertises 'info migration' command. Therefore we have an old
 +         * command implementation installed and this must be kvm 72 on debian */
-+        qemuReportError(VIR_ERR_INTERNAL_ERROR,
++        virReportError(VIR_ERR_INTERNAL_ERROR,
 +                        _("command 'info migrate' is not implemented in kvm,"
 +                          " please update to qemu-kvm"));
 +        goto cleanup;
 +   }
  
- done:
+  done:
      ret = 0;

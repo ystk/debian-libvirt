@@ -1,5 +1,7 @@
 #!/bin/sh
 
+(xmllint --version) >/dev/null 2>&1 || skip_test_ 'Missing xmllint'
+
 check_schema () {
 
 DIRS=$1
@@ -19,6 +21,12 @@ do
     cmd="xmllint --relaxng $SCHEMA --noout $xml"
     result=`$cmd 2>&1`
     ret=$?
+
+    # Alter ret if error was expected.
+    case $xml:$ret in
+        *-invalid.xml:[34]) ret=0 ;;
+        *-invalid.xml:0)    ret=3 ;;
+    esac
 
     test_result $n $(basename $(dirname $xml))"/"$(basename $xml) $ret
     if test "$verbose" = "1" && test $ret != 0 ; then

@@ -1,4 +1,3 @@
-
 /*
  * esx_nwfilter_driver.c: nwfilter driver functions for managing VMware ESX
  *                        firewall rules
@@ -17,18 +16,16 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
 #include <config.h>
 
 #include "internal.h"
-#include "util.h"
-#include "memory.h"
-#include "logging.h"
-#include "uuid.h"
+#include "viralloc.h"
+#include "viruuid.h"
 #include "esx_private.h"
 #include "esx_nwfilter_driver.h"
 #include "esx_vi.h"
@@ -69,8 +66,8 @@ esxNWFilterClose(virConnectPtr conn)
 
 static virNWFilterDriver esxNWFilterDriver = {
     .name = "ESX",
-    .open = esxNWFilterOpen, /* 0.8.1 */
-    .close = esxNWFilterClose, /* 0.8.1 */
+    .nwfilterOpen = esxNWFilterOpen, /* 0.8.1 */
+    .nwfilterClose = esxNWFilterClose, /* 0.8.1 */
 };
 
 

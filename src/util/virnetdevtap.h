@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2011 Red Hat, Inc.
+ * Copyright (C) 2007-2011, 2013 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -12,8 +12,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *     Mark McLoughlin <markmc@redhat.com>
@@ -25,14 +25,28 @@
 
 # include "internal.h"
 # include "virnetdevvportprofile.h"
+# include "virnetdevvlan.h"
+
+# ifdef __FreeBSD__
+/* This should be defined on OSes that don't automatically
+ * cleanup released devices */
+#  define VIR_NETDEV_TAP_REQUIRE_MANUAL_CLEANUP 1
+# endif
 
 int virNetDevTapCreate(char **ifname,
                        int *tapfd,
+                       int tapfdSize,
                        unsigned int flags)
     ATTRIBUTE_NONNULL(1) ATTRIBUTE_RETURN_CHECK;
 
 int virNetDevTapDelete(const char *ifname)
     ATTRIBUTE_NONNULL(1) ATTRIBUTE_RETURN_CHECK;
+
+int virNetDevTapGetName(int tapfd, char **ifname)
+    ATTRIBUTE_NONNULL(2) ATTRIBUTE_RETURN_CHECK;
+
+char* virNetDevTapGetRealDeviceName(char *ifname)
+      ATTRIBUTE_NONNULL(1) ATTRIBUTE_RETURN_CHECK;
 
 typedef enum {
    VIR_NETDEV_TAP_CREATE_NONE = 0,
@@ -42,14 +56,18 @@ typedef enum {
    VIR_NETDEV_TAP_CREATE_VNET_HDR           = 1 << 1,
    /* Set this interface's MAC as the bridge's MAC address */
    VIR_NETDEV_TAP_CREATE_USE_MAC_FOR_BRIDGE = 1 << 2,
+   /* The device will persist after the file descriptor is closed */
+   VIR_NETDEV_TAP_CREATE_PERSIST            = 1 << 3,
 } virNetDevTapCreateFlags;
 
 int virNetDevTapCreateInBridgePort(const char *brname,
                                    char **ifname,
-                                   const unsigned char *macaddr,
+                                   const virMacAddr *macaddr,
                                    const unsigned char *vmuuid,
                                    int *tapfd,
+                                   int tapfdSize,
                                    virNetDevVPortProfilePtr virtPortProfile,
+                                   virNetDevVlanPtr virtVlan,
                                    unsigned int flags)
     ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3)
     ATTRIBUTE_RETURN_CHECK;

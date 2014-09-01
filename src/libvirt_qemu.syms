@@ -19,3 +19,14 @@ LIBVIRT_QEMU_0.9.4 {
     global:
         virDomainQemuAttach;
 } LIBVIRT_QEMU_0.8.3;
+
+LIBVIRT_QEMU_0.10.0 {
+    global:
+        virDomainQemuAgentCommand;
+} LIBVIRT_QEMU_0.9.4;
+
+LIBVIRT_QEMU_1.2.3 {
+    global:
+        virConnectDomainQemuMonitorEventDeregister;
+        virConnectDomainQemuMonitorEventRegister;
+} LIBVIRT_QEMU_0.10.0;

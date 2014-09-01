@@ -5,10 +5,12 @@
 #include <string.h>
 
 #include "internal.h"
-#include "util.h"
 #include "testutils.h"
-#include "buf.h"
-#include "memory.h"
+#include "virbuffer.h"
+#include "viralloc.h"
+#include "virstring.h"
+
+#define VIR_FROM_THIS VIR_FROM_NONE
 
 #define TEST_ERROR(...)                             \
     do {                                            \
@@ -46,7 +48,7 @@ static int testBufInfiniteLoop(const void *data)
         virBufferAsprintf(buf, "%s", addstr);
 
     ret = 0;
-out:
+ out:
     bufret = virBufferContentAndReset(buf);
     if (!bufret) {
         TEST_ERROR("Buffer had error set");
@@ -73,6 +75,10 @@ static int testBufAutoIndent(const void *data ATTRIBUTE_UNUSED)
         ret = -1;
     }
     virBufferAdjustIndent(buf, 3);
+    if (STRNEQ(virBufferCurrentContent(buf), "")) {
+        TEST_ERROR("Wrong content");
+        ret = -1;
+    }
     if (virBufferGetIndent(buf, false) != 3 ||
         virBufferGetIndent(buf, true) != 3 ||
         virBufferError(buf)) {
@@ -102,6 +108,14 @@ static int testBufAutoIndent(const void *data ATTRIBUTE_UNUSED)
     }
     virBufferAdjustIndent(buf, 2);
     virBufferAddLit(buf, "1");
+    if (virBufferError(buf)) {
+        TEST_ERROR("Buffer had error");
+        return -1;
+    }
+    if (STRNEQ(virBufferCurrentContent(buf), "  1")) {
+        TEST_ERROR("Wrong content");
+        ret = -1;
+    }
     if (virBufferGetIndent(buf, false) != 2 ||
         virBufferGetIndent(buf, true) != 0) {
         TEST_ERROR("Wrong indentation");
@@ -124,6 +138,11 @@ static int testBufAutoIndent(const void *data ATTRIBUTE_UNUSED)
     virBufferEscapeShell(buf, " 11");
     virBufferAddChar(buf, '\n');
 
+    if (virBufferError(buf)) {
+        TEST_ERROR("Buffer had error");
+        return -1;
+    }
+
     result = virBufferContentAndReset(buf);
     if (!result || STRNEQ(result, expected)) {
         virtTestDifference(stderr, expected, result);
@@ -132,6 +151,55 @@ static int testBufAutoIndent(const void *data ATTRIBUTE_UNUSED)
     VIR_FREE(result);
     return ret;
 }
+
+static int testBufTrim(const void *data ATTRIBUTE_UNUSED)
+{
+    virBuffer bufinit = VIR_BUFFER_INITIALIZER;
+    virBufferPtr buf = NULL;
+    char *result = NULL;
+    const char *expected = "a,b";
+    int ret = -1;
+
+    virBufferTrim(buf, "", 0);
+    buf = &bufinit;
+
+    virBufferAddLit(buf, "a;");
+    virBufferTrim(buf, "", 0);
+    virBufferTrim(buf, "", -1);
+    virBufferTrim(buf, NULL, 1);
+    virBufferTrim(buf, NULL, 5);
+    virBufferTrim(buf, "a", 2);
+
+    virBufferAddLit(buf, ",b,,");
+    virBufferTrim(buf, "b", -1);
+    virBufferTrim(buf, "b,,", 1);
+    virBufferTrim(buf, ",", -1);
+
+    if (virBufferError(buf)) {
+        TEST_ERROR("Buffer had error");
+        return -1;
+    }
+
+    result = virBufferContentAndReset(buf);
+    if (!result || STRNEQ(result, expected)) {
+        virtTestDifference(stderr, expected, result);
+        goto cleanup;
+    }
+
+    virBufferTrim(buf, NULL, -1);
+    if (virBufferError(buf) != -1) {
+        TEST_ERROR("Usage error not flagged");
+        goto cleanup;
+    }
+
+    ret = 0;
+
+ cleanup:
+    virBufferFreeAndReset(buf);
+    VIR_FREE(result);
+    return ret;
+}
+
 
 static int
 mymain(void)
@@ -142,15 +210,16 @@ mymain(void)
 #define DO_TEST(msg, cb, data)                                         \
     do {                                                               \
         struct testInfo info = { data };                               \
-        if (virtTestRun("Buf: " msg, 1, cb, &info) < 0)                 \
+        if (virtTestRun("Buf: " msg, cb, &info) < 0)                   \
             ret = -1;                                                  \
     } while (0)
 
     DO_TEST("EscapeString infinite loop", testBufInfiniteLoop, 1);
     DO_TEST("VSprintf infinite loop", testBufInfiniteLoop, 0);
     DO_TEST("Auto-indentation", testBufAutoIndent, 0);
+    DO_TEST("Trim", testBufTrim, 0);
 
-    return ret==0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)
