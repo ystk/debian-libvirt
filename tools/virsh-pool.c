@@ -1063,6 +1063,9 @@ cmdPoolList(vshControl *ctl, const vshCmd *cmd ATTRIBUTE_UNUSED)
             case VIR_STORAGE_POOL_GLUSTER:
                 flags |= VIR_CONNECT_LIST_STORAGE_POOLS_GLUSTER;
                 break;
+            case VIR_STORAGE_POOL_ZFS:
+                flags |= VIR_CONNECT_LIST_STORAGE_POOLS_ZFS;
+                break;
             case VIR_STORAGE_POOL_LAST:
                 break;
             }
@@ -1764,9 +1767,6 @@ cmdPoolEdit(vshControl *ctl, const vshCmd *cmd)
     ret = true; goto edit_cleanup;
 #define EDIT_DEFINE \
     (pool_edited = virStoragePoolDefineXML(ctl->conn, doc_edited, 0))
-#define EDIT_FREE \
-    if (pool_edited)    \
-        virStoragePoolFree(pool_edited);
 #include "virsh-edit.c"
 
     vshPrint(ctl, _("Pool %s XML configuration edited.\n"),

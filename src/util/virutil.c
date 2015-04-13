@@ -148,7 +148,7 @@ int virSetCloseExec(int fd)
 }
 
 #ifdef WIN32
-int virSetSockReuseAddr(int fd ATTRIBUTE_UNUSED)
+int virSetSockReuseAddr(int fd ATTRIBUTE_UNUSED, bool fatal ATTRIBUTE_UNUSED)
 {
     /*
      * SO_REUSEADDR on Windows is actually akin to SO_REUSEPORT
@@ -163,10 +163,17 @@ int virSetSockReuseAddr(int fd ATTRIBUTE_UNUSED)
     return 0;
 }
 #else
-int virSetSockReuseAddr(int fd)
+int virSetSockReuseAddr(int fd, bool fatal)
 {
     int opt = 1;
-    return setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    if (ret < 0 && fatal) {
+        virReportSystemError(errno, "%s",
+                             _("Unable to set socket reuse addr flag"));
+    }
+
+    return ret;
 }
 #endif
 
@@ -1056,6 +1063,7 @@ virGetGroupList(uid_t uid, gid_t gid, gid_t **list)
 
     ret = mgetgroups(user, primary, list);
     if (ret < 0) {
+        sa_assert(!*list);
         virReportSystemError(errno,
                              _("cannot get group list for '%s'"), user);
         goto cleanup;
@@ -1153,8 +1161,7 @@ virGetWin32DirectoryRoot(char **path)
 
     *path = NULL;
 
-    if (GetWindowsDirectory(windowsdir, ARRAY_CARDINALITY(windowsdir)))
-    {
+    if (GetWindowsDirectory(windowsdir, ARRAY_CARDINALITY(windowsdir))) {
         const char *tmp;
         /* Usually X:\Windows, but in terminal server environments
          * might be an UNC path, AFAIK.
@@ -1499,8 +1506,7 @@ void virFileWaitForDevices(void)
      * If this fails for any reason, we still have the backup of polling for
      * 5 seconds for device nodes.
      */
-    if (virRun(settleprog, &exitstatus) < 0)
-    {}
+    ignore_value(virRun(settleprog, &exitstatus));
 }
 #else
 void virFileWaitForDevices(void)
@@ -2396,3 +2402,77 @@ void virUpdateSelfLastChanged(const char *path)
         selfLastChanged = sb.st_ctime;
     }
 }
+
+#ifndef WIN32
+
+/**
+ * virGetListenFDs:
+ *
+ * Parse LISTEN_PID and LISTEN_FDS passed from caller.
+ *
+ * Returns number of passed FDs.
+ */
+unsigned int
+virGetListenFDs(void)
+{
+    const char *pidstr;
+    const char *fdstr;
+    size_t i = 0;
+    unsigned long long procid;
+    unsigned int nfds;
+
+    VIR_DEBUG("Setting up networking from caller");
+
+    if (!(pidstr = virGetEnvAllowSUID("LISTEN_PID"))) {
+        VIR_DEBUG("No LISTEN_PID from caller");
+        return 0;
+    }
+
+    if (virStrToLong_ull(pidstr, NULL, 10, &procid) < 0) {
+        VIR_DEBUG("Malformed LISTEN_PID from caller %s", pidstr);
+        return 0;
+    }
+
+    if ((pid_t)procid != getpid()) {
+        VIR_DEBUG("LISTEN_PID %s is not for us %llu",
+                  pidstr, (unsigned long long)getpid());
+        return 0;
+    }
+
+    if (!(fdstr = virGetEnvAllowSUID("LISTEN_FDS"))) {
+        VIR_DEBUG("No LISTEN_FDS from caller");
+        return 0;
+    }
+
+    if (virStrToLong_ui(fdstr, NULL, 10, &nfds) < 0) {
+        VIR_DEBUG("Malformed LISTEN_FDS from caller %s", fdstr);
+        return 0;
+    }
+
+    unsetenv("LISTEN_PID");
+    unsetenv("LISTEN_FDS");
+
+    VIR_DEBUG("Got %u file descriptors", nfds);
+
+    for (i = 0; i < nfds; i++) {
+        int fd = STDERR_FILENO + i + 1;
+
+        VIR_DEBUG("Disabling inheritance of passed FD %d", fd);
+
+        if (virSetInherit(fd, false) < 0) {
+            VIR_WARN("Couldn't disable inheritance of passed FD %d", fd);
+        }
+    }
+
+    return nfds;
+}
+
+#else /* WIN32 */
+
+unsigned int
+virGetListenFDs(void)
+{
+    return 0;
+}
+
+#endif /* WIN32 */

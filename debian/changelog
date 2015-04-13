@@ -1,3 +1,164 @@
+libvirt (1.2.9-9) unstable; urgency=medium
+
+  * [4c14b83] qemu: Don't try to parse -help for new QEMU.
+    Closes: #777138, #775773
+    Thanks to Mathieu Malaterre for the debugging
+  * [1addae5] Force capability refresh on upgrades. This makes sure we
+    refresh the capabilities at least once when upgrading from Wheezy.
+    (Closes: #731815)
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 06 Feb 2015 15:40:21 +0100
+
+libvirt (1.2.9-8) unstable; urgency=medium
+
+  * [885f33d] Fix CVE-2015-0236.
+    Patches cherry-picked from upstream (Closes: #776065)
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 23 Jan 2015 19:01:40 +0100
+
+libvirt (1.2.9-7) unstable; urgency=medium
+
+  * [d7df883] CVE-2014-8131: Fix possible deadlock and segfault in
+    qemuConnectGetAllDomainStats()
+    (Closes: #773858)
+  * [d0085e0] qemu: bulk stats: Fix logic in monitor handling
+  * [b5e081c] CVE-2014-8135: storage: fix crash caused by no check return
+    before set close
+    (Closes: #773855)
+  * [a5452de] CVE-2014-8136: qemu: migration: Unlock vm on failed ACL check in
+    protocol v2 APIs
+    (Closes: #773856)
+  * [5aaafc9] qemu: Fix crash in tunnelled migration (Closes: #773503)
+  * [87b3713] lxc: Fix crash when using interface type 'direct'
+    Thanks to Bastian Blank for the patch (Closes: #769600)
+  * [17807c0] Document surprises on CPU microcode updates (Closes: #773706)
+  * [66a3ca6] Install lock drivers (Closes: #773706)
+  * [f6ffda7] vbox: fix a bug in _machineStateInactive (Closes: #770202)
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 24 Dec 2014 10:33:31 +0100
+
+libvirt (1.2.9-6) unstable; urgency=medium
+
+  * [9779548] Add a python build-dependency for the docs build
+    (Closes: #770775)
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 23 Nov 2014 18:47:42 +0100
+
+libvirt (1.2.9-5) unstable; urgency=medium
+
+  [ Guido Günther ]
+  * [5c47e64] Pre-Depend on init-system-helpers.
+    Thanks to intrigeri and Bastien ROUCARIES (Closes: #769551, #766362)
+  * [9aa75f7] util: Prepare URI formatting for libxml2 >= 2.9.2
+    (Closes: #769653)
+
+  [ Ian Campbell ]
+  * [bfe835f] Specify "pygrub" by default for libxl backend guests.
+    Using an absolute path prevents libxl from providing the correct
+    default. (Closes: #770485)
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 23 Nov 2014 14:57:13 +0100
+
+libvirt (1.2.9-4) unstable; urgency=medium
+
+  * [4cdad47] Allow backported versions of dh-systemd
+  * [fb4bf47] Add suggests to libvirt-daemon-system to libvirt-daemon
+    (Closes: #767343)
+  * [e4f03ca] Check if the directories exist before removing them
+    rmdir returns nonzero otherwise and this is more strict than just using
+    || true. (Closes: #767672)
+  * [030fd97] CVE-2014-7823: dumpxml: security hole with migratable flag
+    (Closes: #769149)
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 12 Nov 2014 08:11:17 +0100
+
+libvirt (1.2.9-3) unstable; urgency=medium
+
+  * [28dd361] Remove obsolete conffiles in libvirt-bin too. Depending on the
+    upgrade path they can belong to either libvirt-bin or
+    libvirt-daemon-system. (Closes: #764679)
+  * [de9dcf9] Move polkit rule to /u/s/polkit-1/rules.d/
+    since /e/polkit-1 is for admin changes (Closes: #764826)
+  * [114d777] Remove unused python files. We split out libvirt-python ages
+    ago.
+  * [3a06d85] Add rules for older policy kit (as in jessie/sid).
+    Thanks to Török Edwin, Wolodja Wentland and Michael Biebl
+    (Closes: #765346)
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 14 Oct 2014 18:34:38 +0200
+
+libvirt (1.2.9-2) unstable; urgency=medium
+
+  * Upload to unstable
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 10 Oct 2014 21:13:17 +0200
+
+libvirt (1.2.9-1) experimental; urgency=medium
+
+  * [2d120a7] New upstream version 1.2.9
+  * [0f86acd] Rediff patches
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 02 Oct 2014 07:24:28 +0200
+
+libvirt (1.2.9~rc2-1) experimental; urgency=medium
+
+  * [8707039] New upstream version 1.2.9~rc2
+  * [79ae3d2] Rework patches.
+    Dropped
+        qemu-remove-capabilities.....patch: applied upstream
+  * [c64dc81] qemu: use systemd's TerminateMachine to kill all processes
+    (Closes: #761521)
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 30 Sep 2014 20:47:46 +0200
+
+libvirt (1.2.9~rc1-1) experimental; urgency=medium
+
+  * [063cc84] New upstream version 1.2.9~rc1
+  * [42079a5] Rework patches.
+    Dropped
+        security/CVE-2014-3633-....patch: applied upstream
+  * [d72bb99] Bump symbol versions
+  * [7359fcb] Add simple smoke test using the test:///default driver
+  * [da11813] Use polkit instead of socket permissions.  As before membership
+    in the libvirt group gives r/w access to all VMs.
+  * [98cdfca] Allow for libvirt's socket activation. Now that we're using
+    polkit by default having the rw socket mode 0777 is fine.
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 28 Sep 2014 10:59:28 +0200
+
+libvirt (1.2.8-3) unstable; urgency=medium
+
+  * [9e3d695] Don't ship the socket activation file until we switched to
+    polkit and we can therefore ignore socket permissions. (Closes: #762606)
+  * [a32e72e,4eb67f4] Clean up capabilities and possibly empty dirs
+    (Closes: #761131)
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 25 Sep 2014 12:08:51 +0200
+
+libvirt (1.2.8-2) unstable; urgency=medium
+
+  * [7b0894e] Debianize virtlockd unit file
+  * [2c522fd] Tag Debian specific patches as such
+  * [e1e734b] CVE-2014-3633: qemu: blkiotune: Use correct definition when
+    looking up disk. Thanks to Peter Krempa (Closes: #762203)
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 23 Sep 2014 08:53:01 +0200
+
+libvirt (1.2.8-1) experimental; urgency=medium
+
+  * [e55688b] New upstream version 1.2.8
+    (Closes: #760510)
+  * [daa5c92] New upstream version 1.2.8~rc2
+  * [7f85d5e] Bump symbol versions
+  * [ea29953] Rediff patches.
+    Drop patches appplied upstream:
+        Don-t-fail-qemu-driver-intialization-if-we-can-t-det.patch
+        Include-param.h-on-kFreeBSD.patch
+        Make-uri-command-a-bit-more-prominent.patch
+  * [4633967] Verify tarball signature
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 05 Sep 2014 19:56:50 +0200
+
 libvirt (1.2.7-11) unstable; urgency=medium
 
   * [6534478] Check status in a systemd 208 compatible way

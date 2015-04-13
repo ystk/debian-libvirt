@@ -2222,7 +2222,7 @@ xenUnifiedDomainSetSchedulerParameters(virDomainPtr dom,
 
 static int
 xenUnifiedDomainBlockStats(virDomainPtr dom, const char *path,
-                           struct _virDomainBlockStats *stats)
+                           virDomainBlockStatsPtr stats)
 {
     virDomainDefPtr def = NULL;
     int ret = -1;
@@ -2242,7 +2242,7 @@ xenUnifiedDomainBlockStats(virDomainPtr dom, const char *path,
 
 static int
 xenUnifiedDomainInterfaceStats(virDomainPtr dom, const char *path,
-                               struct _virDomainInterfaceStats *stats)
+                               virDomainInterfaceStatsPtr stats)
 {
     virDomainDefPtr def = NULL;
     int ret = -1;
@@ -2534,7 +2534,7 @@ xenUnifiedNodeDeviceAssignedDomainId(virNodeDevicePtr dev)
     if (numdomains < 0) {
         return ret;
     }
-    if (numdomains > 0){
+    if (numdomains > 0) {
         if (VIR_ALLOC_N(ids, numdomains) < 0)
             goto out;
         if ((numdomains = xenUnifiedConnectListDomains(conn, &ids[0], numdomains)) < 0) {

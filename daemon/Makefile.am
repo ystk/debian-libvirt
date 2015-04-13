@@ -55,6 +55,7 @@ EXTRA_DIST =						\
 	libvirtd.policy.in				\
 	libvirtd.sasl					\
 	libvirtd.service.in				\
+	libvirtd.socket.in				\
 	libvirtd.sysconf				\
 	libvirtd.sysctl					\
 	libvirtd.aug                                    \
@@ -140,7 +141,7 @@ libvirtd_SOURCES = $(DAEMON_SOURCES)
 #-D_XOPEN_SOURCE=600 -D_XOPEN_SOURCE_EXTENDED=1 -D_POSIX_C_SOURCE=199506L
 libvirtd_CFLAGS = \
 	$(LIBXML_CFLAGS) $(GNUTLS_CFLAGS) $(SASL_CFLAGS) \
-	$(XDR_CFLAGS) $(POLKIT_CFLAGS) $(DBUS_CFLAGS) $(LIBNL_CFLAGS) \
+	$(XDR_CFLAGS) $(DBUS_CFLAGS) $(LIBNL_CFLAGS) \
 	$(WARN_CFLAGS) $(PIE_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
 	-DQEMUD_PID_FILE="\"$(QEMUD_PID_FILE)\""
@@ -157,7 +158,6 @@ libvirtd_LDADD =					\
 	$(GNUTLS_LIBS)					\
 	$(SASL_LIBS)					\
 	$(DBUS_LIBS)					\
-	$(POLKIT_LIBS)					\
 	$(LIBNL_LIBS)
 
 if WITH_DTRACE_PROBES
@@ -388,15 +388,18 @@ endif ! LIBVIRT_INIT_SCRIPT_UPSTART
 if LIBVIRT_INIT_SCRIPT_SYSTEMD
 
 SYSTEMD_UNIT_DIR = $(prefix)/lib/systemd/system
-BUILT_SOURCES += libvirtd.service
+BUILT_SOURCES += libvirtd.service libvirtd.socket
 
-install-init-systemd: install-sysconfig libvirtd.service
+install-init-systemd: install-sysconfig libvirtd.service libvirtd.socket
 	$(MKDIR_P) $(DESTDIR)$(SYSTEMD_UNIT_DIR)
 	$(INSTALL_DATA) libvirtd.service \
 	  $(DESTDIR)$(SYSTEMD_UNIT_DIR)/libvirtd.service
+	$(INSTALL_DATA) libvirtd.socket \
+	  $(DESTDIR)$(SYSTEMD_UNIT_DIR)/libvirtd.socket
 
 uninstall-init-systemd: uninstall-sysconfig
 	rm -f $(DESTDIR)$(SYSTEMD_UNIT_DIR)/libvirtd.service
+	rm -f $(DESTDIR)$(SYSTEMD_UNIT_DIR)/libvirtd.socket
 	rmdir $(DESTDIR)$(SYSTEMD_UNIT_DIR) || :
 else ! LIBVIRT_INIT_SCRIPT_SYSTEMD
 install-init-systemd:
@@ -417,6 +420,12 @@ libvirtd.service: libvirtd.service.in $(top_builddir)/config.status
 	    -e 's|[@]localstatedir[@]|$(localstatedir)|g'	\
 	    -e 's|[@]sbindir[@]|$(sbindir)|g'			\
 	    -e 's|[@]sysconfdir[@]|$(sysconfdir)|g'		\
+	    < $< > $@-t &&					\
+	    mv $@-t $@
+
+libvirtd.socket: libvirtd.socket.in $(top_builddir)/config.status
+	$(AM_V_GEN)sed						\
+	    -e 's|[@]runstatedir[@]|$(runstatedir)|g'		\
 	    < $< > $@-t &&					\
 	    mv $@-t $@
 

@@ -5,7 +5,7 @@ Maintainer: Debian Libvirt Maintainers <pkg-libvirt-maintainers@lists.alioth.deb
 Uploaders: Guido Günther <agx@sigxcpu.org>, Laurent Léonard <laurent@open-minds.org>
 Build-Depends:
  debhelper (>= 7),
- dh-systemd (>= 1.18),
+ dh-systemd (>= 1.18~),
  libxml2-dev,
  libncurses5-dev,
  libreadline-dev,
@@ -39,6 +39,7 @@ Build-Depends:
  libapparmor-dev [linux-any],
  libsystemd-daemon-dev [linux-any],
  systemtap-sdt-dev [amd64 armel armhf i386 ia64 powerpc s390],
+ python,
 # for --with-storage-sheepdog
  sheepdog [linux-any],
 # for --with-storage-rados
@@ -89,6 +90,8 @@ Depends:
 Section: admin
 Replaces: libvirt-bin (<< 1.2.6-1~)
 Conflicts: libvirt-bin (<< 1.2.6-1~)
+Suggests:
+ libvirt-daemon,
 Description: programs for the libvirt library
  Libvirt is a C toolkit to interact with the virtualization capabilities
  of recent versions of Linux (and other OSes). The library aims at providing
@@ -109,6 +112,8 @@ Recommends:
  qemu-kvm | qemu (>= 0.9.1),
  libxml2-utils,
  netcat-openbsd,
+Suggests:
+ libvirt-daemon-system,
 Description: programs for the libvirt library
  Libvirt is a C toolkit to interact with the virtualization capabilities
  of recent versions of Linux (and other OSes). The library aims at providing
@@ -119,6 +124,8 @@ Description: programs for the libvirt library
 
 Package: libvirt-daemon-system
 Architecture: any
+# Needed to clean up old libvirt-bin cruft, can be removed post jessie
+Pre-Depends: init-system-helpers (>= 1.18~)
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
@@ -127,6 +134,7 @@ Depends:
  libvirt-clients (= ${binary:Version}),
  libvirt-daemon (= ${binary:Version}),
  logrotate,
+ policykit-1,
 Recommends:
  bridge-utils,
  dmidecode,
@@ -137,7 +145,7 @@ Recommends:
  parted,
  pm-utils,
 Section: admin
-Suggests: policykit-1, radvd, auditd, systemtap, systemd, apparmor
+Suggests: radvd, auditd, systemtap, systemd, apparmor
 Breaks: avahi-daemon (<< 0.6.31-3~)
 Replaces: libvirt-bin (<< 1.2.7-4~)
 Conflicts: libvirt-bin (<< 1.2.6-1~)

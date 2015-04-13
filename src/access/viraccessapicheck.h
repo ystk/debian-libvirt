@@ -24,6 +24,8 @@ extern bool virConnectDomainEventRegisterAnyCheckACL(virConnectPtr conn, virDoma
 extern int virConnectDomainXMLFromNativeEnsureACL(virConnectPtr conn);
 extern int virConnectDomainXMLToNativeEnsureACL(virConnectPtr conn);
 extern int virConnectFindStoragePoolSourcesEnsureACL(virConnectPtr conn);
+extern int virConnectGetAllDomainStatsEnsureACL(virConnectPtr conn);
+extern bool virConnectGetAllDomainStatsCheckACL(virConnectPtr conn, virDomainDefPtr domain);
 extern int virConnectGetCapabilitiesEnsureACL(virConnectPtr conn);
 extern int virConnectGetCPUModelNamesEnsureACL(virConnectPtr conn);
 extern int virConnectGetDomainCapabilitiesEnsureACL(virConnectPtr conn);
@@ -97,6 +99,7 @@ extern int virDomainAbortJobEnsureACL(virConnectPtr conn, virDomainDefPtr domain
 extern int virDomainAttachDeviceEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
 extern int virDomainAttachDeviceFlagsEnsureACL(virConnectPtr conn, virDomainDefPtr domain, unsigned int flags);
 extern int virDomainBlockCommitEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
+extern int virDomainBlockCopyEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
 extern int virDomainBlockJobAbortEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
 extern int virDomainBlockJobSetSpeedEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
 extern int virDomainBlockPeekEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
@@ -192,6 +195,7 @@ extern int virDomainMigrateSetMaxSpeedEnsureACL(virConnectPtr conn, virDomainDef
 extern int virDomainOpenChannelEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
 extern int virDomainOpenConsoleEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
 extern int virDomainOpenGraphicsEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
+extern int virDomainOpenGraphicsFdEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
 extern int virDomainPinEmulatorEnsureACL(virConnectPtr conn, virDomainDefPtr domain, unsigned int flags);
 extern int virDomainPinVcpuEnsureACL(virConnectPtr conn, virDomainDefPtr domain);
 extern int virDomainPinVcpuFlagsEnsureACL(virConnectPtr conn, virDomainDefPtr domain, unsigned int flags);
@@ -271,6 +275,7 @@ extern int virNetworkLookupByUUIDEnsureACL(virConnectPtr conn, virNetworkDefPtr 
 extern int virNetworkSetAutostartEnsureACL(virConnectPtr conn, virNetworkDefPtr network);
 extern int virNetworkUndefineEnsureACL(virConnectPtr conn, virNetworkDefPtr network);
 extern int virNetworkUpdateEnsureACL(virConnectPtr conn, virNetworkDefPtr network, unsigned int flags);
+extern int virNodeAllocPagesEnsureACL(virConnectPtr conn);
 extern int virNodeDeviceCreateXMLEnsureACL(virConnectPtr conn, virNodeDeviceDefPtr device);
 extern int virNodeDeviceDestroyEnsureACL(virConnectPtr conn, virNodeDeviceDefPtr device);
 extern int virNodeDeviceDetachFlagsEnsureACL(virConnectPtr conn, virNodeDeviceDefPtr device);

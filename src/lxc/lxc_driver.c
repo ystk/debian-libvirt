@@ -680,37 +680,6 @@ lxcDomainGetMaxMemory(virDomainPtr dom)
     return ret;
 }
 
-static int lxcDomainSetMaxMemory(virDomainPtr dom, unsigned long newmax)
-{
-    virDomainObjPtr vm;
-    int ret = -1;
-
-    if (!(vm = lxcDomObjFromDomain(dom)))
-        goto cleanup;
-
-    if (virDomainSetMaxMemoryEnsureACL(dom->conn, vm->def) < 0)
-        goto cleanup;
-
-    if (newmax < vm->def->mem.cur_balloon) {
-        if (!virDomainObjIsActive(vm)) {
-            vm->def->mem.cur_balloon = newmax;
-        } else {
-            virReportError(VIR_ERR_OPERATION_INVALID, "%s",
-                           _("Cannot set max memory lower than current"
-                             " memory for an active domain"));
-            goto cleanup;
-        }
-    }
-
-    vm->def->mem.max_balloon = newmax;
-    ret = 0;
-
- cleanup:
-    if (vm)
-        virObjectUnlock(vm);
-    return ret;
-}
-
 static int lxcDomainSetMemoryFlags(virDomainPtr dom, unsigned long newmem,
                                    unsigned int flags)
 {
@@ -721,10 +690,10 @@ static int lxcDomainSetMemoryFlags(virDomainPtr dom, unsigned long newmem,
     virLXCDomainObjPrivatePtr priv;
     virLXCDriverPtr driver = dom->conn->privateData;
     virLXCDriverConfigPtr cfg = NULL;
-    unsigned long oldmax = 0;
 
     virCheckFlags(VIR_DOMAIN_AFFECT_LIVE |
-                  VIR_DOMAIN_AFFECT_CONFIG, -1);
+                  VIR_DOMAIN_AFFECT_CONFIG |
+                  VIR_DOMAIN_MEM_MAXIMUM, -1);
 
     if (!(vm = lxcDomObjFromDomain(dom)))
         goto cleanup;
@@ -743,32 +712,50 @@ static int lxcDomainSetMemoryFlags(virDomainPtr dom, unsigned long newmem,
                                         &persistentDef) < 0)
         goto cleanup;
 
-    if (flags & VIR_DOMAIN_AFFECT_LIVE)
-        oldmax = vm->def->mem.max_balloon;
-    if (flags & VIR_DOMAIN_AFFECT_CONFIG) {
-        if (!oldmax || oldmax > persistentDef->mem.max_balloon)
-            oldmax = persistentDef->mem.max_balloon;
-    }
-
-    if (newmem > oldmax) {
-        virReportError(VIR_ERR_INVALID_ARG,
-                       "%s", _("Cannot set memory higher than max memory"));
-        goto cleanup;
-    }
-
-    if (flags & VIR_DOMAIN_AFFECT_LIVE) {
-        if (virCgroupSetMemory(priv->cgroup, newmem) < 0) {
-            virReportError(VIR_ERR_OPERATION_FAILED,
-                           "%s", _("Failed to set memory for domain"));
+    if (flags & VIR_DOMAIN_MEM_MAXIMUM) {
+        if (flags & VIR_DOMAIN_AFFECT_LIVE) {
+            virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                           _("Cannot resize the max memory "
+                             "on an active domain"));
             goto cleanup;
         }
-    }
 
-    if (flags & VIR_DOMAIN_AFFECT_CONFIG) {
-        sa_assert(persistentDef);
-        persistentDef->mem.cur_balloon = newmem;
-        if (virDomainSaveConfig(cfg->configDir, persistentDef) < 0)
+        if (flags & VIR_DOMAIN_AFFECT_CONFIG) {
+            persistentDef->mem.max_balloon = newmem;
+            if (persistentDef->mem.cur_balloon > newmem)
+                persistentDef->mem.cur_balloon = newmem;
+            if (virDomainSaveConfig(cfg->configDir, persistentDef) < 0)
+                goto cleanup;
+        }
+    } else {
+        unsigned long oldmax = 0;
+
+        if (flags & VIR_DOMAIN_AFFECT_LIVE)
+            oldmax = vm->def->mem.max_balloon;
+        if (flags & VIR_DOMAIN_AFFECT_CONFIG) {
+            if (!oldmax || oldmax > persistentDef->mem.max_balloon)
+                oldmax = persistentDef->mem.max_balloon;
+        }
+
+        if (newmem > oldmax) {
+            virReportError(VIR_ERR_INVALID_ARG,
+                           "%s", _("Cannot set memory higher than max memory"));
             goto cleanup;
+        }
+
+        if (flags & VIR_DOMAIN_AFFECT_LIVE) {
+            if (virCgroupSetMemory(priv->cgroup, newmem) < 0) {
+                virReportError(VIR_ERR_OPERATION_FAILED,
+                               "%s", _("Failed to set memory for domain"));
+                goto cleanup;
+            }
+        }
+
+        if (flags & VIR_DOMAIN_AFFECT_CONFIG) {
+            persistentDef->mem.cur_balloon = newmem;
+            if (virDomainSaveConfig(cfg->configDir, persistentDef) < 0)
+                goto cleanup;
+        }
     }
 
     ret = 0;
@@ -784,6 +771,11 @@ static int lxcDomainSetMemoryFlags(virDomainPtr dom, unsigned long newmem,
 static int lxcDomainSetMemory(virDomainPtr dom, unsigned long newmem)
 {
     return lxcDomainSetMemoryFlags(dom, newmem, VIR_DOMAIN_AFFECT_LIVE);
+}
+
+static int lxcDomainSetMaxMemory(virDomainPtr dom, unsigned long newmax)
+{
+    return lxcDomainSetMemoryFlags(dom, newmax, VIR_DOMAIN_MEM_MAXIMUM);
 }
 
 static int
@@ -2190,19 +2182,19 @@ lxcDomainParseBlkioDeviceStr(char *blkioDeviceStr, const char *type,
         temp = p + 1;
 
         if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WEIGHT)) {
-            if (virStrToLong_ui(temp, &p, 10, &result[i].weight) < 0)
+            if (virStrToLong_uip(temp, &p, 10, &result[i].weight) < 0)
                 goto error;
         } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_READ_IOPS)) {
-            if (virStrToLong_ui(temp, &p, 10, &result[i].riops) < 0)
+            if (virStrToLong_uip(temp, &p, 10, &result[i].riops) < 0)
                 goto error;
         } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_IOPS)) {
-            if (virStrToLong_ui(temp, &p, 10, &result[i].wiops) < 0)
+            if (virStrToLong_uip(temp, &p, 10, &result[i].wiops) < 0)
                 goto error;
         } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_READ_BPS)) {
-            if (virStrToLong_ull(temp, &p, 10, &result[i].rbps) < 0)
+            if (virStrToLong_ullp(temp, &p, 10, &result[i].rbps) < 0)
                 goto error;
-        } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_BPS)){
-            if (virStrToLong_ull(temp, &p, 10, &result[i].wbps) < 0)
+        } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_BPS)) {
+            if (virStrToLong_ullp(temp, &p, 10, &result[i].wbps) < 0)
                 goto error;
         } else {
             goto error;
@@ -2230,8 +2222,10 @@ lxcDomainParseBlkioDeviceStr(char *blkioDeviceStr, const char *type,
                    _("unable to parse blkio device '%s' '%s'"),
                    type, blkioDeviceStr);
  cleanup:
-    virBlkioDeviceArrayClear(result, ndevices);
-    VIR_FREE(result);
+    if (result) {
+        virBlkioDeviceArrayClear(result, ndevices);
+        VIR_FREE(result);
+    }
     return -1;
 }
 
@@ -2254,17 +2248,17 @@ lxcDomainMergeBlkioDevice(virBlkioDevicePtr *dest_array,
             if (STREQ(src->path, dest->path)) {
                 found = true;
 
-                if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WEIGHT))
+                if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WEIGHT)) {
                     dest->weight = src->weight;
-                else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_READ_IOPS))
+                } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_READ_IOPS)) {
                     dest->riops = src->riops;
-                else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_IOPS))
+                } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_IOPS)) {
                     dest->wiops = src->wiops;
-                else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_READ_BPS))
+                } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_READ_BPS)) {
                     dest->rbps = src->rbps;
-                else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_BPS))
+                } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_BPS)) {
                     dest->wbps = src->wbps;
-                else {
+                } else {
                     virReportError(VIR_ERR_INVALID_ARG, _("Unknown parameter %s"),
                                    type);
                     return -1;
@@ -2280,17 +2274,17 @@ lxcDomainMergeBlkioDevice(virBlkioDevicePtr *dest_array,
                 return -1;
             dest = &(*dest_array)[*dest_size - 1];
 
-            if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WEIGHT))
+            if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WEIGHT)) {
                 dest->weight = src->weight;
-            else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_READ_IOPS))
+            } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_READ_IOPS)) {
                 dest->riops = src->riops;
-            else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_IOPS))
+            } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_IOPS)) {
                 dest->wiops = src->wiops;
-            else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_READ_BPS))
+            } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_READ_BPS)) {
                 dest->rbps = src->rbps;
-            else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_BPS))
+            } else if (STREQ(type, VIR_DOMAIN_BLKIO_DEVICE_WRITE_BPS)) {
                 dest->wbps = src->wbps;
-            else {
+            } else {
                 *dest_size = *dest_size - 1;
                 return -1;
             }
@@ -2307,7 +2301,7 @@ lxcDomainMergeBlkioDevice(virBlkioDevicePtr *dest_array,
 static int
 lxcDomainBlockStats(virDomainPtr dom,
                     const char *path,
-                    struct _virDomainBlockStats *stats)
+                    virDomainBlockStatsPtr stats)
 {
     int ret = -1, idx;
     virDomainObjPtr vm;
@@ -2614,7 +2608,7 @@ lxcDomainSetBlkioParameters(virDomainPtr dom,
                             break;
                         }
                     }
-                } else if (STREQ(param->field, VIR_DOMAIN_BLKIO_DEVICE_WRITE_BPS)){
+                } else if (STREQ(param->field, VIR_DOMAIN_BLKIO_DEVICE_WRITE_BPS)) {
                     for (j = 0; j < ndevices; j++) {
                         if (virCgroupSetBlkioDeviceWriteBps(priv->cgroup,
                                                             devices[j].path,
@@ -3090,7 +3084,7 @@ lxcDomainGetBlkioParameters(virDomainPtr dom,
 static int
 lxcDomainInterfaceStats(virDomainPtr dom,
                         const char *path,
-                        struct _virDomainInterfaceStats *stats)
+                        virDomainInterfaceStatsPtr stats)
 {
     virDomainObjPtr vm;
     size_t i;
@@ -3132,7 +3126,7 @@ lxcDomainInterfaceStats(virDomainPtr dom,
 static int
 lxcDomainInterfaceStats(virDomainPtr dom,
                         const char *path ATTRIBUTE_UNUSED,
-                        struct _virDomainInterfaceStats *stats ATTRIBUTE_UNUSED)
+                        virDomainInterfaceStatsPtr stats ATTRIBUTE_UNUSED)
 {
     virReportUnsupportedError();
     return -1;
@@ -4047,7 +4041,7 @@ lxcDomainAttachDeviceDiskLive(virLXCDriverPtr driver,
         goto cleanup;
     }
 
-    if (!virDomainDiskSourceIsBlockType(def)) {
+    if (!virDomainDiskSourceIsBlockType(def->src)) {
         virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
                        _("Can't setup disk for non-block device"));
         goto cleanup;
@@ -5393,7 +5387,7 @@ lxcNodeGetInfo(virConnectPtr conn,
 
 static int
 lxcDomainMemoryStats(virDomainPtr dom,
-                     struct _virDomainMemoryStat *stats,
+                     virDomainMemoryStatPtr stats,
                      unsigned int nr_stats,
                      unsigned int flags)
 {
@@ -5691,6 +5685,27 @@ lxcNodeGetFreePages(virConnectPtr conn,
 }
 
 
+static int
+lxcNodeAllocPages(virConnectPtr conn,
+                  unsigned int npages,
+                  unsigned int *pageSizes,
+                  unsigned long long *pageCounts,
+                  int startCell,
+                  unsigned int cellCount,
+                  unsigned int flags)
+{
+    bool add = !(flags & VIR_NODE_ALLOC_PAGES_SET);
+
+    virCheckFlags(VIR_NODE_ALLOC_PAGES_SET, -1);
+
+    if (virNodeAllocPagesEnsureACL(conn) < 0)
+        return -1;
+
+    return nodeAllocPages(npages, pageSizes, pageCounts,
+                          startCell, cellCount, add);
+}
+
+
 /* Function Tables */
 static virDriver lxcDriver = {
     .no = VIR_DRV_LXC,
@@ -5782,6 +5797,7 @@ static virDriver lxcDriver = {
     .domainReboot = lxcDomainReboot, /* 1.0.1 */
     .domainLxcOpenNamespace = lxcDomainLxcOpenNamespace, /* 1.0.2 */
     .nodeGetFreePages = lxcNodeGetFreePages, /* 1.2.6 */
+    .nodeAllocPages = lxcNodeAllocPages, /* 1.2.9 */
 };
 
 static virStateDriver lxcStateDriver = {
