@@ -7613,7 +7613,7 @@ virDomainGetSchedulerType(virDomainPtr domain, int *nparams)
     virCheckDomainReturn(domain, NULL);
     conn = domain->conn;
 
-    if (conn->driver->domainGetSchedulerType){
+    if (conn->driver->domainGetSchedulerType) {
         schedtype = conn->driver->domainGetSchedulerType(domain, nparams);
         if (!schedtype)
             goto error;
@@ -7908,7 +7908,7 @@ virDomainBlockStats(virDomainPtr dom, const char *disk,
                     virDomainBlockStatsPtr stats, size_t size)
 {
     virConnectPtr conn;
-    struct _virDomainBlockStats stats2 = { -1, -1, -1, -1, -1 };
+    virDomainBlockStatsStruct stats2 = { -1, -1, -1, -1, -1 };
 
     VIR_DOMAIN_DEBUG(dom, "disk=%s, stats=%p, size=%zi", disk, stats, size);
 
@@ -8047,8 +8047,8 @@ virDomainInterfaceStats(virDomainPtr dom, const char *path,
                         virDomainInterfaceStatsPtr stats, size_t size)
 {
     virConnectPtr conn;
-    struct _virDomainInterfaceStats stats2 = { -1, -1, -1, -1,
-                                               -1, -1, -1, -1 };
+    virDomainInterfaceStatsStruct stats2 = { -1, -1, -1, -1,
+                                             -1, -1, -1, -1 };
 
     VIR_DOMAIN_DEBUG(dom, "path=%s, stats=%p, size=%zi",
                      path, stats, size);
@@ -10987,7 +10987,7 @@ virNetworkLookupByUUID(virConnectPtr conn, const unsigned char *uuid)
     virCheckConnectReturn(conn, NULL);
     virCheckNonNullArgGoto(uuid, error);
 
-    if (conn->networkDriver && conn->networkDriver->networkLookupByUUID){
+    if (conn->networkDriver && conn->networkDriver->networkLookupByUUID) {
         virNetworkPtr ret;
         ret = conn->networkDriver->networkLookupByUUID(conn, uuid);
         if (!ret)
@@ -13960,6 +13960,14 @@ virStorageVolDownload(virStorageVolPtr vol,
  * detect any errors. The results will be unpredictable if
  * another active stream is writing to the storage volume.
  *
+ * When the data stream is closed whether the upload is successful
+ * or not the target storage pool will be refreshed to reflect pool
+ * and volume changes as a result of the upload. Depending on
+ * the target volume storage backend and the source stream type
+ * for a successful upload, the target volume may take on the
+ * characteristics from the source stream such as format type,
+ * capacity, and allocation.
+ *
  * Returns 0, or -1 upon error.
  */
 int
@@ -14209,7 +14217,7 @@ virStorageVolGetInfo(virStorageVolPtr vol,
 
     conn = vol->conn;
 
-    if (conn->storageDriver->storageVolGetInfo){
+    if (conn->storageDriver->storageVolGetInfo) {
         int ret;
         ret = conn->storageDriver->storageVolGetInfo(vol, info);
         if (ret < 0)
@@ -16956,7 +16964,7 @@ virNWFilterLookupByUUID(virConnectPtr conn, const unsigned char *uuid)
     virCheckConnectReturn(conn, NULL);
     virCheckNonNullArgGoto(uuid, error);
 
-    if (conn->nwfilterDriver && conn->nwfilterDriver->nwfilterLookupByUUID){
+    if (conn->nwfilterDriver && conn->nwfilterDriver->nwfilterLookupByUUID) {
         virNWFilterPtr ret;
         ret = conn->nwfilterDriver->nwfilterLookupByUUID(conn, uuid);
         if (!ret)
@@ -17559,7 +17567,7 @@ virDomainGetJobInfo(virDomainPtr domain, virDomainJobInfoPtr info)
  * @type: where to store the job type (one of virDomainJobType)
  * @params: where to store job statistics
  * @nparams: number of items in @params
- * @flags: extra flags; not used yet, so callers should always pass 0
+ * @flags: bitwise-OR of virDomainGetJobStatsFlags
  *
  * Extract information about progress of a background job on a domain.
  * Will return an error if the domain is not active. The function returns
@@ -17568,6 +17576,15 @@ virDomainGetJobInfo(virDomainPtr domain, virDomainJobInfoPtr info)
  * macros and new fields will likely be introduced in the future so callers
  * may receive fields that they do not understand in case they talk to a
  * newer server.
+ *
+ * When @flags contains VIR_DOMAIN_JOB_STATS_COMPLETED, the function will
+ * return statistics about a recently completed job. Specifically, this
+ * flag may be used to query statistics of a completed incoming migration.
+ * Statistics of a completed job are automatically destroyed once read or
+ * when libvirtd is restarted. Note that time information returned for
+ * completed migrations may be completely irrelevant unless both source and
+ * destination hosts have synchronized time (i.e., NTP daemon is running on
+ * both of them).
  *
  * Returns 0 in case of success and -1 in case of failure.
  */
@@ -19659,10 +19676,14 @@ virDomainBlockJobAbort(virDomainPtr dom, const char *disk,
  * @dom: pointer to domain object
  * @disk: path to the block device, or device shorthand
  * @info: pointer to a virDomainBlockJobInfo structure
- * @flags: extra flags; not used yet, so callers should always pass 0
+ * @flags: bitwise-OR of virDomainBlockJobInfoFlags
  *
  * Request block job information for the given disk.  If an operation is active
- * @info will be updated with the current progress.
+ * @info will be updated with the current progress.  The units used for the
+ * bandwidth field of @info depends on @flags.  If @flags includes
+ * VIR_DOMAIN_BLOCK_JOB_INFO_BANDWIDTH_BYTES, bandwidth is in bytes/second
+ * (although this mode can risk failure due to overflow, depending on both
+ * client and server word size); otherwise, the value is rounded up to MiB/s.
  *
  * The @disk parameter is either an unambiguous source name of the
  * block device (the <source file='...'/> sub-element, such as
@@ -19712,11 +19733,20 @@ virDomainGetBlockJobInfo(virDomainPtr dom, const char *disk,
  * virDomainBlockJobSetSpeed:
  * @dom: pointer to domain object
  * @disk: path to the block device, or device shorthand
- * @bandwidth: specify bandwidth limit in MiB/s
- * @flags: extra flags; not used yet, so callers should always pass 0
+ * @bandwidth: specify bandwidth limit; flags determine the unit
+ * @flags: bitwise-OR of virDomainBlockJobSetSpeedFlags
  *
  * Set the maximimum allowable bandwidth that a block job may consume.  If
- * bandwidth is 0, the limit will revert to the hypervisor default.
+ * bandwidth is 0, the limit will revert to the hypervisor default of
+ * unlimited.
+ *
+ * If @flags contains VIR_DOMAIN_BLOCK_JOB_SPEED_BANDWIDTH_BYTES, @bandwidth
+ * is in bytes/second; otherwise, it is in MiB/second.  Values larger than
+ * 2^52 bytes/sec may be rejected due to overflow considerations based on
+ * the word size of both client and server, and values larger than 2^31
+ * bytes/sec may cause overflow problems if later queried by
+ * virDomainGetBlockJobInfo() without scaling.  Hypervisors may further
+ * restrict the range of valid bandwidth values.
  *
  * The @disk parameter is either an unambiguous source name of the
  * block device (the <source file='...'/> sub-element, such as
@@ -19764,8 +19794,8 @@ virDomainBlockJobSetSpeed(virDomainPtr dom, const char *disk,
  * virDomainBlockPull:
  * @dom: pointer to domain object
  * @disk: path to the block device, or device shorthand
- * @bandwidth: (optional) specify copy bandwidth limit in MiB/s
- * @flags: extra flags; not used yet, so callers should always pass 0
+ * @bandwidth: (optional) specify bandwidth limit; flags determine the unit
+ * @flags: bitwise-OR of virDomainBlockPullFlags
  *
  * Populate a disk image with data from its backing image.  Once all data from
  * its backing image has been pulled, the disk no longer depends on a backing
@@ -19782,12 +19812,20 @@ virDomainBlockJobSetSpeed(virDomainPtr dom, const char *disk,
  * can be found by calling virDomainGetXMLDesc() and inspecting
  * elements within //domain/devices/disk.
  *
- * The maximum bandwidth (in MiB/s) that will be used to do the copy can be
- * specified with the bandwidth parameter.  If set to 0, libvirt will choose a
- * suitable default.  Some hypervisors do not support this feature and will
- * return an error if bandwidth is not 0; in this case, it might still be
- * possible for a later call to virDomainBlockJobSetSpeed() to succeed.
- * The actual speed can be determined with virDomainGetBlockJobInfo().
+ * The maximum bandwidth that will be used to do the copy can be
+ * specified with the @bandwidth parameter.  If set to 0, there is no
+ * limit.  If @flags includes VIR_DOMAIN_BLOCK_PULL_BANDWIDTH_BYTES,
+ * @bandwidth is in bytes/second; otherwise, it is in MiB/second.
+ * Values larger than 2^52 bytes/sec may be rejected due to overflow
+ * considerations based on the word size of both client and server,
+ * and values larger than 2^31 bytes/sec may cause overflow problems
+ * if later queried by virDomainGetBlockJobInfo() without scaling.
+ * Hypervisors may further restrict the range of valid bandwidth
+ * values.  Some hypervisors do not support this feature and will
+ * return an error if bandwidth is not 0; in this case, it might still
+ * be possible for a later call to virDomainBlockJobSetSpeed() to
+ * succeed.  The actual speed can be determined with
+ * virDomainGetBlockJobInfo().
  *
  * This is shorthand for virDomainBlockRebase() with a NULL base.
  *
@@ -19832,7 +19870,7 @@ virDomainBlockPull(virDomainPtr dom, const char *disk,
  * @disk: path to the block device, or device shorthand
  * @base: path to backing file to keep, or device shorthand,
  *        or NULL for no backing file
- * @bandwidth: (optional) specify copy bandwidth limit in MiB/s
+ * @bandwidth: (optional) specify bandwidth limit; flags determine the unit
  * @flags: bitwise-OR of virDomainBlockRebaseFlags
  *
  * Populate a disk image with data from its backing image chain, and
@@ -19873,7 +19911,10 @@ virDomainBlockPull(virDomainPtr dom, const char *disk,
  * pre-create files with relative backing file names, rather than the default
  * of absolute backing file names; as a security precaution, you should
  * generally only use reuse_ext with the shallow flag and a non-raw
- * destination file.
+ * destination file.  By default, the copy destination will be treated as
+ * type='file', but using VIR_DOMAIN_BLOCK_REBASE_COPY_DEV treats the
+ * destination as type='block' (affecting how virDomainGetBlockInfo() will
+ * report allocation after pivoting).
  *
  * A copy job has two parts; in the first phase, the @bandwidth parameter
  * affects how fast the source is pulled into the destination, and the job
@@ -19908,15 +19949,29 @@ virDomainBlockPull(virDomainPtr dom, const char *disk,
  * example, "vda[3]" refers to the backing store with index equal to "3"
  * in the chain of disk "vda".
  *
- * The maximum bandwidth (in MiB/s) that will be used to do the copy can be
- * specified with the bandwidth parameter.  If set to 0, libvirt will choose a
- * suitable default.  Some hypervisors do not support this feature and will
- * return an error if bandwidth is not 0; in this case, it might still be
- * possible for a later call to virDomainBlockJobSetSpeed() to succeed.
- * The actual speed can be determined with virDomainGetBlockJobInfo().
+ * The maximum bandwidth that will be used to do the copy can be
+ * specified with the @bandwidth parameter.  If set to 0, there is no
+ * limit.  If @flags includes VIR_DOMAIN_BLOCK_REBASE_BANDWIDTH_BYTES,
+ * @bandwidth is in bytes/second; otherwise, it is in MiB/second.
+ * Values larger than 2^52 bytes/sec may be rejected due to overflow
+ * considerations based on the word size of both client and server,
+ * and values larger than 2^31 bytes/sec may cause overflow problems
+ * if later queried by virDomainGetBlockJobInfo() without scaling.
+ * Hypervisors may further restrict the range of valid bandwidth
+ * values.  Some hypervisors do not support this feature and will
+ * return an error if bandwidth is not 0; in this case, it might still
+ * be possible for a later call to virDomainBlockJobSetSpeed() to
+ * succeed.  The actual speed can be determined with
+ * virDomainGetBlockJobInfo().
  *
  * When @base is NULL and @flags is 0, this is identical to
- * virDomainBlockPull().
+ * virDomainBlockPull().  When @flags contains VIR_DOMAIN_BLOCK_REBASE_COPY,
+ * this command is shorthand for virDomainBlockCopy() where the destination
+ * XML encodes @base as a <disk type='file'>, @bandwidth is properly scaled
+ * and passed as a typed parameter, the shallow and reuse external flags
+ * are preserved, and remaining flags control whether the XML encodes a
+ * destination format of raw instead of leaving the destination identical
+ * to the source format or probed from the reused file.
  *
  * Returns 0 if the operation has started, -1 on failure.
  */
@@ -19942,7 +19997,8 @@ virDomainBlockRebase(virDomainPtr dom, const char *disk,
         virCheckNonNullArgGoto(base, error);
     } else if (flags & (VIR_DOMAIN_BLOCK_REBASE_SHALLOW |
                         VIR_DOMAIN_BLOCK_REBASE_REUSE_EXT |
-                        VIR_DOMAIN_BLOCK_REBASE_COPY_RAW)) {
+                        VIR_DOMAIN_BLOCK_REBASE_COPY_RAW |
+                        VIR_DOMAIN_BLOCK_REBASE_COPY_DEV)) {
         virReportInvalidArg(flags,
                             _("use of flags in %s requires a copy job"),
                             __FUNCTION__);
@@ -19967,6 +20023,120 @@ virDomainBlockRebase(virDomainPtr dom, const char *disk,
 
 
 /**
+ * virDomainBlockCopy:
+ * @dom: pointer to domain object
+ * @disk: path to the block device, or device shorthand
+ * @destxml: XML description of the copy destination
+ * @params: Pointer to block copy parameter objects, or NULL
+ * @nparams: Number of block copy parameters (this value can be the same or
+ *           less than the number of parameters supported)
+ * @flags: bitwise-OR of virDomainBlockCopyFlags
+ *
+ * Copy the guest-visible contents of a disk image to a new file described
+ * by @destxml.  The destination XML has a top-level element of <disk>, and
+ * resembles what is used when hot-plugging a disk via virDomainAttachDevice(),
+ * except that only sub-elements related to describing the new host resource
+ * are necessary (sub-elements related to the guest view, such as <target>,
+ * are ignored).  It is strongly recommended to include a <driver type='...'/>
+ * format designation for the destination, to avoid the potential of any
+ * security problem that might be caused by probing a file for its format.
+ *
+ * This command starts a long-running copy.  By default, the copy will pull
+ * the entire source chain into the destination file, but if @flags also
+ * contains VIR_DOMAIN_BLOCK_COPY_SHALLOW, then only the top of the source
+ * chain will be copied (the source and destination have a common backing
+ * file).  The format of the destination file is controlled by the <driver>
+ * sub-element of the XML.  The destination will be created unless the
+ * VIR_DOMAIN_BLOCK_COPY_REUSE_EXT flag is present stating that the file
+ * was pre-created with the correct format and metadata and sufficient
+ * size to hold the copy. In case the VIR_DOMAIN_BLOCK_COPY_SHALLOW flag
+ * is used the pre-created file has to exhibit the same guest visible contents
+ * as the backing file of the original image. This allows a management app to
+ * pre-create files with relative backing file names, rather than the default
+ * of absolute backing file names.
+ *
+ * A copy job has two parts; in the first phase, the source is copied into
+ * the destination, and the job can only be canceled by reverting to the
+ * source file; progress in this phase can be tracked via the
+ * virDomainBlockJobInfo() command, with a job type of
+ * VIR_DOMAIN_BLOCK_JOB_TYPE_COPY.  The job transitions to the second
+ * phase when the job info states cur == end, and remains alive to mirror
+ * all further changes to both source and destination.  The user must
+ * call virDomainBlockJobAbort() to end the mirroring while choosing
+ * whether to revert to source or pivot to the destination.  An event is
+ * issued when the job ends, and depending on the hypervisor, an event may
+ * also be issued when the job transitions from pulling to mirroring.  If
+ * the job is aborted, a new job will have to start over from the beginning
+ * of the first phase.
+ *
+ * Some hypervisors will restrict certain actions, such as virDomainSave()
+ * or virDomainDetachDevice(), while a copy job is active; they may
+ * also restrict a copy job to transient domains.
+ *
+ * The @disk parameter is either an unambiguous source name of the
+ * block device (the <source file='...'/> sub-element, such as
+ * "/path/to/image"), or the device target shorthand (the
+ * <target dev='...'/> sub-element, such as "vda").  Valid names
+ * can be found by calling virDomainGetXMLDesc() and inspecting
+ * elements within //domain/devices/disk.
+ *
+ * The @params and @nparams arguments can be used to set hypervisor-specific
+ * tuning parameters, such as maximum bandwidth or granularity.  For a
+ * parameter that the hypervisor understands, explicitly specifying 0
+ * behaves the same as omitting the parameter, to use the hypervisor
+ * default; however, omitting a parameter is less likely to fail.
+ *
+ * This command is a superset of the older virDomainBlockRebase() when used
+ * with the VIR_DOMAIN_BLOCK_REBASE_COPY flag, and offers better control
+ * over the destination format, the ability to copy to a destination that
+ * is not a local file, and the possibility of additional tuning parameters.
+ *
+ * Returns 0 if the operation has started, -1 on failure.
+ */
+int
+virDomainBlockCopy(virDomainPtr dom, const char *disk,
+                   const char *destxml,
+                   virTypedParameterPtr params,
+                   int nparams,
+                   unsigned int flags)
+{
+    virConnectPtr conn;
+
+    VIR_DOMAIN_DEBUG(dom,
+                     "disk=%s, destxml=%s, params=%p, nparams=%d, flags=%x",
+                     disk, destxml, params, nparams, flags);
+    VIR_TYPED_PARAMS_DEBUG(params, nparams);
+
+    virResetLastError();
+
+    virCheckDomainReturn(dom, -1);
+    conn = dom->conn;
+
+    virCheckReadOnlyGoto(conn->flags, error);
+    virCheckNonNullArgGoto(disk, error);
+    virCheckNonNullArgGoto(destxml, error);
+    virCheckNonNegativeArgGoto(nparams, error);
+    if (nparams)
+        virCheckNonNullArgGoto(params, error);
+
+    if (conn->driver->domainBlockCopy) {
+        int ret;
+        ret = conn->driver->domainBlockCopy(dom, disk, destxml,
+                                            params, nparams, flags);
+        if (ret < 0)
+            goto error;
+        return ret;
+    }
+
+    virReportUnsupportedError();
+
+ error:
+    virDispatchError(dom->conn);
+    return -1;
+}
+
+
+/**
  * virDomainBlockCommit:
  * @dom: pointer to domain object
  * @disk: path to the block device, or device shorthand
@@ -19974,7 +20144,7 @@ virDomainBlockRebase(virDomainPtr dom, const char *disk,
  *        or NULL for default
  * @top: path to file within backing chain that contains data to be merged,
  *       or device shorthand, or NULL to merge all possible data
- * @bandwidth: (optional) specify commit bandwidth limit in MiB/s
+ * @bandwidth: (optional) specify bandwidth limit; flags determine the unit
  * @flags: bitwise-OR of virDomainBlockCommitFlags
  *
  * Commit changes that were made to temporary top-level files within a disk
@@ -20052,12 +20222,20 @@ virDomainBlockRebase(virDomainPtr dom, const char *disk,
  * example, "vda[3]" refers to the backing store with index equal to "3"
  * in the chain of disk "vda".
  *
- * The maximum bandwidth (in MiB/s) that will be used to do the commit can be
- * specified with the bandwidth parameter.  If set to 0, libvirt will choose a
- * suitable default.  Some hypervisors do not support this feature and will
- * return an error if bandwidth is not 0; in this case, it might still be
- * possible for a later call to virDomainBlockJobSetSpeed() to succeed.
- * The actual speed can be determined with virDomainGetBlockJobInfo().
+ * The maximum bandwidth that will be used to do the commit can be
+ * specified with the @bandwidth parameter.  If set to 0, there is no
+ * limit.  If @flags includes VIR_DOMAIN_BLOCK_COMMIT_BANDWIDTH_BYTES,
+ * @bandwidth is in bytes/second; otherwise, it is in MiB/second.
+ * Values larger than 2^52 bytes/sec may be rejected due to overflow
+ * considerations based on the word size of both client and server,
+ * and values larger than 2^31 bytes/sec may cause overflow problems
+ * if later queried by virDomainGetBlockJobInfo() without scaling.
+ * Hypervisors may further restrict the range of valid bandwidth
+ * values.  Some hypervisors do not support this feature and will
+ * return an error if bandwidth is not 0; in this case, it might still
+ * be possible for a later call to virDomainBlockJobSetSpeed() to
+ * succeed.  The actual speed can be determined with
+ * virDomainGetBlockJobInfo().
  *
  * Returns 0 if the operation has started, -1 on failure.
  */
@@ -20160,6 +20338,63 @@ virDomainOpenGraphics(virDomainPtr dom,
     if (dom->conn->driver->domainOpenGraphics) {
         int ret;
         ret = dom->conn->driver->domainOpenGraphics(dom, idx, fd, flags);
+        if (ret < 0)
+            goto error;
+        return ret;
+    }
+
+    virReportUnsupportedError();
+
+ error:
+    virDispatchError(dom->conn);
+    return -1;
+}
+
+
+/**
+ * virDomainOpenGraphicsFD:
+ * @dom: pointer to domain object
+ * @idx: index of graphics config to open
+ * @flags: bitwise-OR of virDomainOpenGraphicsFlags
+ *
+ * This will create a socket pair connected to the graphics backend of @dom.
+ * One end of the socket will be returned on success, and the other end is
+ * handed to the hypervisor.
+ * If @dom has multiple graphics backends configured, then @idx will determine
+ * which one is opened, starting from @idx 0.
+ *
+ * To disable any authentication, pass the VIR_DOMAIN_OPEN_GRAPHICS_SKIPAUTH
+ * constant for @flags.
+ *
+ * This method can only be used when connected to a local
+ * libvirt hypervisor, over a UNIX domain socket. Attempts
+ * to use this method over a TCP connection will always fail.
+ *
+ * Returns an fd on success, -1 on failure
+ */
+int
+virDomainOpenGraphicsFD(virDomainPtr dom,
+                        unsigned int idx,
+                        unsigned int flags)
+{
+    VIR_DOMAIN_DEBUG(dom, "idx=%u, flags=%x", idx, flags);
+
+    virResetLastError();
+
+    virCheckDomainReturn(dom, -1);
+
+    virCheckReadOnlyGoto(dom->conn->flags, error);
+
+    if (!VIR_DRV_SUPPORTS_FEATURE(dom->conn->driver, dom->conn,
+                                  VIR_DRV_FEATURE_FD_PASSING)) {
+        virReportError(VIR_ERR_ARGUMENT_UNSUPPORTED, "%s",
+                       _("fd passing is not supported by this connection"));
+        goto error;
+    }
+
+    if (dom->conn->driver->domainOpenGraphicsFD) {
+        int ret;
+        ret = dom->conn->driver->domainOpenGraphicsFD(dom, idx, flags);
         if (ret < 0)
             goto error;
         return ret;
@@ -21072,7 +21307,7 @@ virDomainSetTime(virDomainPtr dom,
  * @flags: extra flags; not used yet, so callers should always pass 0
  *
  * This calls queries the host system on free pages of
- * specified size. Ont the input, @pages is expected to be
+ * specified size. For the input, @pages is expected to be
  * filled with pages that caller is interested in (the size
  * unit is kibibytes, so e.g. pass 2048 for 2MB), then @startcell
  * refers to the first NUMA node that info should be collected
@@ -21332,4 +21567,350 @@ virConnectGetDomainCapabilities(virConnectPtr conn,
  error:
     virDispatchError(conn);
     return NULL;
+}
+
+
+/**
+ * virConnectGetAllDomainStats:
+ * @conn: pointer to the hypervisor connection
+ * @stats: stats to return, binary-OR of virDomainStatsTypes
+ * @retStats: Pointer that will be filled with the array of returned stats
+ * @flags: extra flags; binary-OR of virConnectGetAllDomainStatsFlags
+ *
+ * Query statistics for all domains on a given connection.
+ *
+ * Report statistics of various parameters for a running VM according to @stats
+ * field. The statistics are returned as an array of structures for each queried
+ * domain. The structure contains an array of typed parameters containing the
+ * individual statistics. The typed parameter name for each statistic field
+ * consists of a dot-separated string containing name of the requested group
+ * followed by a group specific description of the statistic value.
+ *
+ * The statistic groups are enabled using the @stats parameter which is a
+ * binary-OR of enum virDomainStatsTypes. The following groups are available
+ * (although not necessarily implemented for each hypervisor):
+ *
+ * VIR_DOMAIN_STATS_STATE: Return domain state and reason for entering that
+ * state. The typed parameter keys are in this format:
+ * "state.state" - state of the VM, returned as int from virDomainState enum
+ * "state.reason" - reason for entering given state, returned as int from
+ *                  virDomain*Reason enum corresponding to given state.
+ *
+ * VIR_DOMAIN_STATS_CPU_TOTAL: Return CPU statistics and usage information.
+ * The typed parameter keys are in this format:
+ * "cpu.time" - total cpu time spent for this domain in nanoseconds
+ *              as unsigned long long.
+ * "cpu.user" - user cpu time spent in nanoseconds as unsigned long long.
+ * "cpu.system" - system cpu time spent in nanoseconds as unsigned long long.
+ *
+ * VIR_DOMAIN_STATS_BALLOON: Return memory balloon device information.
+ * The typed parameter keys are in this format:
+ * "balloon.current" - the memory in kiB currently used
+ *                     as unsigned long long.
+ * "balloon.maximum" - the maximum memory in kiB allowed
+ *                     as unsigned long long.
+ *
+ * VIR_DOMAIN_STATS_VCPU: Return virtual CPU statistics.
+ * Due to VCPU hotplug, the vcpu.<num>.* array could be sparse.
+ * The actual size of the array corresponds to "vcpu.current".
+ * The array size will never exceed "vcpu.maximum".
+ * The typed parameter keys are in this format:
+ * "vcpu.current" - current number of online virtual CPUs as unsigned int.
+ * "vcpu.maximum" - maximum number of online virtual CPUs as unsigned int.
+ * "vcpu.<num>.state" - state of the virtual CPU <num>, as int
+ *                      from virVcpuState enum.
+ * "vcpu.<num>.time" - virtual cpu time spent by virtual CPU <num>
+ *                     as unsigned long long.
+ *
+ * VIR_DOMAIN_STATS_INTERFACE: Return network interface statistics.
+ * The typed parameter keys are in this format:
+ * "net.count" - number of network interfaces on this domain
+ *               as unsigned int.
+ * "net.<num>.name" - name of the interface <num> as string.
+ * "net.<num>.rx.bytes" - bytes received as unsigned long long.
+ * "net.<num>.rx.pkts" - packets received as unsigned long long.
+ * "net.<num>.rx.errs" - receive errors as unsigned long long.
+ * "net.<num>.rx.drop" - receive packets dropped as unsigned long long.
+ * "net.<num>.tx.bytes" - bytes transmitted as unsigned long long.
+ * "net.<num>.tx.pkts" - packets transmitted as unsigned long long.
+ * "net.<num>.tx.errs" - transmission errors as unsigned long long.
+ * "net.<num>.tx.drop" - transmit packets dropped as unsigned long long.
+ *
+ * VIR_DOMAIN_STATS_BLOCK: Return block devices statistics.
+ * The typed parameter keys are in this format:
+ * "block.count" - number of block devices on this domain
+ *                 as unsigned int.
+ * "block.<num>.name" - name of the block device <num> as string.
+ *                      matches the target name (vda/sda/hda) of the
+ *                      block device.
+ * "block.<num>.rd.reqs" - number of read requests as unsigned long long.
+ * "block.<num>.rd.bytes" - number of read bytes as unsigned long long.
+ * "block.<num>.rd.times" - total time (ns) spent on reads as
+ *                          unsigned long long.
+ * "block.<num>.wr.reqs" - number of write requests as unsigned long long.
+ * "block.<num>.wr.bytes" - number of written bytes as unsigned long long.
+ * "block.<num>.wr.times" - total time (ns) spent on writes as
+ *                          unsigned long long.
+ * "block.<num>.fl.reqs" - total flush requests as unsigned long long.
+ * "block.<num>.fl.times" - total time (ns) spent on cache flushing as
+ *                          unsigned long long.
+ * "block.<num>.errors" - Xen only: the 'oo_req' value as
+ *                        unsigned long long.
+ *
+ * Note that entire stats groups or individual stat fields may be missing from
+ * the output in case they are not supported by the given hypervisor, are not
+ * applicable for the current state of the guest domain, or their retrieval
+ * was not successful.
+ *
+ * Using 0 for @stats returns all stats groups supported by the given
+ * hypervisor.
+ *
+ * Specifying VIR_CONNECT_GET_ALL_DOMAINS_STATS_ENFORCE_STATS as @flags makes
+ * the function return error in case some of the stat types in @stats were
+ * not recognized by the daemon.
+ *
+ * Similarly to virConnectListAllDomains, @flags can contain various flags to
+ * filter the list of domains to provide stats for.
+ *
+ * VIR_CONNECT_GET_ALL_DOMAINS_STATS_ACTIVE selects online domains while
+ * VIR_CONNECT_GET_ALL_DOMAINS_STATS_INACTIVE selects offline ones.
+ *
+ * VIR_CONNECT_GET_ALL_DOMAINS_STATS_PERSISTENT and
+ * VIR_CONNECT_GET_ALL_DOMAINS_STATS_TRANSIENT allow to filter the list
+ * according to their persistence.
+ *
+ * To filter the list of VMs by domain state @flags can contain
+ * VIR_CONNECT_GET_ALL_DOMAINS_STATS_RUNNING,
+ * VIR_CONNECT_GET_ALL_DOMAINS_STATS_PAUSED,
+ * VIR_CONNECT_GET_ALL_DOMAINS_STATS_SHUTOFF and/or
+ * VIR_CONNECT_GET_ALL_DOMAINS_STATS_OTHER for all other states.
+ *
+ * Returns the count of returned statistics structures on success, -1 on error.
+ * The requested data are returned in the @retStats parameter. The returned
+ * array should be freed by the caller. See virDomainStatsRecordListFree.
+ */
+int
+virConnectGetAllDomainStats(virConnectPtr conn,
+                            unsigned int stats,
+                            virDomainStatsRecordPtr **retStats,
+                            unsigned int flags)
+{
+    int ret = -1;
+
+    VIR_DEBUG("conn=%p, stats=0x%x, retStats=%p, flags=0x%x",
+              conn, stats, retStats, flags);
+
+    virResetLastError();
+
+    virCheckConnectReturn(conn, -1);
+    virCheckNonNullArgGoto(retStats, cleanup);
+
+    if (!conn->driver->connectGetAllDomainStats) {
+        virReportUnsupportedError();
+        goto cleanup;
+    }
+
+    ret = conn->driver->connectGetAllDomainStats(conn, NULL, 0, stats,
+                                                 retStats, flags);
+
+ cleanup:
+    if (ret < 0)
+        virDispatchError(conn);
+
+    return ret;
+}
+
+
+/**
+ * virDomainListGetStats:
+ * @doms: NULL terminated array of domains
+ * @stats: stats to return, binary-OR of virDomainStatsTypes
+ * @retStats: Pointer that will be filled with the array of returned stats
+ * @flags: extra flags; binary-OR of virConnectGetAllDomainStatsFlags
+ *
+ * Query statistics for domains provided by @doms. Note that all domains in
+ * @doms must share the same connection.
+ *
+ * Report statistics of various parameters for a running VM according to @stats
+ * field. The statistics are returned as an array of structures for each queried
+ * domain. The structure contains an array of typed parameters containing the
+ * individual statistics. The typed parameter name for each statistic field
+ * consists of a dot-separated string containing name of the requested group
+ * followed by a group specific description of the statistic value.
+ *
+ * The statistic groups are enabled using the @stats parameter which is a
+ * binary-OR of enum virDomainStatsTypes. The stats groups are documented
+ * in virConnectGetAllDomainStats.
+ *
+ * Using 0 for @stats returns all stats groups supported by the given
+ * hypervisor.
+ *
+ * Specifying VIR_CONNECT_GET_ALL_DOMAINS_STATS_ENFORCE_STATS as @flags makes
+ * the function return error in case some of the stat types in @stats were
+ * not recognized by the daemon.
+ *
+ * Note that any of the domain list filtering flags in @flags will be rejected
+ * by this function.
+ *
+ * Returns the count of returned statistics structures on success, -1 on error.
+ * The requested data are returned in the @retStats parameter. The returned
+ * array should be freed by the caller. See virDomainStatsRecordListFree.
+ * Note that the count of returned stats may be less than the domain count
+ * provided via @doms.
+ */
+int
+virDomainListGetStats(virDomainPtr *doms,
+                      unsigned int stats,
+                      virDomainStatsRecordPtr **retStats,
+                      unsigned int flags)
+{
+    virConnectPtr conn = NULL;
+    virDomainPtr *nextdom = doms;
+    unsigned int ndoms = 0;
+    int ret = -1;
+
+    VIR_DEBUG("doms=%p, stats=0x%x, retStats=%p, flags=0x%x",
+              doms, stats, retStats, flags);
+
+    virResetLastError();
+
+    virCheckNonNullArgGoto(doms, cleanup);
+    virCheckNonNullArgGoto(retStats, cleanup);
+
+    if (!*doms) {
+        virReportError(VIR_ERR_INVALID_ARG,
+                       _("doms array in %s must contain at least one domain"),
+                       __FUNCTION__);
+        goto cleanup;
+    }
+
+    conn = doms[0]->conn;
+    virCheckConnectReturn(conn, -1);
+
+    if (!conn->driver->connectGetAllDomainStats) {
+        virReportUnsupportedError();
+        goto cleanup;
+    }
+
+    while (*nextdom) {
+        virDomainPtr dom = *nextdom;
+
+        virCheckDomainGoto(dom, cleanup);
+
+        if (dom->conn != conn) {
+            virReportError(VIR_ERR_INVALID_ARG,
+                           _("domains in 'doms' array must belong to a "
+                             "single connection in %s"), __FUNCTION__);
+            goto cleanup;
+        }
+
+        ndoms++;
+        nextdom++;
+    }
+
+    ret = conn->driver->connectGetAllDomainStats(conn, doms, ndoms,
+                                                 stats, retStats, flags);
+
+ cleanup:
+    if (ret < 0)
+        virDispatchError(conn);
+    return ret;
+}
+
+
+/**
+ * virDomainStatsRecordListFree:
+ * @stats: NULL terminated array of virDomainStatsRecords to free
+ *
+ * Convenience function to free a list of domain stats returned by
+ * virDomainListGetStats and virConnectGetAllDomainStats.
+ */
+void
+virDomainStatsRecordListFree(virDomainStatsRecordPtr *stats)
+{
+    virDomainStatsRecordPtr *next;
+
+    if (!stats)
+        return;
+
+    for (next = stats; *next; next++) {
+        virTypedParamsFree((*next)->params, (*next)->nparams);
+        virDomainFree((*next)->dom);
+        VIR_FREE(*next);
+    }
+
+    VIR_FREE(stats);
+}
+
+
+/**
+ * virNodeAllocPages:
+ * @conn: pointer to the hypervisor connection
+ * @npages: number of items in the @pageSizes and
+ *          @pageCounts arrays
+ * @pageSizes: which huge page sizes to allocate
+ * @pageCounts: how many pages should be allocated
+ * @startCell: index of first cell to allocate pages on
+ * @cellCount: number of consecutive cells to allocate pages on
+ * @flags: extra flags; binary-OR of virNodeAllocPagesFlags
+ *
+ * Sometimes, when trying to start a new domain, it may be
+ * necessary to reserve some huge pages in the system pool which
+ * can be then allocated by the domain. This API serves that
+ * purpose. On its input, @pageSizes and @pageCounts are arrays
+ * of the same cardinality of @npages. The @pageSizes contains
+ * page sizes which are to be allocated in the system (the size
+ * unit is kibibytes), and @pageCounts then contains the number
+ * of pages to reserve.  If @flags is 0
+ * (VIR_NODE_ALLOC_PAGES_ADD), each pool corresponding to
+ * @pageSizes grows by the number of pages specified in the
+ * corresponding @pageCounts.  If @flags contains
+ * VIR_NODE_ALLOC_PAGES_SET, each pool mentioned is resized to
+ * the given number of pages.  The pages pool can be allocated
+ * over several NUMA nodes at once, just point at @startCell and
+ * tell how many subsequent NUMA nodes should be taken in. As a
+ * special case, if @startCell is equal to negative one, then
+ * kernel is instructed to allocate the pages over all NUMA nodes
+ * proportionally.
+ *
+ * Returns: the number of nodes successfully adjusted or -1 in
+ * case of an error.
+ */
+int
+virNodeAllocPages(virConnectPtr conn,
+                  unsigned int npages,
+                  unsigned int *pageSizes,
+                  unsigned long long *pageCounts,
+                  int startCell,
+                  unsigned int cellCount,
+                  unsigned int flags)
+{
+    VIR_DEBUG("conn=%p npages=%u pageSizes=%p pageCounts=%p "
+              "startCell=%d cellCount=%u flagx=%x",
+              conn, npages, pageSizes, pageCounts, startCell,
+              cellCount, flags);
+
+    virResetLastError();
+
+    virCheckConnectReturn(conn, -1);
+    virCheckReadOnlyGoto(conn->flags, error);
+    virCheckNonZeroArgGoto(npages, error);
+    virCheckNonNullArgGoto(pageSizes, error);
+    virCheckNonNullArgGoto(pageCounts, error);
+    virCheckNonZeroArgGoto(cellCount, error);
+
+    if (conn->driver->nodeAllocPages) {
+        int ret;
+        ret = conn->driver->nodeAllocPages(conn, npages, pageSizes,
+                                           pageCounts, startCell,
+                                           cellCount, flags);
+        if (ret < 0)
+            goto error;
+        return ret;
+    }
+
+    virReportUnsupportedError();
+ error:
+    virDispatchError(conn);
+    return -1;
 }

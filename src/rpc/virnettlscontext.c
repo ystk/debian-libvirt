@@ -43,7 +43,7 @@
 #include "virthread.h"
 #include "configmake.h"
 
-#define DH_BITS 1024
+#define DH_BITS 2048
 
 #define LIBVIRT_PKI_DIR SYSCONFDIR "/pki"
 #define LIBVIRT_CACERT LIBVIRT_PKI_DIR "/CA/cacert.pem"
@@ -1003,7 +1003,7 @@ static int virNetTLSContextValidCertificate(virNetTLSContextPtr ctxt,
 
     memset(dname, 0, dnamesize);
 
-    if ((ret = gnutls_certificate_verify_peers2(sess->session, &status)) < 0){
+    if ((ret = gnutls_certificate_verify_peers2(sess->session, &status)) < 0) {
         virReportError(VIR_ERR_SYSTEM_ERROR,
                        _("Unable to verify TLS peer: %s"),
                        gnutls_strerror(ret));

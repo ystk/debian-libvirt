@@ -96,6 +96,7 @@ src/openvz/openvz_driver.c
 src/openvz/openvz_util.c
 src/parallels/parallels_driver.c
 src/parallels/parallels_network.c
+src/parallels/parallels_sdk.c
 src/parallels/parallels_utils.c
 src/parallels/parallels_utils.h
 src/parallels/parallels_storage.c
@@ -148,6 +149,7 @@ src/storage/storage_backend_mpath.c
 src/storage/storage_backend_rbd.c
 src/storage/storage_backend_scsi.c
 src/storage/storage_backend_sheepdog.c
+src/storage/storage_backend_zfs.c
 src/storage/storage_driver.c
 src/test/test_driver.c
 src/uml/uml_conf.c
@@ -193,6 +195,7 @@ src/util/virnuma.c
 src/util/virobject.c
 src/util/virpci.c
 src/util/virpidfile.c
+src/util/virpolkit.c
 src/util/virportallocator.c
 src/util/virprocess.c
 src/util/virrandom.c
@@ -216,6 +219,7 @@ src/util/virxml.c
 src/vbox/vbox_MSCOMGlue.c
 src/vbox/vbox_XPCOMCGlue.c
 src/vbox/vbox_driver.c
+src/vbox/vbox_common.c
 src/vbox/vbox_snapshot_conf.c
 src/vbox/vbox_tmpl.c
 src/vmware/vmware_conf.c
@@ -230,8 +234,10 @@ src/xen/xm_internal.c
 src/xen/xs_internal.c
 src/xenapi/xenapi_driver.c
 src/xenapi/xenapi_utils.c
-src/xenxs/xen_sxpr.c
-src/xenxs/xen_xm.c
+src/xenconfig/xen_common.c
+src/xenconfig/xen_sxpr.c
+src/xenconfig/xen_xm.c
+tests/virpolkittest.c
 tools/libvirt-guests.sh.in
 tools/virsh.c
 tools/virsh.h

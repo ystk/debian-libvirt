@@ -731,7 +731,9 @@ virSecuritySELinuxReserveSecurityLabel(virSecurityManagerPtr mgr,
     virSecurityLabelDefPtr seclabel;
 
     seclabel = virDomainDefGetSecurityLabelDef(def, SECURITY_SELINUX_NAME);
-    if (!seclabel || seclabel->type == VIR_DOMAIN_SECLABEL_STATIC)
+    if (!seclabel ||
+        seclabel->type == VIR_DOMAIN_SECLABEL_NONE ||
+        seclabel->type == VIR_DOMAIN_SECLABEL_STATIC)
         return 0;
 
     if (getpidcon_raw(pid, &pctx) == -1) {
@@ -1327,7 +1329,8 @@ virSecuritySELinuxSetSecurityHostdevSubsysLabel(virDomainDefPtr def,
     /* Like virSecuritySELinuxSetSecurityImageLabelInternal() for a networked
      * disk, do nothing for an iSCSI hostdev
      */
-    if (scsisrc->protocol == VIR_DOMAIN_HOSTDEV_SCSI_PROTOCOL_TYPE_ISCSI)
+    if (dev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI &&
+        scsisrc->protocol == VIR_DOMAIN_HOSTDEV_SCSI_PROTOCOL_TYPE_ISCSI)
         return 0;
 
     switch (dev->source.subsys.type) {
@@ -1520,7 +1523,8 @@ virSecuritySELinuxRestoreSecurityHostdevSubsysLabel(virSecurityManagerPtr mgr,
     /* Like virSecuritySELinuxRestoreSecurityImageLabelInt() for a networked
      * disk, do nothing for an iSCSI hostdev
      */
-    if (scsisrc->protocol == VIR_DOMAIN_HOSTDEV_SCSI_PROTOCOL_TYPE_ISCSI)
+    if (dev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI &&
+        scsisrc->protocol == VIR_DOMAIN_HOSTDEV_SCSI_PROTOCOL_TYPE_ISCSI)
         return 0;
 
     switch (dev->source.subsys.type) {
@@ -1911,6 +1915,10 @@ virSecuritySELinuxRestoreSecurityAllLabel(virSecurityManagerPtr mgr,
                                      mgr) < 0)
         rc = -1;
 
+    if (def->os.loader && def->os.loader->nvram &&
+        virSecuritySELinuxRestoreSecurityFileLabel(mgr, def->os.loader->nvram) < 0)
+        rc = -1;
+
     if (def->os.kernel &&
         virSecuritySELinuxRestoreSecurityFileLabel(mgr, def->os.kernel) < 0)
         rc = -1;
@@ -2292,6 +2300,13 @@ virSecuritySELinuxSetSecurityAllLabel(virSecurityManagerPtr mgr,
                                      true,
                                      virSecuritySELinuxSetSecuritySmartcardCallback,
                                      mgr) < 0)
+        return -1;
+
+    /* This is different than kernel or initrd. The nvram store
+     * is really a disk, qemu can read and write to it. */
+    if (def->os.loader && def->os.loader->nvram &&
+        secdef && secdef->imagelabel &&
+        virSecuritySELinuxSetFilecon(def->os.loader->nvram, secdef->imagelabel) < 0)
         return -1;
 
     if (def->os.kernel &&

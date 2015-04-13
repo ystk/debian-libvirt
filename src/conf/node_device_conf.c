@@ -187,7 +187,7 @@ virNodeDeviceObjPtr virNodeDeviceAssignDef(virNodeDeviceObjListPtr devs,
     }
     virNodeDeviceObjLock(device);
 
-    if (VIR_APPEND_ELEMENT_COPY(devs->objs, devs->count, device) < 0){
+    if (VIR_APPEND_ELEMENT_COPY(devs->objs, devs->count, device) < 0) {
         virNodeDeviceObjUnlock(device);
         virNodeDeviceObjFree(device);
         return NULL;
@@ -683,9 +683,9 @@ virNodeDevCapStorageParseXML(xmlXPathContextPtr ctxt,
             goto out;
         }
 
-        if (STREQ(type, "hotpluggable"))
+        if (STREQ(type, "hotpluggable")) {
             data->storage.flags |= VIR_NODE_DEV_CAP_STORAGE_HOTPLUGGABLE;
-        else if (STREQ(type, "removable")) {
+        } else if (STREQ(type, "removable")) {
             xmlNodePtr orignode2;
 
             data->storage.flags |= VIR_NODE_DEV_CAP_STORAGE_REMOVABLE;
@@ -1732,12 +1732,12 @@ virNodeDeviceCapMatch(virNodeDeviceObjPtr devobj,
             return true;
 
         if (cap->type == VIR_NODE_DEV_CAP_SCSI_HOST) {
-            if (type == VIR_CONNECT_LIST_NODE_DEVICES_CAP_FC_HOST &&
+            if (type == VIR_NODE_DEV_CAP_FC_HOST &&
                 (cap->data.scsi_host.flags &
                  VIR_NODE_DEV_CAP_FLAG_HBA_FC_HOST))
                 return true;
 
-            if (type == VIR_CONNECT_LIST_NODE_DEVICES_CAP_VPORTS &&
+            if (type == VIR_NODE_DEV_CAP_VPORTS &&
                 (cap->data.scsi_host.flags &
                  VIR_NODE_DEV_CAP_FLAG_HBA_VPORT_OPS))
                 return true;

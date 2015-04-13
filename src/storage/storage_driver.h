@@ -26,6 +26,7 @@
 
 # include <sys/stat.h>
 
+# include "domain_conf.h"
 # include "storage_conf.h"
 # include "virstoragefile.h"
 
@@ -49,8 +50,12 @@ bool virStorageFileSupportsSecurityDriver(virStorageSourcePtr src);
 
 int virStorageFileGetMetadata(virStorageSourcePtr src,
                               uid_t uid, gid_t gid,
-                              bool allow_probe)
+                              bool allow_probe,
+                              bool report_broken)
     ATTRIBUTE_NONNULL(1);
+
+int virStorageTranslateDiskSourcePool(virConnectPtr conn,
+                                      virDomainDiskDefPtr def);
 
 int storageRegister(void);
 

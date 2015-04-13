@@ -508,6 +508,28 @@ cleanup:
 
 
 
+static int remoteDispatchConnectGetAllDomainStats(
+    virNetServerPtr server,
+    virNetServerClientPtr client,
+    virNetMessagePtr msg,
+    virNetMessageErrorPtr rerr,
+    remote_connect_get_all_domain_stats_args *args,
+    remote_connect_get_all_domain_stats_ret *ret);
+static int remoteDispatchConnectGetAllDomainStatsHelper(
+    virNetServerPtr server,
+    virNetServerClientPtr client,
+    virNetMessagePtr msg,
+    virNetMessageErrorPtr rerr,
+    void *args,
+    void *ret)
+{
+  VIR_DEBUG("server=%p client=%p msg=%p rerr=%p args=%p ret=%p", server, client, msg, rerr, args, ret);
+  return remoteDispatchConnectGetAllDomainStats(server, client, msg, rerr, args, ret);
+}
+/* remoteDispatchConnectGetAllDomainStats body has to be implemented manually */
+
+
+
 static int remoteDispatchConnectGetCapabilities(
     virNetServerPtr server,
     virNetServerClientPtr client,
@@ -2582,6 +2604,67 @@ cleanup:
         virNetMessageSaveError(rerr);
     if (dom)
         virDomainFree(dom);
+    return rv;
+}
+
+
+
+static int remoteDispatchDomainBlockCopy(
+    virNetServerPtr server,
+    virNetServerClientPtr client,
+    virNetMessagePtr msg,
+    virNetMessageErrorPtr rerr,
+    remote_domain_block_copy_args *args);
+static int remoteDispatchDomainBlockCopyHelper(
+    virNetServerPtr server,
+    virNetServerClientPtr client,
+    virNetMessagePtr msg,
+    virNetMessageErrorPtr rerr,
+    void *args,
+    void *ret ATTRIBUTE_UNUSED)
+{
+  VIR_DEBUG("server=%p client=%p msg=%p rerr=%p args=%p ret=%p", server, client, msg, rerr, args, ret);
+  return remoteDispatchDomainBlockCopy(server, client, msg, rerr, args);
+}
+static int remoteDispatchDomainBlockCopy(
+    virNetServerPtr server ATTRIBUTE_UNUSED,
+    virNetServerClientPtr client,
+    virNetMessagePtr msg ATTRIBUTE_UNUSED,
+    virNetMessageErrorPtr rerr,
+    remote_domain_block_copy_args *args)
+{
+    int rv = -1;
+    virDomainPtr dom = NULL;
+    virTypedParameterPtr params = NULL;
+    int nparams = 0;
+    struct daemonClientPrivate *priv =
+        virNetServerClientGetPrivateData(client);
+
+    if (!priv->conn) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("connection not open"));
+        goto cleanup;
+    }
+
+    if (!(dom = get_nonnull_domain(priv->conn, args->dom)))
+        goto cleanup;
+
+    if ((params = remoteDeserializeTypedParameters(args->params.params_val,
+                                                   args->params.params_len,
+                                                   REMOTE_DOMAIN_BLOCK_COPY_PARAMETERS_MAX,
+                                                   &nparams)) == NULL)
+        goto cleanup;
+
+    if (virDomainBlockCopy(dom, args->path, args->destxml, params, nparams, args->flags) < 0)
+        goto cleanup;
+
+    rv = 0;
+
+cleanup:
+    if (rv < 0)
+        virNetMessageSaveError(rerr);
+    if (dom)
+        virDomainFree(dom);
+    virTypedParamsFree(params, nparams);
     return rv;
 }
 
@@ -6576,6 +6659,27 @@ static int remoteDispatchDomainOpenGraphicsHelper(
 
 
 
+static int remoteDispatchDomainOpenGraphicsFd(
+    virNetServerPtr server,
+    virNetServerClientPtr client,
+    virNetMessagePtr msg,
+    virNetMessageErrorPtr rerr,
+    remote_domain_open_graphics_fd_args *args);
+static int remoteDispatchDomainOpenGraphicsFdHelper(
+    virNetServerPtr server,
+    virNetServerClientPtr client,
+    virNetMessagePtr msg,
+    virNetMessageErrorPtr rerr,
+    void *args,
+    void *ret ATTRIBUTE_UNUSED)
+{
+  VIR_DEBUG("server=%p client=%p msg=%p rerr=%p args=%p ret=%p", server, client, msg, rerr, args, ret);
+  return remoteDispatchDomainOpenGraphicsFd(server, client, msg, rerr, args);
+}
+/* remoteDispatchDomainOpenGraphicsFd body has to be implemented manually */
+
+
+
 static int remoteDispatchDomainPinEmulator(
     virNetServerPtr server,
     virNetServerClientPtr client,
@@ -7583,7 +7687,7 @@ static int remoteDispatchDomainSetBlkioParameters(
     int rv = -1;
     virDomainPtr dom = NULL;
     virTypedParameterPtr params = NULL;
-    int nparams = 0;;
+    int nparams = 0;
     struct daemonClientPrivate *priv =
         virNetServerClientGetPrivateData(client);
 
@@ -7644,7 +7748,7 @@ static int remoteDispatchDomainSetBlockIoTune(
     int rv = -1;
     virDomainPtr dom = NULL;
     virTypedParameterPtr params = NULL;
-    int nparams = 0;;
+    int nparams = 0;
     struct daemonClientPrivate *priv =
         virNetServerClientGetPrivateData(client);
 
@@ -7705,7 +7809,7 @@ static int remoteDispatchDomainSetInterfaceParameters(
     int rv = -1;
     virDomainPtr dom = NULL;
     virTypedParameterPtr params = NULL;
-    int nparams = 0;;
+    int nparams = 0;
     struct daemonClientPrivate *priv =
         virNetServerClientGetPrivateData(client);
 
@@ -7931,7 +8035,7 @@ static int remoteDispatchDomainSetMemoryParameters(
     int rv = -1;
     virDomainPtr dom = NULL;
     virTypedParameterPtr params = NULL;
-    int nparams = 0;;
+    int nparams = 0;
     struct daemonClientPrivate *priv =
         virNetServerClientGetPrivateData(client);
 
@@ -8103,7 +8207,7 @@ static int remoteDispatchDomainSetNumaParameters(
     int rv = -1;
     virDomainPtr dom = NULL;
     virTypedParameterPtr params = NULL;
-    int nparams = 0;;
+    int nparams = 0;
     struct daemonClientPrivate *priv =
         virNetServerClientGetPrivateData(client);
 
@@ -8164,7 +8268,7 @@ static int remoteDispatchDomainSetSchedulerParameters(
     int rv = -1;
     virDomainPtr dom = NULL;
     virTypedParameterPtr params = NULL;
-    int nparams = 0;;
+    int nparams = 0;
     struct daemonClientPrivate *priv =
         virNetServerClientGetPrivateData(client);
 
@@ -8225,7 +8329,7 @@ static int remoteDispatchDomainSetSchedulerParametersFlags(
     int rv = -1;
     virDomainPtr dom = NULL;
     virTypedParameterPtr params = NULL;
-    int nparams = 0;;
+    int nparams = 0;
     struct daemonClientPrivate *priv =
         virNetServerClientGetPrivateData(client);
 
@@ -10823,6 +10927,28 @@ cleanup:
 
 
 
+static int remoteDispatchNodeAllocPages(
+    virNetServerPtr server,
+    virNetServerClientPtr client,
+    virNetMessagePtr msg,
+    virNetMessageErrorPtr rerr,
+    remote_node_alloc_pages_args *args,
+    remote_node_alloc_pages_ret *ret);
+static int remoteDispatchNodeAllocPagesHelper(
+    virNetServerPtr server,
+    virNetServerClientPtr client,
+    virNetMessagePtr msg,
+    virNetMessageErrorPtr rerr,
+    void *args,
+    void *ret)
+{
+  VIR_DEBUG("server=%p client=%p msg=%p rerr=%p args=%p ret=%p", server, client, msg, rerr, args, ret);
+  return remoteDispatchNodeAllocPages(server, client, msg, rerr, args, ret);
+}
+/* remoteDispatchNodeAllocPages body has to be implemented manually */
+
+
+
 static int remoteDispatchNodeDeviceCreateXML(
     virNetServerPtr server,
     virNetServerClientPtr client,
@@ -11884,7 +12010,7 @@ static int remoteDispatchNodeSetMemoryParameters(
 {
     int rv = -1;
     virTypedParameterPtr params = NULL;
-    int nparams = 0;;
+    int nparams = 0;
     struct daemonClientPrivate *priv =
         virNetServerClientGetPrivateData(client);
 
@@ -17507,6 +17633,51 @@ virNetServerProgramProc remoteProcs[] = {
    (xdrproc_t)xdr_remote_connect_get_domain_capabilities_args,
    sizeof(remote_connect_get_domain_capabilities_ret),
    (xdrproc_t)xdr_remote_connect_get_domain_capabilities_ret,
+   true,
+   0
+},
+{ /* Method DomainOpenGraphicsFd => 343 */
+   remoteDispatchDomainOpenGraphicsFdHelper,
+   sizeof(remote_domain_open_graphics_fd_args),
+   (xdrproc_t)xdr_remote_domain_open_graphics_fd_args,
+   0,
+   (xdrproc_t)xdr_void,
+   true,
+   0
+},
+{ /* Method ConnectGetAllDomainStats => 344 */
+   remoteDispatchConnectGetAllDomainStatsHelper,
+   sizeof(remote_connect_get_all_domain_stats_args),
+   (xdrproc_t)xdr_remote_connect_get_all_domain_stats_args,
+   sizeof(remote_connect_get_all_domain_stats_ret),
+   (xdrproc_t)xdr_remote_connect_get_all_domain_stats_ret,
+   true,
+   0
+},
+{ /* Method DomainBlockCopy => 345 */
+   remoteDispatchDomainBlockCopyHelper,
+   sizeof(remote_domain_block_copy_args),
+   (xdrproc_t)xdr_remote_domain_block_copy_args,
+   0,
+   (xdrproc_t)xdr_void,
+   true,
+   0
+},
+{ /* Async event DomainEventCallbackTunable => 346 */
+   NULL,
+   0,
+   (xdrproc_t)xdr_void,
+   0,
+   (xdrproc_t)xdr_void,
+   true,
+   0
+},
+{ /* Method NodeAllocPages => 347 */
+   remoteDispatchNodeAllocPagesHelper,
+   sizeof(remote_node_alloc_pages_args),
+   (xdrproc_t)xdr_remote_node_alloc_pages_args,
+   sizeof(remote_node_alloc_pages_ret),
+   (xdrproc_t)xdr_remote_node_alloc_pages_ret,
    true,
    0
 },

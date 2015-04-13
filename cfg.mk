@@ -568,7 +568,7 @@ sc_avoid_attribute_unused_in_header:
 	  $(_sc_search_regexp)
 
 sc_prohibit_int_ijk:
-	@prohibit='\<(int|unsigned) ([^(]* )*(i|j|k)\>(\s|,|;)'		\
+	@prohibit='\<(int|unsigned) ([^(=]* )*(i|j|k)\>(\s|,|;)'	\
 	halt='use size_t, not int/unsigned int for loop vars i, j, k'	\
 	  $(_sc_search_regexp)
 
@@ -775,7 +775,7 @@ sc_prohibit_cross_inclusion:
 	    locking/) safe="($$dir|util|conf|rpc)";;			\
 	    cpu/| network/| node_device/| rpc/| security/| storage/)	\
 	      safe="($$dir|util|conf|storage)";;			\
-	    xenapi/ | xenxs/ ) safe="($$dir|util|conf|xen)";;		\
+	    xenapi/ | xenconfig/ ) safe="($$dir|util|conf|xen)";;	\
 	    *) safe="($$dir|$(mid_dirs)|util)";;			\
 	  esac;								\
 	  in_vc_files="^src/$$dir"					\
@@ -910,13 +910,26 @@ sc_require_space_before_label:
 	halt="Top-level labels should be indented by one space"        \
 	  $(_sc_search_regexp)
 
+# Doesn't catch all cases of mismatched braces across if-else, but it helps
+sc_require_if_else_matching_braces:
+	@prohibit='(  else( if .*\))? {|} else( if .*\))?$$)'		\
+	in_vc_files='\.[chx]$$'						\
+	halt="if one side of if-else uses {}, both sides must use it"	\
+	  $(_sc_search_regexp)
+
 sc_curly_braces_style:
-	@files=$$($(VC_LIST_EXCEPT) | grep '\.[ch]$$');                \
-	$(GREP) -nHP                                                   \
-'^\s*(?!([a-zA-Z_]*for_?each[a-zA-Z_]*) ?\()([_a-zA-Z0-9]+( [_a-zA-Z0-9]+)* ?\()?(\*?[_a-zA-Z0-9]+(,? \*?[_a-zA-Z0-9\[\]]+)+|void)\) ?\{' \
-	$$files && { echo '$(ME): Non-K&R style used for curly'        \
-			  'braces around function body, see'           \
-			  'HACKING' 1>&2; exit 1; } || :
+	@files=$$($(VC_LIST_EXCEPT) | grep '\.[ch]$$');			\
+	if $(GREP) -nHP							\
+'^\s*(?!([a-zA-Z_]*for_?each[a-zA-Z_]*) ?\()([_a-zA-Z0-9]+( [_a-zA-Z0-9]+)* ?\()?(\*?[_a-zA-Z0-9]+(,? \*?[_a-zA-Z0-9\[\]]+)+|void)\) ?\{'		\
+	$$files; then							\
+	  echo '$(ME): Non-K&R style used for curly braces around'	\
+		'function body, see HACKING' 1>&2; exit 1;		\
+	fi;								\
+	if $(GREP) -A1 -En ' ((if|for|while|switch) \(|(else|do)\b)[^{]*$$'\
+	  $$files | $(GREP) '^[^ ]*- *{'; then				\
+	  echo '$(ME): Use hanging braces for compound statements,'	\
+		'see HACKING' 1>&2; exit 1;				\
+	fi
 
 sc_prohibit_windows_special_chars_in_filename:
 	@files=$$($(VC_LIST_EXCEPT) | grep '[:*?"<>|]');               \
@@ -942,6 +955,12 @@ sc_prohibit_empty_first_line:
 	END { if (fail == 1) {						\
 	  print "$(ME): Prohibited empty first line" > "/dev/stderr";	\
 	} exit fail; }' $$($(VC_LIST_EXCEPT));
+
+sc_prohibit_paren_brace:
+	@prohibit='\)\{$$'						\
+	in_vc_files='\.[chx]$$'						\
+	halt='Put space between closing parenthesis and opening brace'	\
+	  $(_sc_search_regexp)
 
 # We don't use this feature of maint.mk.
 prev_version_file = /dev/null
@@ -1124,3 +1143,6 @@ exclude_file_name_regexp--sc_prohibit_mixed_case_abbreviations = \
 
 exclude_file_name_regexp--sc_prohibit_empty_first_line = \
   ^(README|daemon/THREADS\.txt|src/esx/README|docs/library.xen|tests/vmwareverdata/fusion-5.0.3.txt|tests/nodeinfodata/linux-raspberrypi/cpu/offline)$$
+
+exclude_file_name_regexp--sc_prohibit_useless_translation = \
+  ^tests/virpolkittest.c
