@@ -1,7 +1,7 @@
 /*
  * driver.c: Helpers for loading drivers
  *
- * Copyright (C) 2006-2009 Red Hat, Inc.
+ * Copyright (C) 2006-2011 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -23,54 +23,70 @@
 #include <config.h>
 
 #include <unistd.h>
+#include <c-ctype.h>
 
 #include "driver.h"
-#include "memory.h"
-#include "logging.h"
-#include "util.h"
+#include "viralloc.h"
+#include "virfile.h"
+#include "virlog.h"
+#include "virutil.h"
+#include "configmake.h"
+#include "virstring.h"
 
-#define DEFAULT_DRIVER_DIR LIBDIR "/libvirt/drivers"
+VIR_LOG_INIT("driver");
 
-/* Make sure ... INTERNAL_CALL can not be set by the caller */
-verify((VIR_SECRET_GET_VALUE_INTERNAL_CALL &
-        VIR_SECRET_GET_VALUE_FLAGS_MASK) == 0);
 
 #ifdef WITH_DRIVER_MODULES
 
-/* XXX re-implment this for other OS, or use libtools helper lib ? */
+/* XXX re-implement this for other OS, or use libtools helper lib ? */
 
 # include <dlfcn.h>
+# define DEFAULT_DRIVER_DIR LIBDIR "/libvirt/connection-driver"
 
 void *
 virDriverLoadModule(const char *name)
 {
-    const char *moddir = getenv("LIBVIRT_DRIVER_DIR");
-    char *modfile = NULL, *regfunc = NULL;
+    char *modfile = NULL, *regfunc = NULL, *fixedname = NULL;
+    char *tmp;
     void *handle = NULL;
     int (*regsym)(void);
 
-    if (moddir == NULL)
-        moddir = DEFAULT_DRIVER_DIR;
+    VIR_DEBUG("Module load %s", name);
 
-    DEBUG("Module load %s", name);
-
-    if (virAsprintf(&modfile, "%s/libvirt_driver_%s.so", moddir, name) < 0)
+    if (!(modfile = virFileFindResourceFull(name,
+                                            "libvirt_driver_",
+                                            ".so",
+                                            abs_topbuilddir "/src/.libs",
+                                            DEFAULT_DRIVER_DIR,
+                                            "LIBVIRT_DRIVER_DIR")))
         return NULL;
 
     if (access(modfile, R_OK) < 0) {
-        VIR_WARN("Module %s not accessible", modfile);
+        VIR_INFO("Module %s not accessible", modfile);
         goto cleanup;
     }
 
-    handle = dlopen(modfile, RTLD_NOW | RTLD_LOCAL);
+    virUpdateSelfLastChanged(modfile);
+
+    handle = dlopen(modfile, RTLD_NOW | RTLD_GLOBAL);
     if (!handle) {
         VIR_ERROR(_("failed to load module %s %s"), modfile, dlerror());
         goto cleanup;
     }
 
-    if (virAsprintf(&regfunc, "%sRegister", name) < 0) {
+    if (VIR_STRDUP_QUIET(fixedname, name) < 0) {
+        VIR_ERROR(_("out of memory"));
         goto cleanup;
     }
+
+    /* convert something_like_this into somethingLikeThis */
+    while ((tmp = strchr(fixedname, '_'))) {
+        memmove(tmp, tmp + 1, strlen(tmp));
+        *tmp = c_toupper(*tmp);
+    }
+
+    if (virAsprintfQuiet(&regfunc, "%sRegister", fixedname) < 0)
+        goto cleanup;
 
     regsym = dlsym(handle, regfunc);
     if (!regsym) {
@@ -85,11 +101,13 @@ virDriverLoadModule(const char *name)
 
     VIR_FREE(modfile);
     VIR_FREE(regfunc);
+    VIR_FREE(fixedname);
     return handle;
 
-cleanup:
+ cleanup:
     VIR_FREE(modfile);
     VIR_FREE(regfunc);
+    VIR_FREE(fixedname);
     if (handle)
         dlclose(handle);
     return NULL;

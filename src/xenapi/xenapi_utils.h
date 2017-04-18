@@ -1,5 +1,6 @@
 /*
  * xenapi_utils.h: Xen API driver -- utils header
+ * Copyright (C) 2012, Red Hat, Inc.
  * Copyright (C) 2009, 2010 Citrix Ltd.
  *
  * This library is free software; you can redistribute it and/or
@@ -13,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Sharadha Prabhakar <sharadha.prabhakar@citrix.com>
  */
@@ -22,10 +23,9 @@
 #ifndef __VIR_XENAPI_UTILS__
 # define __VIR_XENAPI_UTILS__
 
-# include <stdint.h>
-# include <libxml/uri.h>
 # include <xen/api/xen_all.h>
 # include "internal.h"
+# include "viruri.h"
 # include "domain_conf.h"
 
 # define NETWORK_DEVID_SIZE  (12)
@@ -40,23 +40,23 @@ xenapiUtil_RequestPassword(virConnectAuthPtr auth, const char *username,
                            const char *hostname);
 
 int
-xenapiUtil_ParseQuery(virConnectPtr conn, xmlURIPtr uri, int *noVerify);
+xenapiUtil_ParseQuery(virConnectPtr conn, virURIPtr uri, int *noVerify);
 
 enum xen_on_normal_exit
-actionShutdownLibvirt2XenapiEnum(enum virDomainLifecycleAction action);
+actionShutdownLibvirt2XenapiEnum(virDomainLifecycleAction action);
 
 enum xen_on_crash_behaviour
-actionCrashLibvirt2XenapiEnum(enum virDomainLifecycleAction action);
+actionCrashLibvirt2XenapiEnum(virDomainLifecycleCrashAction action);
 
 char *
 createXenAPIBootOrderString(int nboot, int *bootDevs);
 
-enum virDomainBootOrder map2LibvirtBootOrder(char c);
+virDomainBootOrder map2LibvirtBootOrder(char c);
 
-enum virDomainLifecycleAction
+virDomainLifecycleAction
 xenapiNormalExitEnum2virDomainLifecycle(enum xen_on_normal_exit action);
 
-enum virDomainLifecycleAction
+virDomainLifecycleCrashAction
 xenapiCrashExitEnum2virDomainLifecycle(enum xen_on_crash_behaviour action);
 
 void getCpuBitMapfromString(char *mask, unsigned char *cpumap, int maplen);
@@ -77,9 +77,5 @@ createVMRecordFromXml (virConnectPtr conn, virDomainDefPtr defPtr,
 
 int
 allocStringMap (xen_string_string_map **strings, char *key, char *val);
-
-int
-createVifNetwork(virConnectPtr conn, xen_vm vm, char *device,
-                 char *bridge, char *mac);
 
 #endif /* __VIR_XENAPI_UTILS__ */

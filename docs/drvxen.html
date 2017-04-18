@@ -13,136 +13,12 @@
     <meta name="description" content="libvirt, virtualization, virtualization API" />
   </head>
   <body>
-    <div id="header">
-      <div id="headerLogo"></div>
-      <div id="headerSearch">
-        <form action="search.php" enctype="application/x-www-form-urlencoded" method="get"><div>
-            <input id="query" name="query" type="text" size="12" value="" />
-            <input id="submit" name="submit" type="submit" value="Search" />
-          </div></form>
-      </div>
-    </div>
     <div id="body">
-      <div id="menu">
-        <ul class="l0"><li>
-            <div>
-              <a title="Front page of the libvirt website" class="inactive" href="index.html">Home</a>
-            </div>
-          </li><li>
-            <div>
-              <a title="Details of new features and bugs fixed in each release" class="inactive" href="news.html">News</a>
-            </div>
-          </li><li>
-            <div>
-              <a title="Get the latest source releases, binary builds and get access to the source repository" class="inactive" href="downloads.html">Downloads</a>
-            </div>
-          </li><li>
-            <div>
-              <a title="Information for users, administrators and developers" class="active" href="docs.html">Documentation</a>
-              <ul class="l1"><li>
-                  <div>
-                    <a title="Information about deploying and using libvirt" class="inactive" href="deployment.html">Deployment</a>
-                  </div>
-                </li><li>
-                  <div>
-                    <a title="Overview of the logical subsystems in the libvirt API" class="inactive" href="intro.html">Architecture</a>
-                  </div>
-                </li><li>
-                  <div>
-                    <a title="Description of the XML formats used in libvirt" class="inactive" href="format.html">XML format</a>
-                  </div>
-                </li><li>
-                  <div>
-                    <a title="Hypervisor specific driver information" class="active" href="drivers.html">Drivers</a>
-                    <ul class="l2"><li>
-                        <div>
-                          <span class="active">Xen</span>
-                        </div>
-                      </li><li>
-                        <div>
-                          <a title="Driver for QEMU, KQEMU, KVM and Xenner" class="inactive" href="drvqemu.html">QEMU / KVM</a>
-                        </div>
-                      </li><li>
-                        <div>
-                          <a title="Driver for the Linux native container API" class="inactive" href="drvlxc.html">Linux Container</a>
-                        </div>
-                      </li><li>
-                        <div>
-                          <a title="Pseudo-driver simulating APIs in memory for test suites" class="inactive" href="drvtest.html">Test</a>
-                        </div>
-                      </li><li>
-                        <div>
-                          <a title="Driver providing secure remote to the libvirt APIs" class="inactive" href="drvremote.html">Remote</a>
-                        </div>
-                      </li><li>
-                        <div>
-                          <a title="Driver for the OpenVZ container technology" class="inactive" href="drvopenvz.html">OpenVZ</a>
-                        </div>
-                      </li><li>
-                        <div>
-                          <a title="Driver for the User Mode Linux technology" class="inactive" href="drvuml.html">UML</a>
-                        </div>
-                      </li><li>
-                        <div>
-                          <a title="Driver for the storage management APIs" class="inactive" href="storage.html">Storage</a>
-                        </div>
-                      </li><li>
-                        <div>
-                          <a title="Driver for VirtualBox" class="inactive" href="drvvbox.html">VirtualBox</a>
-                        </div>
-                      </li><li>
-                        <div>
-                          <a title="Driver for OpenNebula" class="inactive" href="drvone.html">OpenNebula</a>
-                        </div>
-                      </li><li>
-                        <div>
-                          <a title="Driver for VMware ESX" class="inactive" href="drvesx.html">VMware ESX</a>
-                        </div>
-                      </li></ul>
-                  </div>
-                </li><li>
-                  <div>
-                    <a title="Reference manual for the C public API" class="inactive" href="html/index.html">API reference</a>
-                  </div>
-                </li><li>
-                  <div>
-                    <a title="Bindings of the libvirt API for other languages" class="inactive" href="bindings.html">Language bindings</a>
-                  </div>
-                </li><li>
-                  <div>
-                    <a title="Working on the internals of libvirt API, driver and daemon code" class="inactive" href="internals.html">Internals</a>
-                  </div>
-                </li></ul>
-            </div>
-          </li><li>
-            <div>
-              <a title="User contributed content" class="inactive" href="http://wiki.libvirt.org">Wiki</a>
-            </div>
-          </li><li>
-            <div>
-              <a title="Frequently asked questions" class="inactive" href="http://wiki.libvirt.org/page/FAQ">FAQ</a>
-            </div>
-          </li><li>
-            <div>
-              <a title="How and where to report bugs and request features" class="inactive" href="bugs.html">Bug reports</a>
-            </div>
-          </li><li>
-            <div>
-              <a title="How to contact the developers via email and IRC" class="inactive" href="contact.html">Contact</a>
-            </div>
-          </li><li>
-            <div>
-              <a title="Miscellaneous links of interest related to libvirt" class="inactive" href="relatedlinks.html">Related Links</a>
-            </div>
-          </li><li>
-            <div>
-              <a title="Overview of all content on the website" class="inactive" href="sitemap.html">Sitemap</a>
-            </div>
-          </li></ul>
-      </div>
       <div id="content">
         <h1>Xen hypervisor driver</h1>
         <ul><li>
+            <a href="#project">Project Links</a>
+          </li><li>
             <a href="#prereq">Deployment pre-requisites</a>
           </li><li>
             <a href="#uri">Connections to Xen driver</a>
@@ -161,7 +37,16 @@
       on any Xen release from 3.0.1 onwards.
     </p>
         <h2>
-          <a name="prereq" id="prereq">Deployment pre-requisites</a>
+          <a name="project" shape="rect" id="project">Project Links</a>
+          <a class="headerlink" href="#project" title="Permalink to this headline">¶</a>
+        </h2>
+        <ul><li>
+        The <a href="http://www.cl.cam.ac.uk/Research/SRG/netos/xen/index.html" shape="rect">Xen</a>
+        hypervisor on Linux and Solaris hosts
+      </li></ul>
+        <h2>
+          <a name="prereq" shape="rect" id="prereq">Deployment pre-requisites</a>
+          <a class="headerlink" href="#prereq" title="Permalink to this headline">¶</a>
         </h2>
         <p>
       The libvirt Xen driver uses a combination of channels to manage Xen
@@ -190,16 +75,24 @@
         libvirt will automatically process XM configuration files kept in
         the <code>/etc/xen</code> directory. It is important not to place
         any other non-config files in this directory.
+      </li><li>
+        <strong>libxl</strong>: Starting with Xen 4.2, the legacy XenD/xm
+        toolstack is deprecated in favor of libxl, also commonly called
+        libxenlight.  libvirt supports this new Xen toolstack via the
+        libxl driver.  If XenD is enabled, the legacy xen driver consisting
+        of the above mentioned channels will be used.  If XenD is disabled,
+        the libxl driver will be used.
       </li></ul>
         <h2>
-          <a name="uri" id="uri">Connections to Xen driver</a>
+          <a name="uri" shape="rect" id="uri">Connections to Xen driver</a>
+          <a class="headerlink" href="#uri" title="Permalink to this headline">¶</a>
         </h2>
         <p>
     The libvirt Xen driver is a single-instance privileged driver,
-    with a driver name of 'xen'. Some example conection URIs for
+    with a driver name of 'xen'. Some example connection URIs for
     the libvirt driver are:
     </p>
-        <pre>
+        <pre xml:space="preserve">
 xen:///                        (local access, direct)
 xen+unix:///                   (local access, via daemon)
 xen://example.com/             (remote access, TLS/x509)
@@ -207,7 +100,8 @@ xen+tcp://example.com/         (remote access, SASl/Kerberos)
 xen+ssh://root@example.com/    (remote access, SSH tunnelled)
 </pre>
         <h2>
-          <a name="imex" id="imex">Import and export of libvirt domain XML configs</a>
+          <a name="imex" shape="rect" id="imex">Import and export of libvirt domain XML configs</a>
+          <a class="headerlink" href="#imex" title="Permalink to this headline">¶</a>
         </h2>
         <p>The Xen driver currently supports two native
       config formats. The first known as <code>xen-xm</code> is the format
@@ -215,14 +109,15 @@ xen+ssh://root@example.com/    (remote access, SSH tunnelled)
       known as <code>xen-sxpr</code>, is the format used for interacting
       with the XenD's legacy HTTP RPC service.</p>
         <h3>
-          <a name="xmlimport" id="xmlimport">Converting from XM config files to domain XML</a>
+          <a name="xmlimport" shape="rect" id="xmlimport">Converting from XM config files to domain XML</a>
+          <a class="headerlink" href="#xmlimport" title="Permalink to this headline">¶</a>
         </h3>
         <p>
       The <code>virsh domxml-from-native</code> provides a way to convert an
       existing set of XM config files into a guest description using libvirt Domain XML
       that can then be used by libvirt.
     </p>
-        <pre>$ virsh -c xen:/// domxml-from-native xen-xm rhel5.cfg
+        <pre xml:space="preserve">$ virsh -c xen:/// domxml-from-native xen-xm rhel5.cfg
 &lt;domain type='xen'&gt;
   &lt;name&gt;rhel5pv&lt;/name&gt;
   &lt;uuid&gt;8f07fe28-753f-2729-d76d-bdbd892f949a&lt;/uuid&gt;
@@ -260,14 +155,15 @@ xen+ssh://root@example.com/    (remote access, SSH tunnelled)
   &lt;/devices&gt;
 &lt;/domain&gt;</pre>
         <h3>
-          <a name="xmlexport" id="xmlexport">Converting from domain XML to XM config files</a>
+          <a name="xmlexport" shape="rect" id="xmlexport">Converting from domain XML to XM config files</a>
+          <a class="headerlink" href="#xmlexport" title="Permalink to this headline">¶</a>
         </h3>
         <p>
       The <code>virsh domxml-to-native</code> provides a way to convert a
       guest description using libvirt Domain XML, into the XM config file
       format.
     </p>
-        <pre>$ virsh -c xen:/// domxml-to-native xen-xm rhel5pv.xml
+        <pre xml:space="preserve">$ virsh -c xen:/// domxml-to-native xen-xm rhel5pv.xml
 name = "rhel5pv"
 uuid = "8f07fe28-753f-2729-d76d-bdbd892f949a"
 maxmem = 2500
@@ -287,11 +183,12 @@ vnclisten = "0.0.0.0"
 disk = [ "tap:aio:/var/lib/xen/images/rhel5pv.img,xvda,w", "tap:qcow:/root/qcow1-xen.img,xvdd,w" ]
 vif = [ "mac=00:16:3e:60:36:ba,bridge=virbr0,script=vif-bridge,vifname=vif5.0" ]</pre>
         <h2>
-          <a name="xmlconfig" id="xmlconfig">Example domain XML config</a>
+          <a name="xmlconfig" shape="rect" id="xmlconfig">Example domain XML config</a>
+          <a class="headerlink" href="#xmlconfig" title="Permalink to this headline">¶</a>
         </h2>
         <p>
       Below are some example XML configurations for Xen guest domains.
-      For full details of the available options, consult the <a href="formatdomain.html">domain XML format</a>
+      For full details of the available options, consult the <a href="formatdomain.html" shape="rect">domain XML format</a>
       guide.
     </p>
         <h3>Paravirtualized guest bootloader</h3>
@@ -299,7 +196,7 @@ vif = [ "mac=00:16:3e:60:36:ba,bridge=virbr0,script=vif-bridge,vifname=vif5.0" ]
       Using a bootloader allows a paravirtualized guest to be booted using
       a kernel stored inside its virtual disk image
     </p>
-        <pre>&lt;domain type='xen' &gt;
+        <pre xml:space="preserve">&lt;domain type='xen' &gt;
   &lt;name&gt;fc8&lt;/name&gt;
   &lt;bootloader&gt;/usr/bin/pygrub&lt;/bootloader&gt;
   &lt;os&gt;
@@ -325,7 +222,7 @@ vif = [ "mac=00:16:3e:60:36:ba,bridge=virbr0,script=vif-bridge,vifname=vif5.0" ]
       For installation of paravirtualized guests it is typical to boot the
       domain using a kernel and initrd stored in the host OS
     </p>
-        <pre>&lt;domain type='xen' &gt;
+        <pre xml:space="preserve">&lt;domain type='xen' &gt;
   &lt;name&gt;fc8&lt;/name&gt;
   &lt;os&gt;
     &lt;type&gt;linux&lt;/type&gt;
@@ -354,7 +251,7 @@ vif = [ "mac=00:16:3e:60:36:ba,bridge=virbr0,script=vif-bridge,vifname=vif5.0" ]
       Fullyvirtualized guests use the emulated BIOS to boot off the primary
       harddisk, CDROM or Network PXE ROM.
     </p>
-        <pre>&lt;domain type='xen' id='3'&gt;
+        <pre xml:space="preserve">&lt;domain type='xen' id='3'&gt;
   &lt;name&gt;fv0&lt;/name&gt;
   &lt;uuid&gt;4dea22b31d52d8f32516782e98ab3fa0&lt;/uuid&gt;
   &lt;os&gt;
@@ -403,7 +300,7 @@ vif = [ "mac=00:16:3e:60:36:ba,bridge=virbr0,script=vif-bridge,vifname=vif5.0" ]
       for complete automation of OS installation, for example using the Anaconda
       kickstart support.
     </p>
-        <pre>&lt;domain type='xen' id='3'&gt;
+        <pre xml:space="preserve">&lt;domain type='xen' id='3'&gt;
   &lt;name&gt;fv0&lt;/name&gt;
   &lt;uuid&gt;4dea22b31d52d8f32516782e98ab3fa0&lt;/uuid&gt;
   &lt;os&gt;
@@ -449,9 +346,50 @@ vif = [ "mac=00:16:3e:60:36:ba,bridge=virbr0,script=vif-bridge,vifname=vif5.0" ]
 &lt;/domain&gt;</pre>
       </div>
     </div>
+    <div id="nav">
+      <div id="home">
+        <a href="index.html">Home</a>
+      </div>
+      <div id="jumplinks">
+        <ul><li>
+            <a href="downloads.html">Download</a>
+          </li><li>
+            <a href="contribute.html">Contribute</a>
+          </li><li>
+            <a href="docs.html">Learn</a>
+          </li></ul>
+      </div>
+      <div id="search">
+        <form action="search.php" enctype="application/x-www-form-urlencoded" method="get"><div>
+            <input name="query" type="text" size="12" value="" />
+            <input name="submit" type="submit" value="Go" />
+          </div></form>
+      </div>
+    </div>
     <div id="footer">
-      <p id="sponsor">
-	    Sponsored by:<br /><a href="http://et.redhat.com/"><img src="et.png" alt="Project sponsored by Red Hat Emerging Technology" /></a></p>
+      <div id="contact">
+        <h3>Contact</h3>
+        <ul><li>
+            <a href="contact.html#email">email</a>
+          </li><li>
+            <a href="contact.html#irc">irc</a>
+          </li></ul>
+      </div>
+      <div id="community">
+        <h3>Community</h3>
+        <ul><li>
+            <a href="https://twitter.com/hashtag/libvirt">twitter</a>
+          </li><li>
+            <a href="https://plus.google.com/communities/109522598353007505282">google+</a>
+          </li><li>
+            <a href="http://stackoverflow.com/questions/tagged/libvirt">stackoverflow</a>
+          </li><li>
+            <a href="http://serverfault.com/questions/tagged/libvirt">serverfault</a>
+          </li></ul>
+      </div>
+      <div id="conduct">
+            Participants in the libvirt project agree to abide by <a href="governance.html#codeofconduct">the project code of conduct</a></div>
+      <br class="clear" />
     </div>
   </body>
 </html>

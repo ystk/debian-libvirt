@@ -1,6 +1,7 @@
 /*
  * domain_nwfilter.c:
  *
+ * Copyright (C) 2014 Red Hat, Inc.
  * Copyright (C) 2010 IBM Corporation
  *
  * This library is free software; you can redistribute it and/or
@@ -14,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Stefan Berger <stefanb@us.ibm.com>
  */
@@ -31,28 +32,32 @@
 static virDomainConfNWFilterDriverPtr nwfilterDriver;
 
 void
-virDomainConfNWFilterRegister(virDomainConfNWFilterDriverPtr driver) {
+virDomainConfNWFilterRegister(virDomainConfNWFilterDriverPtr driver)
+{
     nwfilterDriver = driver;
 }
 
 int
-virDomainConfNWFilterInstantiate(virConnectPtr conn,
-                                 virDomainNetDefPtr net) {
+virDomainConfNWFilterInstantiate(const unsigned char *vmuuid,
+                                 virDomainNetDefPtr net)
+{
     if (nwfilterDriver != NULL)
-        return nwfilterDriver->instantiateFilter(conn, net);
+        return nwfilterDriver->instantiateFilter(vmuuid, net);
     /* driver module not available -- don't indicate failure */
     return 0;
 }
 
 void
-virDomainConfNWFilterTeardown(virDomainNetDefPtr net) {
+virDomainConfNWFilterTeardown(virDomainNetDefPtr net)
+{
     if (nwfilterDriver != NULL)
         nwfilterDriver->teardownFilter(net);
 }
 
 void
-virDomainConfVMNWFilterTeardown(virDomainObjPtr vm) {
-    int i;
+virDomainConfVMNWFilterTeardown(virDomainObjPtr vm)
+{
+    size_t i;
 
     if (nwfilterDriver != NULL) {
         for (i = 0; i < vm->def->nnets; i++)

@@ -1,5 +1,6 @@
 /*
  * xenapi_utils.c: Xen API driver -- utils parts.
+ * Copyright (C) 2011-2014 Red Hat, Inc.
  * Copyright (C) 2009, 2010 Citrix Ltd.
  *
  * This library is free software; you can redistribute it and/or
@@ -13,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Sharadha Prabhakar <sharadha.prabhakar@citrix.com>
  */
@@ -23,32 +24,35 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
-#include <libxml/uri.h>
 #include <xen/api/xen_all.h>
 #include "internal.h"
 #include "domain_conf.h"
-#include "virterror_internal.h"
+#include "virerror.h"
 #include "datatypes.h"
-#include "util.h"
-#include "uuid.h"
-#include "memory.h"
-#include "buf.h"
-#include "logging.h"
-#include "qparams.h"
+#include "viruuid.h"
+#include "viralloc.h"
+#include "virbuffer.h"
+#include "virlog.h"
+#include "viruri.h"
 #include "xenapi_driver_private.h"
 #include "xenapi_utils.h"
+#include "virstring.h"
+
+VIR_LOG_INIT("xenapi.xenapi_utils");
 
 void
 xenSessionFree(xen_session *session)
 {
-    int i;
+    size_t i;
+    char *tmp;
     if (session->error_description != NULL) {
         for (i = 0; i < session->error_description_count; i++)
             VIR_FREE(session->error_description[i]);
         VIR_FREE(session->error_description);
     }
-    VIR_FREE(session->session_id);
+    /* The session_id member is type of 'const char *'. Sigh. */
+    tmp = (char *)session->session_id;
+    VIR_FREE(tmp);
     VIR_FREE(session);
 }
 
@@ -60,7 +64,7 @@ xenapiUtil_RequestPassword(virConnectAuthPtr auth, const char *username,
     virConnectCredential cred;
     char *prompt;
 
-    memset(&cred, 0, sizeof (virConnectCredential));
+    memset(&cred, 0, sizeof(virConnectCredential));
 
     if (virAsprintf(&prompt, "Enter %s password for %s", username,
                     hostname) < 0) {
@@ -80,9 +84,8 @@ xenapiUtil_RequestPassword(virConnectAuthPtr auth, const char *username,
         cred.result = NULL;
         cred.resultlen = 0;
 
-        if ((*(auth->cb))(&cred, 1, auth->cbdata) < 0) {
+        if ((*(auth->cb))(&cred, 1, auth->cbdata) < 0)
             VIR_FREE(cred.result);
-        }
 
         break;
     }
@@ -93,29 +96,16 @@ xenapiUtil_RequestPassword(virConnectAuthPtr auth, const char *username,
 }
 
 int
-xenapiUtil_ParseQuery(virConnectPtr conn, xmlURIPtr uri, int *noVerify)
+xenapiUtil_ParseQuery(virConnectPtr conn, virURIPtr uri, int *noVerify)
 {
     int result = 0;
-    int i;
-    struct qparam_set *queryParamSet = NULL;
-    struct qparam *queryParam = NULL;
+    size_t i;
 
-#ifdef HAVE_XMLURI_QUERY_RAW
-    queryParamSet = qparam_query_parse(uri->query_raw);
-#else
-    queryParamSet = qparam_query_parse(uri->query);
-#endif
-
-    if (queryParamSet == NULL) {
-        goto failure;
-    }
-
-    for (i = 0; i < queryParamSet->n; i++) {
-        queryParam = &queryParamSet->p[i];
+    for (i = 0; i < uri->paramsCount; i++) {
+        virURIParamPtr queryParam = &uri->params[i];
         if (STRCASEEQ(queryParam->name, "no_verify")) {
-            if (noVerify == NULL) {
+            if (noVerify == NULL)
                 continue;
-            }
             if (virStrToLong_i(queryParam->value, NULL, 10, noVerify) < 0 ||
                 (*noVerify != 0 && *noVerify != 1)) {
                 xenapiSessionErrorHandler(conn, VIR_ERR_INVALID_ARG,
@@ -125,14 +115,11 @@ xenapiUtil_ParseQuery(virConnectPtr conn, xmlURIPtr uri, int *noVerify)
         }
     }
 
-  cleanup:
-    if (queryParamSet != NULL) {
-        free_qparam_set(queryParamSet);
-    }
+ cleanup:
 
     return result;
 
-  failure:
+ failure:
     result = -1;
 
     goto cleanup;
@@ -141,7 +128,7 @@ xenapiUtil_ParseQuery(virConnectPtr conn, xmlURIPtr uri, int *noVerify)
 
 
 enum xen_on_normal_exit
-actionShutdownLibvirt2XenapiEnum(enum virDomainLifecycleAction action)
+actionShutdownLibvirt2XenapiEnum(virDomainLifecycleAction action)
 {
     enum xen_on_normal_exit num = XEN_ON_NORMAL_EXIT_RESTART;
     if (action == VIR_DOMAIN_LIFECYCLE_DESTROY)
@@ -153,17 +140,21 @@ actionShutdownLibvirt2XenapiEnum(enum virDomainLifecycleAction action)
 
 
 enum xen_on_crash_behaviour
-actionCrashLibvirt2XenapiEnum(enum virDomainLifecycleAction action)
+actionCrashLibvirt2XenapiEnum(virDomainLifecycleCrashAction action)
 {
     enum xen_on_crash_behaviour num = XEN_ON_CRASH_BEHAVIOUR_RESTART;
-    if (action == VIR_DOMAIN_LIFECYCLE_DESTROY)
+    if (action == VIR_DOMAIN_LIFECYCLE_CRASH_DESTROY)
         num = XEN_ON_CRASH_BEHAVIOUR_DESTROY;
-    else if (action == VIR_DOMAIN_LIFECYCLE_RESTART)
+    else if (action == VIR_DOMAIN_LIFECYCLE_CRASH_RESTART)
         num = XEN_ON_CRASH_BEHAVIOUR_RESTART;
-    else if (action == VIR_DOMAIN_LIFECYCLE_PRESERVE)
+    else if (action == VIR_DOMAIN_LIFECYCLE_CRASH_PRESERVE)
         num = XEN_ON_CRASH_BEHAVIOUR_PRESERVE;
-    else if (action == VIR_DOMAIN_LIFECYCLE_RESTART_RENAME)
+    else if (action == VIR_DOMAIN_LIFECYCLE_CRASH_RESTART_RENAME)
         num = XEN_ON_CRASH_BEHAVIOUR_RENAME_RESTART;
+    else if (action == VIR_DOMAIN_LIFECYCLE_CRASH_COREDUMP_DESTROY)
+        num = XEN_ON_CRASH_BEHAVIOUR_COREDUMP_AND_DESTROY;
+    else if (action == VIR_DOMAIN_LIFECYCLE_CRASH_COREDUMP_RESTART)
+        num = XEN_ON_CRASH_BEHAVIOUR_COREDUMP_AND_RESTART;
     return num;
 }
 
@@ -173,7 +164,7 @@ createXenAPIBootOrderString(int nboot, int *bootDevs)
 {
     virBuffer ret = VIR_BUFFER_INITIALIZER;
     char *val = NULL;
-    int i;
+    size_t i;
     for (i = 0; i < nboot; i++) {
         if (bootDevs[i] == VIR_DOMAIN_BOOT_FLOPPY)
             val = (char *)"a";
@@ -184,14 +175,15 @@ createXenAPIBootOrderString(int nboot, int *bootDevs)
         else if (bootDevs[i] == VIR_DOMAIN_BOOT_NET)
             val = (char *)"n";
         if (val)
-            virBufferEscapeString(&ret,"%s",val);
+            virBufferEscapeString(&ret, "%s", val);
     }
     return virBufferContentAndReset(&ret);
 }
 
 /* convert boot order string to libvirt boot order enum */
-enum virDomainBootOrder
-map2LibvirtBootOrder(char c) {
+virDomainBootOrder
+map2LibvirtBootOrder(char c)
+{
     switch (c) {
     case 'a':
         return VIR_DOMAIN_BOOT_FLOPPY;
@@ -206,10 +198,10 @@ map2LibvirtBootOrder(char c) {
     }
 }
 
-enum virDomainLifecycleAction
+virDomainLifecycleAction
 xenapiNormalExitEnum2virDomainLifecycle(enum xen_on_normal_exit action)
 {
-    enum virDomainLifecycleAction num = VIR_DOMAIN_LIFECYCLE_RESTART;
+    virDomainLifecycleAction num = VIR_DOMAIN_LIFECYCLE_RESTART;
     if (action == XEN_ON_NORMAL_EXIT_DESTROY)
         num = VIR_DOMAIN_LIFECYCLE_DESTROY;
     else if (action == XEN_ON_NORMAL_EXIT_RESTART)
@@ -218,18 +210,22 @@ xenapiNormalExitEnum2virDomainLifecycle(enum xen_on_normal_exit action)
 }
 
 
-enum virDomainLifecycleAction
+virDomainLifecycleCrashAction
 xenapiCrashExitEnum2virDomainLifecycle(enum xen_on_crash_behaviour action)
 {
-    enum virDomainLifecycleAction num = VIR_DOMAIN_LIFECYCLE_RESTART;
+    virDomainLifecycleCrashAction num = VIR_DOMAIN_LIFECYCLE_CRASH_RESTART;
     if (action == XEN_ON_CRASH_BEHAVIOUR_DESTROY)
-        num = VIR_DOMAIN_LIFECYCLE_DESTROY;
+        num = VIR_DOMAIN_LIFECYCLE_CRASH_DESTROY;
     else if (action == XEN_ON_CRASH_BEHAVIOUR_RESTART)
-        num = VIR_DOMAIN_LIFECYCLE_RESTART;
+        num = VIR_DOMAIN_LIFECYCLE_CRASH_RESTART;
     else if (action == XEN_ON_CRASH_BEHAVIOUR_PRESERVE)
-        num = VIR_DOMAIN_LIFECYCLE_PRESERVE;
+        num = VIR_DOMAIN_LIFECYCLE_CRASH_PRESERVE;
     else if (action == XEN_ON_CRASH_BEHAVIOUR_RENAME_RESTART)
-        num = VIR_DOMAIN_LIFECYCLE_RESTART_RENAME;
+        num = VIR_DOMAIN_LIFECYCLE_CRASH_RESTART_RENAME;
+    else if (action == XEN_ON_CRASH_BEHAVIOUR_COREDUMP_AND_DESTROY)
+        num = VIR_DOMAIN_LIFECYCLE_CRASH_COREDUMP_DESTROY;
+    else if (action == XEN_ON_CRASH_BEHAVIOUR_COREDUMP_AND_RESTART)
+        num = VIR_DOMAIN_LIFECYCLE_CRASH_COREDUMP_RESTART;
     return num;
 }
 
@@ -239,20 +235,20 @@ xenapiCrashExitEnum2virDomainLifecycle(enum xen_on_crash_behaviour action)
 int
 getStorageVolumeType(char *type)
 {
-    if (STREQ(type,"lvmoiscsi") ||
-        STREQ(type,"lvmohba") ||
-        STREQ(type,"lvm") ||
-        STREQ(type,"file") ||
-        STREQ(type,"iso") ||
-        STREQ(type,"ext") ||
-        STREQ(type,"nfs"))
+    if (STREQ(type, "lvmoiscsi") ||
+        STREQ(type, "lvmohba") ||
+        STREQ(type, "lvm") ||
+        STREQ(type, "file") ||
+        STREQ(type, "iso") ||
+        STREQ(type, "ext") ||
+        STREQ(type, "nfs"))
         return (int)VIR_STORAGE_VOL_FILE;
-    else if (STREQ(type,"iscsi") ||
-             STREQ(type,"equal") ||
-             STREQ(type,"hba") ||
-             STREQ(type,"cslg") ||
-             STREQ(type,"udev") ||
-             STREQ(type,"netapp"))
+    else if (STREQ(type, "iscsi") ||
+             STREQ(type, "equal") ||
+             STREQ(type, "hba") ||
+             STREQ(type, "cslg") ||
+             STREQ(type, "udev") ||
+             STREQ(type, "netapp"))
         return (int)VIR_STORAGE_VOL_BLOCK;
     return -1;
 }
@@ -261,14 +257,16 @@ getStorageVolumeType(char *type)
 char *
 returnErrorFromSession(xen_session *session)
 {
-    int i;
+    size_t i;
     virBuffer buf = VIR_BUFFER_INITIALIZER;
-    for (i = 0; i < session->error_description_count - 1; i++) {
+    for (i = 0; i < session->error_description_count; i++) {
         if (!i)
             virBufferEscapeString(&buf, "%s", session->error_description[i]);
         else
             virBufferEscapeString(&buf, " : %s", session->error_description[i]);
     }
+    if (virBufferUse(&buf) < 1)
+        virBufferAdd(&buf, _("unknown error"), -1);
     return virBufferContentAndReset(&buf);
 }
 
@@ -279,19 +277,15 @@ mapDomainPinVcpu(unsigned char *cpumap, int maplen)
     virBuffer buf = VIR_BUFFER_INITIALIZER;
     size_t len;
     char *ret = NULL;
-    int i, j;
+    size_t i, j;
     for (i = 0; i < maplen; i++) {
         for (j = 0; j < 8; j++) {
-            if (cpumap[i] & (1 << j)) {
-                virBufferVSprintf(&buf, "%d,", (8*i)+j);
-            }
+            if (cpumap[i] & (1 << j))
+                virBufferAsprintf(&buf, "%zu,", (8*i)+j);
         }
     }
-    if (virBufferError(&buf)) {
-        virReportOOMError();
-        virBufferFreeAndReset(&buf);
+    if (virBufferCheckError(&buf) < 0)
         return NULL;
-    }
     ret = virBufferContentAndReset(&buf);
     len = strlen(ret);
     if (len > 0 && ret[len - 1] == ',')
@@ -312,7 +306,7 @@ getCpuBitMapfromString(char *mask, unsigned char *cpumap, int maplen)
         if (virStrToLong_i(num, NULL, 10, &pos) < 0)
             return;
         if (pos < 0 || pos > max_bits - 1)
-            VIR_WARN ("number in str %d exceeds cpumap's max bits %d", pos, max_bits);
+            VIR_WARN("number in str %d exceeds cpumap's max bits %d", pos, max_bits);
         else
             (cpumap)[pos / 8] |= (1 << (pos % 8));
         num = strtok_r(NULL, ",", &bp);
@@ -336,11 +330,10 @@ mapPowerState(enum xen_vm_power_state state)
     case XEN_VM_POWER_STATE_RUNNING:
         virState = VIR_DOMAIN_RUNNING;
         break;
-    case XEN_VM_POWER_STATE_UNKNOWN:
     case XEN_VM_POWER_STATE_UNDEFINED:
-        virState = VIR_DOMAIN_NOSTATE;
-        break;
     default:
+        /* Includes XEN_VM_POWER_STATE_UNKNOWN from libxenserver
+         * 5.5.0, which is gone in 5.6.0.  */
         virState = VIR_DOMAIN_NOSTATE;
         break;
     }
@@ -349,22 +342,20 @@ mapPowerState(enum xen_vm_power_state state)
 
 /* allocate a flexible array and fill values(key,val) */
 int
-allocStringMap (xen_string_string_map **strings, char *key, char *val)
+allocStringMap(xen_string_string_map **strings, char *key, char *val)
 {
     int sz = ((*strings) == NULL) ? 0 : (*strings)->size;
     sz++;
     if (VIR_REALLOC_N(*strings, sizeof(xen_string_string_map) +
-                                sizeof(xen_string_string_map_contents) * sz) < 0) {
-        virReportOOMError();
+                                sizeof(xen_string_string_map_contents) * sz) < 0)
         return -1;
-    }
     (*strings)->size = sz;
-    if (!((*strings)->contents[sz-1].key = strdup(key))) goto error;
-    if (!((*strings)->contents[sz-1].val = strdup(val))) goto error;
+    if (VIR_STRDUP((*strings)->contents[sz-1].key, key) < 0 ||
+        VIR_STRDUP((*strings)->contents[sz-1].val, val) < 0)
+        goto error;
     return 0;
-  error:
+ error:
     xen_string_string_map_free(*strings);
-    virReportOOMError();
     return -1;
 }
 
@@ -378,18 +369,20 @@ xenapiSessionErrorHandle(virConnectPtr conn, virErrorNumber errNum,
 
     if (buf == NULL && priv != NULL && priv->session != NULL) {
         char *ret = returnErrorFromSession(priv->session);
-        virReportErrorHelper(conn, VIR_FROM_XENAPI, errNum, filename, func, lineno, _("%s"), ret);
+        virReportErrorHelper(VIR_FROM_XENAPI, errNum, filename, func, lineno,
+                             "%s", ret);
         xen_session_clear_error(priv->session);
         VIR_FREE(ret);
     } else {
-        virReportErrorHelper(conn, VIR_FROM_XENAPI, errNum, filename, func, lineno, _("%s"), buf);
+        virReportErrorHelper(VIR_FROM_XENAPI, errNum, filename, func, lineno,
+                             "%s", buf);
     }
 }
 
 /* creates network intereface for VM */
-int
-createVifNetwork (virConnectPtr conn, xen_vm vm, char *device,
-                  char *bridge, char *mac)
+static int
+createVifNetwork(virConnectPtr conn, xen_vm vm, int device,
+                 char *bridge, char *mac)
 {
     xen_session *session = ((struct _xenapiPrivate *)(conn->privateData))->session;
     xen_vm xvm = NULL;
@@ -406,14 +399,16 @@ createVifNetwork (virConnectPtr conn, xen_vm vm, char *device,
     xen_network_set *net_set = NULL;
     xen_network_record *net_rec = NULL;
     int cnt = 0;
-    if (xen_network_get_all(session, &net_set)) {
-        for(cnt = 0; cnt < net_set->size; cnt++) {
-            if (xen_network_get_record(session, &net_rec, net_set->contents[cnt])) {
-                if (STREQ(net_rec->bridge, bridge)) {
-                    break;
-                } else {
-                    xen_network_record_free(net_rec);
-                }
+    if (!xen_network_get_all(session, &net_set)) {
+        xen_vm_record_opt_free(vm_opt);
+        return -1;
+    }
+    for (cnt = 0; cnt < net_set->size; cnt++) {
+        if (xen_network_get_record(session, &net_rec, net_set->contents[cnt])) {
+            if (STREQ(net_rec->bridge, bridge)) {
+                break;
+            } else {
+                xen_network_record_free(net_rec);
             }
         }
     }
@@ -432,7 +427,12 @@ createVifNetwork (virConnectPtr conn, xen_vm vm, char *device,
         vif_record->other_config = xen_string_string_map_alloc(0);
         vif_record->runtime_properties = xen_string_string_map_alloc(0);
         vif_record->qos_algorithm_params = xen_string_string_map_alloc(0);
-        vif_record->device = strdup(device);
+        if (virAsprintfQuiet(&vif_record->device, "%d", device) < 0) {
+            xen_vif_record_free(vif_record);
+            xen_network_record_free(net_rec);
+            xen_network_set_free(net_set);
+            return -1;
+        }
         xen_vif_create(session, &vif, vif_record);
         if (!vif) {
             xen_vif_free(vif);
@@ -444,28 +444,30 @@ createVifNetwork (virConnectPtr conn, xen_vm vm, char *device,
         xen_vif_record_free(vif_record);
         xen_network_record_free(net_rec);
     }
-    if (net_set != NULL) xen_network_set_free(net_set);
+    xen_network_set_free(net_set);
     return -1;
 }
 
 /* Create a VM record from the XML description */
 int
-createVMRecordFromXml (virConnectPtr conn, virDomainDefPtr def,
-                       xen_vm_record **record, xen_vm *vm)
+createVMRecordFromXml(virConnectPtr conn, virDomainDefPtr def,
+                      xen_vm_record **record, xen_vm *vm)
 {
     char uuidStr[VIR_UUID_STRING_BUFLEN];
+    xen_string_string_map *strings = NULL;
+    int device_number = 0;
+    size_t i;
+
     *record = xen_vm_record_alloc();
-    if (!((*record)->name_label = strdup(def->name)))
-        goto error_cleanup;
-    if (def->uuid) {
-        virUUIDFormat(def->uuid, uuidStr);
-        if (!((*record)->uuid = strdup(uuidStr)))
-            goto error_cleanup;
-    }
-    if (STREQ(def->os.type, "hvm")) {
+    if (VIR_STRDUP((*record)->name_label, def->name) < 0)
+        goto error;
+    virUUIDFormat(def->uuid, uuidStr);
+    if (VIR_STRDUP((*record)->uuid, uuidStr) < 0)
+        goto error;
+    if (def->os.type == VIR_DOMAIN_OSTYPE_HVM) {
         char *boot_order = NULL;
-        if (!((*record)->hvm_boot_policy = strdup("BIOS order")))
-            goto error_cleanup;
+        if (VIR_STRDUP((*record)->hvm_boot_policy, "BIOS order") < 0)
+            goto error;
         if (def->os.nBootDevs != 0)
             boot_order = createXenAPIBootOrderString(def->os.nBootDevs, &def->os.bootDevs[0]);
         if (boot_order != NULL) {
@@ -474,37 +476,37 @@ createVMRecordFromXml (virConnectPtr conn, virDomainDefPtr def,
             (*record)->hvm_boot_params = hvm_boot_params;
             VIR_FREE(boot_order);
         }
-    } else if (STREQ(def->os.type, "xen")) {
-        if (!((*record)->pv_bootloader = strdup("pygrub")))
-            goto error_cleanup;
+    } else if (def->os.type == VIR_DOMAIN_OSTYPE_XEN) {
+        if (VIR_STRDUP((*record)->pv_bootloader, "pygrub") < 0)
+            goto error;
         if (def->os.kernel) {
-            if (!((*record)->pv_kernel = strdup(def->os.kernel)))
-                goto error_cleanup;
+            if (VIR_STRDUP((*record)->pv_kernel, def->os.kernel) < 0)
+                goto error;
         }
         if (def->os.initrd) {
-            if (!((*record)->pv_ramdisk = strdup(def->os.initrd)))
-                goto error_cleanup;
+            if (VIR_STRDUP((*record)->pv_ramdisk, def->os.initrd) < 0)
+                goto error;
         }
         if (def->os.cmdline) {
-            if (!((*record)->pv_args = strdup(def->os.cmdline)))
-                goto error_cleanup;
+            if (VIR_STRDUP((*record)->pv_args, def->os.cmdline) < 0)
+                goto error;
         }
         (*record)->hvm_boot_params = xen_string_string_map_alloc(0);
     }
     if (def->os.bootloaderArgs)
-        if (!((*record)->pv_bootloader_args = strdup(def->os.bootloaderArgs)))
-            goto error_cleanup;
+        if (VIR_STRDUP((*record)->pv_bootloader_args, def->os.bootloaderArgs) < 0)
+            goto error;
 
-    if (def->memory)
-        (*record)->memory_static_max = (int64_t) (def->memory * 1024);
-    if (def->maxmem)
-        (*record)->memory_dynamic_max = (int64_t) (def->maxmem * 1024);
+    if (def->mem.cur_balloon)
+        (*record)->memory_static_max = (int64_t) (def->mem.cur_balloon * 1024);
+    if (virDomainDefGetMemoryTotal(def))
+        (*record)->memory_dynamic_max = (int64_t) (virDomainDefGetMemoryTotal(def) * 1024);
     else
         (*record)->memory_dynamic_max = (*record)->memory_static_max;
 
-    if (def->vcpus) {
-        (*record)->vcpus_max = (int64_t) def->vcpus;
-        (*record)->vcpus_at_startup = (int64_t) def->vcpus;
+    if (virDomainDefGetVcpusMax(def) > 0) {
+        (*record)->vcpus_max = (int64_t) virDomainDefGetVcpusMax(def);
+        (*record)->vcpus_at_startup = (int64_t) virDomainDefGetVcpus(def);
     }
     if (def->onPoweroff)
         (*record)->actions_after_shutdown = actionShutdownLibvirt2XenapiEnum(def->onPoweroff);
@@ -513,15 +515,16 @@ createVMRecordFromXml (virConnectPtr conn, virDomainDefPtr def,
     if (def->onCrash)
         (*record)->actions_after_crash = actionCrashLibvirt2XenapiEnum(def->onCrash);
 
-    xen_string_string_map *strings = NULL;
-    if (def->features) {
-        if (def->features & (1 << VIR_DOMAIN_FEATURE_ACPI))
-            allocStringMap(&strings, (char *)"acpi", (char *)"true");
-        if (def->features & (1 << VIR_DOMAIN_FEATURE_APIC))
-            allocStringMap(&strings, (char *)"apic", (char *)"true");
-        if (def->features & (1 << VIR_DOMAIN_FEATURE_PAE))
-            allocStringMap(&strings, (char *)"pae", (char *)"true");
-    }
+    if (def->features[VIR_DOMAIN_FEATURE_ACPI] == VIR_TRISTATE_SWITCH_ON)
+        allocStringMap(&strings, (char *)"acpi", (char *)"true");
+    if (def->features[VIR_DOMAIN_FEATURE_APIC] == VIR_TRISTATE_SWITCH_ON)
+        allocStringMap(&strings, (char *)"apic", (char *)"true");
+    if (def->features[VIR_DOMAIN_FEATURE_PAE] == VIR_TRISTATE_SWITCH_ON)
+        allocStringMap(&strings, (char *)"pae", (char *)"true");
+    if (def->features[VIR_DOMAIN_FEATURE_HAP] == VIR_TRISTATE_SWITCH_ON)
+        allocStringMap(&strings, (char *)"hap", (char *)"true");
+    if (def->features[VIR_DOMAIN_FEATURE_VIRIDIAN] == VIR_TRISTATE_SWITCH_ON)
+        allocStringMap(&strings, (char *)"viridian", (char *)"true");
     if (strings != NULL)
         (*record)->platform = strings;
 
@@ -536,36 +539,28 @@ createVMRecordFromXml (virConnectPtr conn, virDomainDefPtr def,
         return -1;
     }
 
-    int device_number = 0;
-    char *bridge = NULL, *mac = NULL;
-    int i;
     for (i = 0; i < def->nnets; i++) {
-        if (def->nets[i]->type == VIR_DOMAIN_NET_TYPE_BRIDGE) {
-            if (def->nets[i]->data.bridge.brname)
-                if (!(bridge = strdup(def->nets[i]->data.bridge.brname)))
-                    goto error_cleanup;
-            if (def->nets[i]->mac) {
-                char macStr[VIR_MAC_STRING_BUFLEN];
-                virFormatMacAddr(def->nets[i]->mac, macStr);
-                if (!(mac = strdup(macStr))) {
-                    VIR_FREE(bridge);
-                    goto error_cleanup;
-                }
+        if (def->nets[i]->type == VIR_DOMAIN_NET_TYPE_BRIDGE &&
+            def->nets[i]->data.bridge.brname) {
+            char *mac;
+
+            if (VIR_ALLOC_N(mac, VIR_MAC_STRING_BUFLEN) < 0)
+                goto error;
+            virMacAddrFormat(&def->nets[i]->mac, mac);
+
+            if (createVifNetwork(conn, *vm, device_number,
+                                 def->nets[i]->data.bridge.brname,
+                                 mac) < 0) {
+                VIR_FREE(mac);
+                virReportOOMError();
+                goto error;
             }
-            if (mac != NULL && bridge != NULL) {
-                char device[NETWORK_DEVID_SIZE] = "\0";
-                sprintf(device, "%d", device_number);
-                createVifNetwork(conn, *vm, device, bridge, mac);
-                VIR_FREE(bridge);
-                device_number++;
-            }
-            VIR_FREE(bridge);
+            device_number++;
         }
     }
     return 0;
 
-  error_cleanup:
-    virReportOOMError();
+ error:
     xen_vm_record_free(*record);
     return -1;
 }

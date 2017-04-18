@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -26,29 +26,24 @@
 
 # include "libvirtd.h"
 
+daemonClientStream *
+daemonCreateClientStream(virNetServerClientPtr client,
+                         virStreamPtr st,
+                         virNetServerProgramPtr prog,
+                         virNetMessageHeaderPtr hdr);
 
+int daemonFreeClientStream(virNetServerClientPtr client,
+                           daemonClientStream *stream);
 
-struct qemud_client_stream *
-remoteCreateClientStream(virConnectPtr conn,
-                         remote_message_header *hdr);
-
-void remoteFreeClientStream(struct qemud_client *client,
-                            struct qemud_client_stream *stream);
-
-int remoteAddClientStream(struct qemud_client *client,
-                          struct qemud_client_stream *stream,
-                          int transmit);
-
-struct qemud_client_stream *
-remoteFindClientStream(struct qemud_client *client,
-                       virStreamPtr stream);
+int daemonAddClientStream(virNetServerClientPtr client,
+                          daemonClientStream *stream,
+                          bool transmit);
 
 int
-remoteRemoveClientStream(struct qemud_client *client,
-                         struct qemud_client_stream *stream);
+daemonRemoveClientStream(virNetServerClientPtr client,
+                         daemonClientStream *stream);
 
 void
-remoteStreamMessageFinished(struct qemud_client *client,
-                            struct qemud_client_message *msg);
+daemonRemoveAllClientStreams(daemonClientStream *stream);
 
 #endif /* __LIBVIRTD_STREAM_H__ */

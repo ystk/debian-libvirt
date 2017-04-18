@@ -1,7 +1,7 @@
 /*
  * capabilities.h: hypervisor capabilities
  *
- * Copyright (C) 2006-2008 Red Hat, Inc.
+ * Copyright (C) 2006-2015 Red Hat, Inc.
  * Copyright (C) 2006-2008 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -24,12 +24,12 @@
 #ifndef __VIR_CAPABILITIES_H
 # define __VIR_CAPABILITIES_H
 
-# include <stdbool.h>
-
 # include "internal.h"
-# include "util.h"
-# include "buf.h"
+# include "virbuffer.h"
 # include "cpu_conf.h"
+# include "virarch.h"
+# include "virmacaddr.h"
+# include "virobject.h"
 
 # include <libxml/xpath.h>
 
@@ -37,8 +37,8 @@ typedef struct _virCapsGuestFeature virCapsGuestFeature;
 typedef virCapsGuestFeature *virCapsGuestFeaturePtr;
 struct _virCapsGuestFeature {
     char *name;
-    int defaultOn;
-    int toggle;
+    bool defaultOn;
+    bool toggle;
 };
 
 typedef struct _virCapsGuestMachine virCapsGuestMachine;
@@ -46,6 +46,7 @@ typedef virCapsGuestMachine *virCapsGuestMachinePtr;
 struct _virCapsGuestMachine {
     char *name;
     char *canonical;
+    unsigned int maxCpus;
 };
 
 typedef struct _virCapsGuestDomainInfo virCapsGuestDomainInfo;
@@ -55,33 +56,57 @@ struct _virCapsGuestDomainInfo {
     char *loader;
     int nmachines;
     virCapsGuestMachinePtr *machines;
-    time_t emulator_mtime; /* do @machines need refreshing? */
 };
 
 typedef struct _virCapsGuestDomain virCapsGuestDomain;
 typedef virCapsGuestDomain *virCapsGuestDomainPtr;
 struct _virCapsGuestDomain {
-    char *type;
+    int type; /* virDomainVirtType */
     virCapsGuestDomainInfo info;
 };
 
 typedef struct _virCapsGuestArch virCapsGuestArch;
 typedef virCapsGuestArch *virCapsGuestArchptr;
 struct _virCapsGuestArch {
-    char *name;
-    int wordsize;
+    virArch id;
+    unsigned int wordsize;
     virCapsGuestDomainInfo defaultInfo;
-    int ndomains;
+    size_t ndomains;
+    size_t ndomains_max;
     virCapsGuestDomainPtr *domains;
 };
 
 typedef struct _virCapsGuest virCapsGuest;
 typedef virCapsGuest *virCapsGuestPtr;
 struct _virCapsGuest {
-    char *ostype;
+    int ostype;
     virCapsGuestArch arch;
-    int nfeatures;
+    size_t nfeatures;
+    size_t nfeatures_max;
     virCapsGuestFeaturePtr *features;
+};
+
+typedef struct _virCapsHostNUMACellCPU virCapsHostNUMACellCPU;
+typedef virCapsHostNUMACellCPU *virCapsHostNUMACellCPUPtr;
+struct _virCapsHostNUMACellCPU {
+    unsigned int id;
+    unsigned int socket_id;
+    unsigned int core_id;
+    virBitmapPtr siblings;
+};
+
+typedef struct _virCapsHostNUMACellSiblingInfo virCapsHostNUMACellSiblingInfo;
+typedef virCapsHostNUMACellSiblingInfo *virCapsHostNUMACellSiblingInfoPtr;
+struct _virCapsHostNUMACellSiblingInfo {
+    int node;               /* foreign NUMA node */
+    unsigned int distance;  /* distance to the node */
+};
+
+typedef struct _virCapsHostNUMACellPageInfo virCapsHostNUMACellPageInfo;
+typedef virCapsHostNUMACellPageInfo *virCapsHostNUMACellPageInfoPtr;
+struct _virCapsHostNUMACellPageInfo {
+    unsigned int size;      /* page size in kibibytes */
+    size_t avail;           /* the size of pool */
 };
 
 typedef struct _virCapsHostNUMACell virCapsHostNUMACell;
@@ -89,29 +114,56 @@ typedef virCapsHostNUMACell *virCapsHostNUMACellPtr;
 struct _virCapsHostNUMACell {
     int num;
     int ncpus;
-    int *cpus;
+    unsigned long long mem; /* in kibibytes */
+    virCapsHostNUMACellCPUPtr cpus;
+    int nsiblings;
+    virCapsHostNUMACellSiblingInfoPtr siblings;
+    int npageinfo;
+    virCapsHostNUMACellPageInfoPtr pageinfo;
+};
+
+typedef struct _virCapsHostSecModelLabel virCapsHostSecModelLabel;
+typedef virCapsHostSecModelLabel *virCapsHostSecModelLabelPtr;
+struct _virCapsHostSecModelLabel {
+    char *type;
+    char *label;
 };
 
 typedef struct _virCapsHostSecModel virCapsHostSecModel;
+typedef virCapsHostSecModel *virCapsHostSecModelPtr;
 struct _virCapsHostSecModel {
     char *model;
     char *doi;
+    size_t nlabels;
+    virCapsHostSecModelLabelPtr labels;
 };
 
 typedef struct _virCapsHost virCapsHost;
 typedef virCapsHost *virCapsHostPtr;
 struct _virCapsHost {
-    char *arch;
-    int nfeatures;
+    virArch arch;
+    size_t nfeatures;
+    size_t nfeatures_max;
     char **features;
-    int offlineMigrate;
-    int liveMigrate;
-    int nmigrateTrans;
+    unsigned int powerMgmt;    /* Bitmask of the PM capabilities.
+                                * See enum virHostPMCapability.
+                                */
+    bool offlineMigrate;
+    bool liveMigrate;
+    size_t nmigrateTrans;
+    size_t nmigrateTrans_max;
     char **migrateTrans;
-    int nnumaCell;
+    size_t nnumaCell;
+    size_t nnumaCell_max;
     virCapsHostNUMACellPtr *numaCell;
-    virCapsHostSecModel secModel;
+
+    size_t nsecModels;
+    virCapsHostSecModelPtr secModels;
+
+    char *netprefix;
     virCPUDefPtr cpu;
+    int nPagesSize;             /* size of pagesSize array */
+    unsigned int *pagesSize;    /* page sizes support on the system */
     unsigned char host_uuid[VIR_UUID_BUFLEN];
 };
 
@@ -131,129 +183,115 @@ struct _virDomainXMLNamespace {
 };
 
 typedef struct _virCaps virCaps;
-typedef virCaps* virCapsPtr;
+typedef virCaps *virCapsPtr;
 struct _virCaps {
-    virCapsHost host;
-    int nguests;
-    virCapsGuestPtr *guests;
-    unsigned char macPrefix[VIR_MAC_PREFIX_BUFLEN];
-    unsigned int emulatorRequired : 1;
-    const char *defaultDiskDriverName;
-    const char *defaultDiskDriverType;
-    int defaultConsoleTargetType;
-    void *(*privateDataAllocFunc)(void);
-    void (*privateDataFreeFunc)(void *);
-    int (*privateDataXMLFormat)(virBufferPtr, void *);
-    int (*privateDataXMLParse)(xmlXPathContextPtr, void *);
-    bool hasWideScsiBus;
+    virObject parent;
 
-    virDomainXMLNamespace ns;
+    virCapsHost host;
+    size_t nguests;
+    size_t nguests_max;
+    virCapsGuestPtr *guests;
+};
+
+typedef struct _virCapsDomainData virCapsDomainData;
+typedef virCapsDomainData *virCapsDomainDataPtr;
+struct _virCapsDomainData {
+    int ostype;
+    int arch;
+    int domaintype; /* virDomainVirtType */
+    const char *emulator;
+    const char *machinetype;
 };
 
 
-extern virCapsPtr
-virCapabilitiesNew(const char *arch,
-                   int offlineMigrate,
-                   int liveMigrate);
+virCapsPtr
+virCapabilitiesNew(virArch hostarch,
+                   bool offlineMigrate,
+                   bool liveMigrate);
 
-extern void
-virCapabilitiesFree(virCapsPtr caps);
-
-extern void
+void
 virCapabilitiesFreeNUMAInfo(virCapsPtr caps);
 
-extern void
-virCapabilitiesSetMacPrefix(virCapsPtr caps,
-                            unsigned char *prefix);
-
-extern void
-virCapabilitiesGenerateMac(virCapsPtr caps,
-                           unsigned char *mac);
-
-extern void
-virCapabilitiesSetEmulatorRequired(virCapsPtr caps);
-
-extern unsigned int
-virCapabilitiesIsEmulatorRequired(virCapsPtr caps);
-
-extern int
+int
 virCapabilitiesAddHostFeature(virCapsPtr caps,
                               const char *name);
 
-extern int
+int
 virCapabilitiesAddHostMigrateTransport(virCapsPtr caps,
                                        const char *name);
 
+int
+virCapabilitiesSetNetPrefix(virCapsPtr caps,
+                            const char *prefix);
 
-extern int
+int
 virCapabilitiesAddHostNUMACell(virCapsPtr caps,
                                int num,
+                               unsigned long long mem,
                                int ncpus,
-                               const int *cpus);
+                               virCapsHostNUMACellCPUPtr cpus,
+                               int nsiblings,
+                               virCapsHostNUMACellSiblingInfoPtr siblings,
+                               int npageinfo,
+                               virCapsHostNUMACellPageInfoPtr pageinfo);
 
 
-extern int
+int
 virCapabilitiesSetHostCPU(virCapsPtr caps,
                           virCPUDefPtr cpu);
 
 
-extern virCapsGuestMachinePtr *
+virCapsGuestMachinePtr *
 virCapabilitiesAllocMachines(const char *const *names,
                              int nnames);
-extern void
+void
 virCapabilitiesFreeMachines(virCapsGuestMachinePtr *machines,
                             int nmachines);
 
-extern virCapsGuestPtr
+virCapsGuestPtr
 virCapabilitiesAddGuest(virCapsPtr caps,
-                        const char *ostype,
-                        const char *arch,
-                        int wordsize,
+                        int ostype,
+                        virArch arch,
                         const char *emulator,
                         const char *loader,
                         int nmachines,
                         virCapsGuestMachinePtr *machines);
 
-extern virCapsGuestDomainPtr
+virCapsGuestDomainPtr
 virCapabilitiesAddGuestDomain(virCapsGuestPtr guest,
-                              const char *hvtype,
+                              int hvtype,
                               const char *emulator,
                               const char *loader,
                               int nmachines,
                               virCapsGuestMachinePtr *machines);
 
-extern virCapsGuestFeaturePtr
+virCapsGuestFeaturePtr
 virCapabilitiesAddGuestFeature(virCapsGuestPtr guest,
                                const char *name,
-                               int defaultOn,
-                               int toggle);
+                               bool defaultOn,
+                               bool toggle);
 
-extern int
-virCapabilitiesSupportsGuestOSType(virCapsPtr caps,
-                                   const char *ostype);
-extern int
-virCapabilitiesSupportsGuestArch(virCapsPtr caps,
-                                 const char *ostype,
-                                 const char *arch);
+int
+virCapabilitiesHostSecModelAddBaseLabel(virCapsHostSecModelPtr secmodel,
+                                        const char *type,
+                                        const char *label);
 
+virCapsDomainDataPtr
+virCapabilitiesDomainDataLookup(virCapsPtr caps,
+                                int ostype,
+                                virArch arch,
+                                int domaintype,
+                                const char *emulator,
+                                const char *machinetype);
 
-extern const char *
-virCapabilitiesDefaultGuestArch(virCapsPtr caps,
-                                const char *ostype,
-                                const char *domain);
-extern const char *
-virCapabilitiesDefaultGuestMachine(virCapsPtr caps,
-                                   const char *ostype,
-                                   const char *arch,
-                                   const char *domain);
-extern const char *
-virCapabilitiesDefaultGuestEmulator(virCapsPtr caps,
-                                    const char *ostype,
-                                    const char *arch,
-                                    const char *domain);
+void
+virCapabilitiesClearHostNUMACellCPUTopology(virCapsHostNUMACellCPUPtr cpu,
+                                            size_t ncpus);
 
-extern char *
+char *
 virCapabilitiesFormatXML(virCapsPtr caps);
 
+virBitmapPtr virCapabilitiesGetCpusForNodemask(virCapsPtr caps,
+                                               virBitmapPtr nodemask);
 
 #endif /* __VIR_CAPABILITIES_H */

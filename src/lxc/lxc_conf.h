@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Red Hat, Inc.
+ * Copyright (C) 2010, 2013 Red Hat, Inc.
  * Copyright IBM Corp. 2008
  *
  * lxc_conf.h: header file for linux container config functions
@@ -18,54 +18,110 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  */
 
 #ifndef LXC_CONF_H
 # define LXC_CONF_H
 
-# include <config.h>
-
 # include "internal.h"
+# include "libvirt_internal.h"
 # include "domain_conf.h"
 # include "domain_event.h"
 # include "capabilities.h"
-# include "threads.h"
-# include "cgroup.h"
+# include "virthread.h"
+# include "security/security_manager.h"
+# include "configmake.h"
+# include "vircgroup.h"
+# include "virsysinfo.h"
+# include "virusb.h"
+# include "virclosecallbacks.h"
+# include "virhostdev.h"
 
-# define LXC_CONFIG_DIR SYSCONF_DIR "/libvirt/lxc"
-# define LXC_STATE_DIR LOCAL_STATE_DIR "/run/libvirt/lxc"
-# define LXC_LOG_DIR LOCAL_STATE_DIR "/log/libvirt/lxc"
+# define LXC_DRIVER_NAME "LXC"
+
+# define LXC_CONFIG_DIR SYSCONFDIR "/libvirt/lxc"
+# define LXC_STATE_DIR LOCALSTATEDIR "/run/libvirt/lxc"
+# define LXC_LOG_DIR LOCALSTATEDIR "/log/libvirt/lxc"
 # define LXC_AUTOSTART_DIR LXC_CONFIG_DIR "/autostart"
 
-typedef struct __lxc_driver lxc_driver_t;
-struct __lxc_driver {
-    virMutex lock;
+typedef struct _virLXCDriver virLXCDriver;
+typedef virLXCDriver *virLXCDriverPtr;
 
-    virCapsPtr caps;
+typedef struct _virLXCDriverConfig virLXCDriverConfig;
+typedef virLXCDriverConfig *virLXCDriverConfigPtr;
 
-    virCgroupPtr cgroup;
-    virDomainObjList domains;
+struct _virLXCDriverConfig {
+    virObject parent;
+
     char *configDir;
     char *autostartDir;
     char *stateDir;
     char *logDir;
-    int log_libvirtd;
+    bool log_libvirtd;
     int have_netns;
 
-    /* An array of callbacks */
-    virDomainEventCallbackListPtr domainEventCallbacks;
-    virDomainEventQueuePtr domainEventQueue;
-    int domainEventTimer;
-    int domainEventDispatching;
+    char *securityDriverName;
+    bool securityDefaultConfined;
+    bool securityRequireConfined;
 };
 
-int lxcLoadDriverConfig(lxc_driver_t *driver);
-virCapsPtr lxcCapsInit(void);
+struct _virLXCDriver {
+    virMutex lock;
 
-# define lxcError(code, ...)                                             \
-    virReportErrorHelper(NULL, VIR_FROM_LXC, code, __FILE__,            \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
+    /* Require lock to get reference on 'config',
+     * then lockless thereafter */
+    virLXCDriverConfigPtr config;
+
+    /* Require lock to get a reference on the object,
+     * lockless access thereafter */
+    virCapsPtr caps;
+
+    /* Immutable pointer, Immutable object */
+    virDomainXMLOptionPtr xmlopt;
+
+    /* Immutable pointer, lockless APIs*/
+    virSysinfoDefPtr hostsysinfo;
+
+    /* Atomic inc/dec only */
+    unsigned int nactive;
+
+    /* Immutable pointers. Caller must provide locking */
+    virStateInhibitCallback inhibitCallback;
+    void *inhibitOpaque;
+
+    /* Immutable pointer, self-locking APIs */
+    virDomainObjListPtr domains;
+
+    virHostdevManagerPtr hostdevMgr;
+
+    /* Immutable pointer, self-locking APIs */
+    virObjectEventStatePtr domainEventState;
+
+    /* Immutable pointer. self-locking APIs */
+    virSecurityManagerPtr securityManager;
+
+    /* Immutable pointer, self-locking APIs */
+    virCloseCallbacksPtr closeCallbacks;
+};
+
+virLXCDriverConfigPtr virLXCDriverConfigNew(void);
+virLXCDriverConfigPtr virLXCDriverGetConfig(virLXCDriverPtr driver);
+int virLXCLoadDriverConfig(virLXCDriverConfigPtr cfg,
+                           const char *filename);
+virCapsPtr virLXCDriverCapsInit(virLXCDriverPtr driver);
+virCapsPtr virLXCDriverGetCapabilities(virLXCDriverPtr driver,
+                                       bool refresh);
+virDomainXMLOptionPtr lxcDomainXMLConfInit(void);
+
+static inline void lxcDriverLock(virLXCDriverPtr driver)
+{
+    virMutexLock(&driver->lock);
+}
+static inline void lxcDriverUnlock(virLXCDriverPtr driver)
+{
+    virMutexUnlock(&driver->lock);
+}
 
 #endif /* LXC_CONF_H */

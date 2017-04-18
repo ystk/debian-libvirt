@@ -1,284 +1,432 @@
 #include <config.h>
 
+#include "testutils.h"
+
 #ifdef WITH_QEMU
 
 # include <stdio.h>
 # include <stdlib.h>
 
-# include "testutils.h"
-# include "qemu/qemu_conf.h"
+# include "qemu/qemu_capabilities.h"
+# include "viralloc.h"
+# include "virstring.h"
 
-# define MAX_HELP_OUTPUT_SIZE 1024*64
+# define VIR_FROM_THIS VIR_FROM_NONE
 
 struct testInfo {
     const char *name;
-    unsigned long long flags;
+    virQEMUCapsPtr flags;
     unsigned int version;
-    unsigned int is_kvm;
+    bool is_kvm;
     unsigned int kvm_version;
+    int error;
 };
 
-static char *progname;
-static char *abs_srcdir;
-
-static void printMismatchedFlags(unsigned long long got,
-                                 unsigned long long expect)
+static void printMismatchedFlags(virQEMUCapsPtr got,
+                                 virQEMUCapsPtr expect)
 {
-    int i;
+    size_t i;
 
-    for (i = 0 ; i < (sizeof(got)*CHAR_BIT) ; i++) {
-        unsigned long long gotFlag = (got & (1LL << i));
-        unsigned long long expectFlag = (expect & (1LL << i));
+    for (i = 0; i < QEMU_CAPS_LAST; i++) {
+        bool gotFlag = virQEMUCapsGet(got, i);
+        bool expectFlag = virQEMUCapsGet(expect, i);
         if (gotFlag && !expectFlag)
-            fprintf(stderr, "Extra flag %i\n", i);
+            fprintf(stderr, "Extra flag %zu\n", i);
         if (!gotFlag && expectFlag)
-            fprintf(stderr, "Missing flag %i\n", i);
+            fprintf(stderr, "Missing flag %zu\n", i);
     }
 }
 
 static int testHelpStrParsing(const void *data)
 {
     const struct testInfo *info = data;
-    char path[PATH_MAX];
-    char helpStr[MAX_HELP_OUTPUT_SIZE];
-    char *help = &(helpStr[0]);
-    unsigned int version, is_kvm, kvm_version;
-    unsigned long long flags;
+    char *path = NULL;
+    char *help = NULL;
+    unsigned int version, kvm_version;
+    bool is_kvm;
+    virQEMUCapsPtr flags = NULL;
+    int ret = -1;
+    char *got = NULL;
+    char *expected = NULL;
 
-    snprintf(path, PATH_MAX, "%s/qemuhelpdata/%s", abs_srcdir, info->name);
-
-    if (virtTestLoadFile(path, &help, MAX_HELP_OUTPUT_SIZE) < 0)
+    if (virAsprintf(&path, "%s/qemuhelpdata/%s", abs_srcdir, info->name) < 0)
         return -1;
 
-    if (qemudParseHelpStr("QEMU", help, &flags,
-                          &version, &is_kvm, &kvm_version) == -1)
-        return -1;
+    if (virTestLoadFile(path, &help) < 0)
+        goto cleanup;
 
-    if (flags != info->flags) {
-        fprintf(stderr, "Computed flags do not match: got 0x%llx, expected 0x%llx\n",
-                flags, info->flags);
+    if (!(flags = virQEMUCapsNew()))
+        goto cleanup;
 
-        if (getenv("VIR_TEST_DEBUG"))
+    if (virQEMUCapsParseHelpStr("QEMU", help, flags,
+                                &version, &is_kvm, &kvm_version, false, NULL) == -1) {
+        virErrorPtr err = virGetLastError();
+
+        if (info->error && err && err->code == info->error)
+            ret = 0;
+        goto cleanup;
+    }
+
+# ifndef WITH_YAJL
+    if (virQEMUCapsGet(info->flags, QEMU_CAPS_MONITOR_JSON))
+        virQEMUCapsSet(flags, QEMU_CAPS_MONITOR_JSON);
+# endif
+
+    VIR_FREE(path);
+    VIR_FREE(help);
+    if (virAsprintf(&path, "%s/qemuhelpdata/%s-device", abs_srcdir,
+                    info->name) < 0)
+        goto cleanup;
+
+    if (virTestLoadFile(path, &help) < 0)
+        goto cleanup;
+
+    if (virQEMUCapsParseDeviceStr(flags, help) < 0)
+        goto cleanup;
+
+    got = virQEMUCapsFlagsString(flags);
+    expected = virQEMUCapsFlagsString(info->flags);
+    if (!got || !expected)
+        goto cleanup;
+
+    if (STRNEQ(got, expected)) {
+        VIR_TEST_DEBUG("%s: computed flags do not match: got %s, expected %s\n",
+            info->name, got, expected);
+
+        if (virTestGetDebug())
             printMismatchedFlags(flags, info->flags);
 
-        return -1;
+        goto cleanup;
     }
 
     if (version != info->version) {
-        fprintf(stderr, "Parsed versions do not match: got %u, expected %u\n",
-                version, info->version);
-        return -1;
+        fprintf(stderr, "%s: parsed versions do not match: got %u, expected %u\n",
+                info->name, version, info->version);
+        goto cleanup;
     }
 
     if (is_kvm != info->is_kvm) {
-        fprintf(stderr, "Parsed is_kvm flag does not match: got %u, expected %u\n",
-                is_kvm, info->is_kvm);
-        return -1;
+        fprintf(stderr,
+                "%s: parsed is_kvm flag does not match: got %u, expected %u\n",
+                info->name, is_kvm, info->is_kvm);
+        goto cleanup;
     }
 
     if (kvm_version != info->kvm_version) {
-        fprintf(stderr, "Parsed KVM versions do not match: got %u, expected %u\n",
-                kvm_version, info->kvm_version);
-        return -1;
+        fprintf(stderr,
+                "%s: parsed KVM versions do not match: got %u, expected %u\n",
+                info->name, kvm_version, info->kvm_version);
+        goto cleanup;
     }
 
-    return 0;
+    ret = 0;
+ cleanup:
+    VIR_FREE(path);
+    VIR_FREE(help);
+    virObjectUnref(flags);
+    VIR_FREE(got);
+    VIR_FREE(expected);
+    return ret;
 }
 
 static int
-mymain(int argc, char **argv)
+mymain(void)
 {
     int ret = 0;
-    char cwd[PATH_MAX];
 
-    progname = argv[0];
-
-    if (argc > 1) {
-        fprintf(stderr, "Usage: %s\n", progname);
-        return (EXIT_FAILURE);
-    }
-
-    abs_srcdir = getenv("abs_srcdir");
-    if (!abs_srcdir)
-        abs_srcdir = getcwd(cwd, sizeof(cwd));
-
-# define DO_TEST(name, flags, version, is_kvm, kvm_version)                          \
-    do {                                                                            \
-        const struct testInfo info = { name, flags, version, is_kvm, kvm_version }; \
-        if (virtTestRun("QEMU Help String Parsing " name,                           \
-                        1, testHelpStrParsing, &info) < 0)                          \
-            ret = -1;                                                               \
+# define DO_TEST_FULL(name, version, is_kvm, kvm_version, error, ...)       \
+    do {                                                                    \
+        struct testInfo info = {                                            \
+            name, NULL, version, is_kvm, kvm_version, error                 \
+        };                                                                  \
+        if (!(info.flags = virQEMUCapsNew()))                               \
+            return EXIT_FAILURE;                                            \
+        virQEMUCapsSetList(info.flags, __VA_ARGS__, QEMU_CAPS_LAST);        \
+        if (virTestRun("QEMU Help String Parsing " name,                    \
+                       testHelpStrParsing, &info) < 0)                      \
+            ret = -1;                                                       \
+        virObjectUnref(info.flags);                                         \
     } while (0)
 
-    DO_TEST("qemu-0.9.1",
-            QEMUD_CMD_FLAG_KQEMU |
-            QEMUD_CMD_FLAG_VNC_COLON |
-            QEMUD_CMD_FLAG_NO_REBOOT |
-            QEMUD_CMD_FLAG_DRIVE |
-            QEMUD_CMD_FLAG_NAME,
-            9001,  0,  0);
-    DO_TEST("kvm-74",
-            QEMUD_CMD_FLAG_VNC_COLON |
-            QEMUD_CMD_FLAG_NO_REBOOT |
-            QEMUD_CMD_FLAG_DRIVE |
-            QEMUD_CMD_FLAG_DRIVE_BOOT |
-            QEMUD_CMD_FLAG_NAME |
-            QEMUD_CMD_FLAG_VNET_HDR |
-            QEMUD_CMD_FLAG_MIGRATE_KVM_STDIO |
-            QEMUD_CMD_FLAG_KVM |
-            QEMUD_CMD_FLAG_DRIVE_FORMAT |
-            QEMUD_CMD_FLAG_MEM_PATH |
-            QEMUD_CMD_FLAG_TDF,
-            9001,  1, 74);
-    DO_TEST("qemu-0.10.5",
-            QEMUD_CMD_FLAG_KQEMU |
-            QEMUD_CMD_FLAG_VNC_COLON |
-            QEMUD_CMD_FLAG_NO_REBOOT |
-            QEMUD_CMD_FLAG_DRIVE |
-            QEMUD_CMD_FLAG_NAME |
-            QEMUD_CMD_FLAG_UUID |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_TCP |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_EXEC |
-            QEMUD_CMD_FLAG_DRIVE_CACHE_V2 |
-            QEMUD_CMD_FLAG_DRIVE_FORMAT |
-            QEMUD_CMD_FLAG_DRIVE_SERIAL |
-            QEMUD_CMD_FLAG_VGA |
-            QEMUD_CMD_FLAG_0_10 |
-            QEMUD_CMD_FLAG_ENABLE_KVM |
-            QEMUD_CMD_FLAG_SDL |
-            QEMUD_CMD_FLAG_RTC_TD_HACK |
-            QEMUD_CMD_FLAG_NO_HPET,
-            10005, 0,  0);
-    DO_TEST("qemu-kvm-0.10.5",
-            QEMUD_CMD_FLAG_VNC_COLON |
-            QEMUD_CMD_FLAG_NO_REBOOT |
-            QEMUD_CMD_FLAG_DRIVE |
-            QEMUD_CMD_FLAG_DRIVE_BOOT |
-            QEMUD_CMD_FLAG_NAME |
-            QEMUD_CMD_FLAG_UUID |
-            QEMUD_CMD_FLAG_VNET_HDR |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_TCP |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_EXEC |
-            QEMUD_CMD_FLAG_DRIVE_CACHE_V2 |
-            QEMUD_CMD_FLAG_KVM |
-            QEMUD_CMD_FLAG_DRIVE_FORMAT |
-            QEMUD_CMD_FLAG_DRIVE_SERIAL |
-            QEMUD_CMD_FLAG_VGA |
-            QEMUD_CMD_FLAG_0_10 |
-            QEMUD_CMD_FLAG_PCIDEVICE |
-            QEMUD_CMD_FLAG_MEM_PATH |
-            QEMUD_CMD_FLAG_SDL |
-            QEMUD_CMD_FLAG_RTC_TD_HACK |
-            QEMUD_CMD_FLAG_NO_HPET |
-            QEMUD_CMD_FLAG_NO_KVM_PIT |
-            QEMUD_CMD_FLAG_TDF,
-            10005, 1,  0);
-    DO_TEST("kvm-86",
-            QEMUD_CMD_FLAG_VNC_COLON |
-            QEMUD_CMD_FLAG_NO_REBOOT |
-            QEMUD_CMD_FLAG_DRIVE |
-            QEMUD_CMD_FLAG_DRIVE_BOOT |
-            QEMUD_CMD_FLAG_NAME |
-            QEMUD_CMD_FLAG_UUID |
-            QEMUD_CMD_FLAG_VNET_HDR |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_TCP |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_EXEC |
-            QEMUD_CMD_FLAG_DRIVE_CACHE_V2 |
-            QEMUD_CMD_FLAG_KVM |
-            QEMUD_CMD_FLAG_DRIVE_FORMAT |
-            QEMUD_CMD_FLAG_DRIVE_SERIAL |
-            QEMUD_CMD_FLAG_VGA |
-            QEMUD_CMD_FLAG_0_10 |
-            QEMUD_CMD_FLAG_PCIDEVICE |
-            QEMUD_CMD_FLAG_SDL |
-            QEMUD_CMD_FLAG_RTC_TD_HACK |
-            QEMUD_CMD_FLAG_NO_HPET |
-            QEMUD_CMD_FLAG_NO_KVM_PIT |
-            QEMUD_CMD_FLAG_TDF,
-            10050, 1,  0);
-    DO_TEST("qemu-kvm-0.11.0-rc2",
-            QEMUD_CMD_FLAG_VNC_COLON |
-            QEMUD_CMD_FLAG_NO_REBOOT |
-            QEMUD_CMD_FLAG_DRIVE |
-            QEMUD_CMD_FLAG_DRIVE_BOOT |
-            QEMUD_CMD_FLAG_NAME |
-            QEMUD_CMD_FLAG_UUID |
-            QEMUD_CMD_FLAG_VNET_HDR |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_TCP |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_EXEC |
-            QEMUD_CMD_FLAG_DRIVE_CACHE_V2 |
-            QEMUD_CMD_FLAG_KVM |
-            QEMUD_CMD_FLAG_DRIVE_FORMAT |
-            QEMUD_CMD_FLAG_DRIVE_SERIAL |
-            QEMUD_CMD_FLAG_VGA |
-            QEMUD_CMD_FLAG_0_10 |
-            QEMUD_CMD_FLAG_PCIDEVICE |
-            QEMUD_CMD_FLAG_MEM_PATH |
-            QEMUD_CMD_FLAG_ENABLE_KVM |
-            QEMUD_CMD_FLAG_BALLOON |
-            QEMUD_CMD_FLAG_SDL |
-            QEMUD_CMD_FLAG_RTC_TD_HACK |
-            QEMUD_CMD_FLAG_NO_HPET |
-            QEMUD_CMD_FLAG_NO_KVM_PIT |
-            QEMUD_CMD_FLAG_TDF |
-            QEMUD_CMD_FLAG_BOOT_MENU,
-            10092, 1,  0);
-    DO_TEST("qemu-0.12.1",
-            QEMUD_CMD_FLAG_VNC_COLON |
-            QEMUD_CMD_FLAG_NO_REBOOT |
-            QEMUD_CMD_FLAG_DRIVE |
-            QEMUD_CMD_FLAG_NAME |
-            QEMUD_CMD_FLAG_UUID |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_TCP |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_EXEC |
-            QEMUD_CMD_FLAG_DRIVE_CACHE_V2 |
-            QEMUD_CMD_FLAG_DRIVE_FORMAT |
-            QEMUD_CMD_FLAG_DRIVE_SERIAL |
-            QEMUD_CMD_FLAG_VGA |
-            QEMUD_CMD_FLAG_0_10 |
-            QEMUD_CMD_FLAG_ENABLE_KVM |
-            QEMUD_CMD_FLAG_SDL |
-            QEMUD_CMD_FLAG_XEN_DOMID |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_UNIX |
-            QEMUD_CMD_FLAG_CHARDEV |
-            QEMUD_CMD_FLAG_BALLOON |
-            QEMUD_CMD_FLAG_DEVICE |
-            QEMUD_CMD_FLAG_SMP_TOPOLOGY |
-            QEMUD_CMD_FLAG_RTC |
-            QEMUD_CMD_FLAG_NO_HPET |
-            QEMUD_CMD_FLAG_BOOT_MENU,
-            12001, 0,  0);
-    DO_TEST("qemu-kvm-0.12.3",
-            QEMUD_CMD_FLAG_VNC_COLON |
-            QEMUD_CMD_FLAG_NO_REBOOT |
-            QEMUD_CMD_FLAG_DRIVE |
-            QEMUD_CMD_FLAG_DRIVE_BOOT |
-            QEMUD_CMD_FLAG_NAME |
-            QEMUD_CMD_FLAG_UUID |
-            QEMUD_CMD_FLAG_VNET_HDR |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_TCP |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_EXEC |
-            QEMUD_CMD_FLAG_DRIVE_CACHE_V2 |
-            QEMUD_CMD_FLAG_KVM |
-            QEMUD_CMD_FLAG_DRIVE_FORMAT |
-            QEMUD_CMD_FLAG_DRIVE_SERIAL |
-            QEMUD_CMD_FLAG_VGA |
-            QEMUD_CMD_FLAG_0_10 |
-            QEMUD_CMD_FLAG_PCIDEVICE |
-            QEMUD_CMD_FLAG_MEM_PATH |
-            QEMUD_CMD_FLAG_SDL |
-            QEMUD_CMD_FLAG_MIGRATE_QEMU_UNIX |
-            QEMUD_CMD_FLAG_CHARDEV |
-            QEMUD_CMD_FLAG_BALLOON |
-            QEMUD_CMD_FLAG_DEVICE |
-            QEMUD_CMD_FLAG_SMP_TOPOLOGY |
-            QEMUD_CMD_FLAG_RTC |
-            QEMUD_CMD_FLAG_VNET_HOST |
-            QEMUD_CMD_FLAG_NO_HPET |
-            QEMUD_CMD_FLAG_NO_KVM_PIT |
-            QEMUD_CMD_FLAG_TDF |
-            QEMUD_CMD_FLAG_BOOT_MENU,
-            12003, 1,  0);
+# define DO_TEST(name, version, is_kvm, kvm_version, ...) \
+    DO_TEST_FULL(name, version, is_kvm, kvm_version, VIR_ERR_OK, __VA_ARGS__)
+
+    DO_TEST("qemu-0.12.1", 12001, 0, 0,
+            QEMU_CAPS_DRIVE_SERIAL,
+            QEMU_CAPS_ENABLE_KVM,
+            QEMU_CAPS_SDL,
+            QEMU_CAPS_CHARDEV,
+            QEMU_CAPS_RTC,
+            QEMU_CAPS_NO_HPET,
+            QEMU_CAPS_BOOT_MENU,
+            QEMU_CAPS_NAME_PROCESS,
+            QEMU_CAPS_SMBIOS_TYPE,
+            QEMU_CAPS_VGA_NONE,
+            QEMU_CAPS_DRIVE_AIO,
+            QEMU_CAPS_PIIX3_USB_UHCI,
+            QEMU_CAPS_PIIX4_USB_UHCI,
+            QEMU_CAPS_USB_HUB,
+            QEMU_CAPS_NO_SHUTDOWN,
+            QEMU_CAPS_NO_ACPI,
+            QEMU_CAPS_SCSI_LSI,
+            QEMU_CAPS_VNC,
+            QEMU_CAPS_DEVICE_VGA,
+            QEMU_CAPS_DEVICE_CIRRUS_VGA,
+            QEMU_CAPS_DEVICE_VMWARE_SVGA,
+            QEMU_CAPS_DEVICE_USB_SERIAL,
+            QEMU_CAPS_DEVICE_USB_NET,
+            QEMU_CAPS_DEVICE_PCI_BRIDGE,
+            QEMU_CAPS_DEVICE_SCSI_GENERIC,
+            QEMU_CAPS_DEVICE_USB_STORAGE,
+            QEMU_CAPS_DEVICE_USB_KBD,
+            QEMU_CAPS_DEVICE_RTL8139,
+            QEMU_CAPS_DEVICE_E1000,
+            QEMU_CAPS_DEVICE_VIRTIO_NET);
+    DO_TEST("qemu-kvm-0.12.3", 12003, 1, 0,
+            QEMU_CAPS_DRIVE_BOOT,
+            QEMU_CAPS_KVM,
+            QEMU_CAPS_DRIVE_SERIAL,
+            QEMU_CAPS_MEM_PATH,
+            QEMU_CAPS_SDL,
+            QEMU_CAPS_CHARDEV,
+            QEMU_CAPS_ENABLE_KVM,
+            QEMU_CAPS_RTC,
+            QEMU_CAPS_NO_HPET,
+            QEMU_CAPS_NO_KVM_PIT,
+            QEMU_CAPS_TDF,
+            QEMU_CAPS_BOOT_MENU,
+            QEMU_CAPS_NESTING,
+            QEMU_CAPS_NAME_PROCESS,
+            QEMU_CAPS_SMBIOS_TYPE,
+            QEMU_CAPS_VGA_NONE,
+            QEMU_CAPS_DRIVE_AIO,
+            QEMU_CAPS_PIIX3_USB_UHCI,
+            QEMU_CAPS_PIIX4_USB_UHCI,
+            QEMU_CAPS_USB_HUB,
+            QEMU_CAPS_NO_SHUTDOWN,
+            QEMU_CAPS_NO_ACPI,
+            QEMU_CAPS_SCSI_LSI,
+            QEMU_CAPS_VNC,
+            QEMU_CAPS_DEVICE_VGA,
+            QEMU_CAPS_DEVICE_CIRRUS_VGA,
+            QEMU_CAPS_DEVICE_VMWARE_SVGA,
+            QEMU_CAPS_DEVICE_USB_SERIAL,
+            QEMU_CAPS_DEVICE_USB_NET,
+            QEMU_CAPS_DEVICE_PCI_BRIDGE,
+            QEMU_CAPS_DEVICE_SCSI_GENERIC,
+            QEMU_CAPS_DEVICE_USB_STORAGE,
+            QEMU_CAPS_DEVICE_USB_KBD,
+            QEMU_CAPS_DEVICE_RTL8139,
+            QEMU_CAPS_DEVICE_E1000,
+            QEMU_CAPS_DEVICE_VIRTIO_NET);
+    DO_TEST("qemu-kvm-0.13.0", 13000, 1, 0,
+            QEMU_CAPS_DRIVE_BOOT,
+            QEMU_CAPS_DRIVE_CACHE_UNSAFE,
+            QEMU_CAPS_KVM,
+            QEMU_CAPS_DRIVE_SERIAL,
+            QEMU_CAPS_MEM_PATH,
+            QEMU_CAPS_SDL,
+            QEMU_CAPS_CHARDEV,
+            QEMU_CAPS_ENABLE_KVM,
+            QEMU_CAPS_MONITOR_JSON,
+            QEMU_CAPS_NETDEV,
+            QEMU_CAPS_RTC,
+            QEMU_CAPS_VHOST_NET,
+            QEMU_CAPS_NO_HPET,
+            QEMU_CAPS_NO_KVM_PIT,
+            QEMU_CAPS_TDF,
+            QEMU_CAPS_PCI_CONFIGFD,
+            QEMU_CAPS_NODEFCONFIG,
+            QEMU_CAPS_BOOT_MENU,
+            QEMU_CAPS_FSDEV,
+            QEMU_CAPS_NESTING,
+            QEMU_CAPS_NAME_PROCESS,
+            QEMU_CAPS_SMBIOS_TYPE,
+            QEMU_CAPS_VGA_NONE,
+            QEMU_CAPS_DRIVE_AIO,
+            QEMU_CAPS_PCI_MULTIFUNCTION,
+            QEMU_CAPS_PIIX3_USB_UHCI,
+            QEMU_CAPS_PIIX4_USB_UHCI,
+            QEMU_CAPS_VT82C686B_USB_UHCI,
+            QEMU_CAPS_PCI_OHCI,
+            QEMU_CAPS_USB_HUB,
+            QEMU_CAPS_NO_SHUTDOWN,
+            QEMU_CAPS_NO_ACPI,
+            QEMU_CAPS_SCSI_LSI,
+            QEMU_CAPS_VNC,
+            QEMU_CAPS_DEVICE_VGA,
+            QEMU_CAPS_DEVICE_CIRRUS_VGA,
+            QEMU_CAPS_DEVICE_VMWARE_SVGA,
+            QEMU_CAPS_DEVICE_USB_SERIAL,
+            QEMU_CAPS_DEVICE_USB_NET,
+            QEMU_CAPS_DEVICE_PCI_BRIDGE,
+            QEMU_CAPS_DEVICE_SCSI_GENERIC,
+            QEMU_CAPS_DEVICE_USB_KBD,
+            QEMU_CAPS_DEVICE_USB_STORAGE,
+            QEMU_CAPS_HOST_PCI_MULTIDOMAIN,
+            QEMU_CAPS_DEVICE_IVSHMEM,
+            QEMU_CAPS_DEVICE_RTL8139,
+            QEMU_CAPS_DEVICE_E1000,
+            QEMU_CAPS_DEVICE_VIRTIO_NET);
+    DO_TEST("qemu-1.0", 1000000, 0, 0,
+            QEMU_CAPS_DRIVE_CACHE_UNSAFE,
+            QEMU_CAPS_DRIVE_SERIAL,
+            QEMU_CAPS_MEM_PATH,
+            QEMU_CAPS_SDL,
+            QEMU_CAPS_CHARDEV,
+            QEMU_CAPS_ENABLE_KVM,
+            QEMU_CAPS_MONITOR_JSON,
+            QEMU_CAPS_NETDEV,
+            QEMU_CAPS_RTC,
+            QEMU_CAPS_VHOST_NET,
+            QEMU_CAPS_NO_HPET,
+            QEMU_CAPS_NODEFCONFIG,
+            QEMU_CAPS_BOOT_MENU,
+            QEMU_CAPS_FSDEV,
+            QEMU_CAPS_NAME_PROCESS,
+            QEMU_CAPS_SMBIOS_TYPE,
+            QEMU_CAPS_SPICE,
+            QEMU_CAPS_VGA_NONE,
+            QEMU_CAPS_BOOTINDEX,
+            QEMU_CAPS_HDA_DUPLEX,
+            QEMU_CAPS_DRIVE_AIO,
+            QEMU_CAPS_CCID_EMULATED,
+            QEMU_CAPS_CCID_PASSTHRU,
+            QEMU_CAPS_CHARDEV_SPICEVMC,
+            QEMU_CAPS_VIRTIO_TX_ALG,
+            QEMU_CAPS_PCI_MULTIFUNCTION,
+            QEMU_CAPS_VIRTIO_IOEVENTFD,
+            QEMU_CAPS_SGA,
+            QEMU_CAPS_VIRTIO_BLK_EVENT_IDX,
+            QEMU_CAPS_VIRTIO_NET_EVENT_IDX,
+            QEMU_CAPS_DRIVE_CACHE_DIRECTSYNC,
+            QEMU_CAPS_PIIX3_USB_UHCI,
+            QEMU_CAPS_PIIX4_USB_UHCI,
+            QEMU_CAPS_USB_EHCI,
+            QEMU_CAPS_ICH9_USB_EHCI1,
+            QEMU_CAPS_VT82C686B_USB_UHCI,
+            QEMU_CAPS_PCI_OHCI,
+            QEMU_CAPS_USB_HUB,
+            QEMU_CAPS_NO_SHUTDOWN,
+            QEMU_CAPS_ICH9_AHCI,
+            QEMU_CAPS_NO_ACPI,
+            QEMU_CAPS_FSDEV_READONLY,
+            QEMU_CAPS_VIRTIO_BLK_SCSI,
+            QEMU_CAPS_FSDEV_WRITEOUT,
+            QEMU_CAPS_SCSI_BLOCK,
+            QEMU_CAPS_SCSI_CD,
+            QEMU_CAPS_IDE_CD,
+            QEMU_CAPS_SCSI_LSI,
+            QEMU_CAPS_BLOCKIO,
+            QEMU_CAPS_VNC,
+            QEMU_CAPS_MACHINE_OPT,
+            QEMU_CAPS_DEVICE_QXL,
+            QEMU_CAPS_DEVICE_VGA,
+            QEMU_CAPS_DEVICE_CIRRUS_VGA,
+            QEMU_CAPS_DEVICE_VMWARE_SVGA,
+            QEMU_CAPS_DEVICE_USB_SERIAL,
+            QEMU_CAPS_DEVICE_USB_NET,
+            QEMU_CAPS_DEVICE_SCSI_GENERIC,
+            QEMU_CAPS_DEVICE_SCSI_GENERIC_BOOTINDEX,
+            QEMU_CAPS_DEVICE_USB_KBD,
+            QEMU_CAPS_DEVICE_USB_STORAGE,
+            QEMU_CAPS_SPLASH_TIMEOUT,
+            QEMU_CAPS_DEVICE_IVSHMEM,
+            QEMU_CAPS_DEVICE_IOH3420,
+            QEMU_CAPS_DEVICE_X3130_UPSTREAM,
+            QEMU_CAPS_DEVICE_XIO3130_DOWNSTREAM,
+            QEMU_CAPS_DEVICE_RTL8139,
+            QEMU_CAPS_DEVICE_E1000,
+            QEMU_CAPS_DEVICE_VIRTIO_NET,
+            QEMU_CAPS_DISPLAY);
+    DO_TEST("qemu-1.1.0", 1001000, 0, 0,
+            QEMU_CAPS_DRIVE_CACHE_UNSAFE,
+            QEMU_CAPS_DRIVE_SERIAL,
+            QEMU_CAPS_MEM_PATH,
+            QEMU_CAPS_SDL,
+            QEMU_CAPS_CHARDEV,
+            QEMU_CAPS_ENABLE_KVM,
+            QEMU_CAPS_MONITOR_JSON,
+            QEMU_CAPS_NETDEV,
+            QEMU_CAPS_RTC,
+            QEMU_CAPS_VHOST_NET,
+            QEMU_CAPS_NO_HPET,
+            QEMU_CAPS_NODEFCONFIG,
+            QEMU_CAPS_BOOT_MENU,
+            QEMU_CAPS_FSDEV,
+            QEMU_CAPS_NAME_PROCESS,
+            QEMU_CAPS_SMBIOS_TYPE,
+            QEMU_CAPS_SPICE,
+            QEMU_CAPS_VGA_NONE,
+            QEMU_CAPS_BOOTINDEX,
+            QEMU_CAPS_HDA_DUPLEX,
+            QEMU_CAPS_DRIVE_AIO,
+            QEMU_CAPS_CCID_EMULATED,
+            QEMU_CAPS_CCID_PASSTHRU,
+            QEMU_CAPS_CHARDEV_SPICEVMC,
+            QEMU_CAPS_VIRTIO_TX_ALG,
+            QEMU_CAPS_PCI_MULTIFUNCTION,
+            QEMU_CAPS_VIRTIO_IOEVENTFD,
+            QEMU_CAPS_SGA,
+            QEMU_CAPS_VIRTIO_BLK_EVENT_IDX,
+            QEMU_CAPS_VIRTIO_NET_EVENT_IDX,
+            QEMU_CAPS_DRIVE_CACHE_DIRECTSYNC,
+            QEMU_CAPS_PIIX3_USB_UHCI,
+            QEMU_CAPS_PIIX4_USB_UHCI,
+            QEMU_CAPS_USB_EHCI,
+            QEMU_CAPS_ICH9_USB_EHCI1,
+            QEMU_CAPS_VT82C686B_USB_UHCI,
+            QEMU_CAPS_PCI_OHCI,
+            QEMU_CAPS_USB_HUB,
+            QEMU_CAPS_NO_SHUTDOWN,
+            QEMU_CAPS_ICH9_AHCI,
+            QEMU_CAPS_NO_ACPI,
+            QEMU_CAPS_FSDEV_READONLY,
+            QEMU_CAPS_VIRTIO_BLK_SCSI,
+            QEMU_CAPS_DRIVE_COPY_ON_READ,
+            QEMU_CAPS_FSDEV_WRITEOUT,
+            QEMU_CAPS_DRIVE_IOTUNE,
+            QEMU_CAPS_SCSI_DISK_CHANNEL,
+            QEMU_CAPS_SCSI_BLOCK,
+            QEMU_CAPS_SCSI_CD,
+            QEMU_CAPS_IDE_CD,
+            QEMU_CAPS_NO_USER_CONFIG,
+            QEMU_CAPS_HDA_MICRO,
+            QEMU_CAPS_NEC_USB_XHCI,
+            QEMU_CAPS_NETDEV_BRIDGE,
+            QEMU_CAPS_SCSI_LSI,
+            QEMU_CAPS_VIRTIO_SCSI,
+            QEMU_CAPS_BLOCKIO,
+            QEMU_CAPS_VNC,
+            QEMU_CAPS_MACHINE_OPT,
+            QEMU_CAPS_DEVICE_QXL,
+            QEMU_CAPS_DEVICE_VGA,
+            QEMU_CAPS_DEVICE_CIRRUS_VGA,
+            QEMU_CAPS_DEVICE_VMWARE_SVGA,
+            QEMU_CAPS_DEVICE_USB_SERIAL,
+            QEMU_CAPS_DEVICE_USB_NET,
+            QEMU_CAPS_DTB,
+            QEMU_CAPS_IPV6_MIGRATION,
+            QEMU_CAPS_DEVICE_PCI_BRIDGE,
+            QEMU_CAPS_DEVICE_SCSI_GENERIC,
+            QEMU_CAPS_DEVICE_SCSI_GENERIC_BOOTINDEX,
+            QEMU_CAPS_VNC_SHARE_POLICY,
+            QEMU_CAPS_DEVICE_USB_KBD,
+            QEMU_CAPS_DEVICE_USB_STORAGE,
+            QEMU_CAPS_OBJECT_USB_AUDIO,
+            QEMU_CAPS_SPLASH_TIMEOUT,
+            QEMU_CAPS_DEVICE_IVSHMEM,
+            QEMU_CAPS_DEVICE_IOH3420,
+            QEMU_CAPS_DEVICE_X3130_UPSTREAM,
+            QEMU_CAPS_DEVICE_XIO3130_DOWNSTREAM,
+            QEMU_CAPS_DEVICE_RTL8139,
+            QEMU_CAPS_DEVICE_E1000,
+            QEMU_CAPS_DEVICE_VIRTIO_NET,
+            QEMU_CAPS_DISPLAY);
+    DO_TEST_FULL("qemu-1.2.0", 1002000, 0, 0, VIR_ERR_CONFIG_UNSUPPORTED,
+            QEMU_CAPS_LAST);
+    DO_TEST_FULL("qemu-kvm-1.2.0", 1002000, 1, 0, VIR_ERR_CONFIG_UNSUPPORTED,
+            QEMU_CAPS_LAST);
 
     return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
@@ -287,6 +435,9 @@ VIRT_TEST_MAIN(mymain)
 
 #else
 
-int main (void) { return (77); /* means 'test skipped' for automake */ }
+int main(void)
+{
+    return EXIT_AM_SKIP;
+}
 
 #endif /* WITH_QEMU */

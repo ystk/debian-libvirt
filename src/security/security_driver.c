@@ -1,19 +1,30 @@
 /*
- * Copyright (C) 2008 Red Hat, Inc.
+ * Copyright (C) 2008-2012 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
  * Authors:
  *     James Morris <jmorris@namei.org>
+ *     Dan Walsh <dwalsh@redhat.com>
  *
  */
 #include <config.h>
 #include <string.h>
 
-#include "virterror_internal.h"
+#include "virerror.h"
+#include "virlog.h"
 
 #include "security_driver.h"
 #ifdef WITH_SECDRIVER_SELINUX
@@ -24,116 +35,64 @@
 # include "security_apparmor.h"
 #endif
 
+#include "security_nop.h"
+
+#define VIR_FROM_THIS VIR_FROM_SECURITY
+
+VIR_LOG_INIT("security.security_driver");
+
 static virSecurityDriverPtr security_drivers[] = {
 #ifdef WITH_SECDRIVER_SELINUX
-    &virSELinuxSecurityDriver,
+    &virSecurityDriverSELinux,
 #endif
 #ifdef WITH_SECDRIVER_APPARMOR
     &virAppArmorSecurityDriver,
 #endif
-    NULL
+    &virSecurityDriverNop, /* Must always be last, since it will always probe */
 };
 
-int
-virSecurityDriverVerify(virDomainDefPtr def)
+virSecurityDriverPtr virSecurityDriverLookup(const char *name,
+                                             const char *virtDriver)
 {
-    unsigned int i;
-    const virSecurityLabelDefPtr secdef = &def->seclabel;
+    virSecurityDriverPtr drv = NULL;
+    size_t i;
 
-    if (!secdef->model ||
-        STREQ(secdef->model, "none"))
-        return 0;
+    VIR_DEBUG("name=%s", NULLSTR(name));
 
-    for (i = 0; security_drivers[i] != NULL ; i++) {
-        if (STREQ(security_drivers[i]->name, secdef->model)) {
-            return security_drivers[i]->domainSecurityVerify(def);
-        }
-    }
-    virSecurityReportError(VIR_ERR_XML_ERROR,
-                           _("invalid security model '%s'"), secdef->model);
-    return -1;
-}
-
-int
-virSecurityDriverStartup(virSecurityDriverPtr *drv,
-                         const char *name,
-                         bool allowDiskFormatProbing)
-{
-    unsigned int i;
-
-    if (name && STREQ(name, "none"))
-        return -2;
-
-    for (i = 0; security_drivers[i] != NULL ; i++) {
+    for (i = 0; i < ARRAY_CARDINALITY(security_drivers) && !drv; i++) {
         virSecurityDriverPtr tmp = security_drivers[i];
 
-        if (name && STRNEQ(tmp->name, name))
+        if (name &&
+            STRNEQ(tmp->name, name))
             continue;
 
-        switch (tmp->probe()) {
+        switch (tmp->probe(virtDriver)) {
         case SECURITY_DRIVER_ENABLE:
-            virSecurityDriverInit(tmp);
-            if (tmp->open(tmp, allowDiskFormatProbing) == -1) {
-                return -1;
-            } else {
-                *drv = tmp;
-                return 0;
-            }
+            VIR_DEBUG("Probed name=%s", tmp->name);
+            drv = tmp;
             break;
 
         case SECURITY_DRIVER_DISABLE:
+            VIR_DEBUG("Not enabled name=%s", tmp->name);
+            if (name && STREQ(tmp->name, name)) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                               _("Security driver %s not enabled"),
+                               name);
+                return NULL;
+            }
             break;
 
         default:
-            return -1;
+            return NULL;
         }
     }
-    return -2;
-}
 
-/*
- * Helpers
- */
-void
-virSecurityDriverInit(virSecurityDriverPtr drv)
-{
-    memset(&drv->_private, 0, sizeof drv->_private);
-}
-
-int
-virSecurityDriverSetDOI(virSecurityDriverPtr drv,
-                        const char *doi)
-{
-    if (strlen(doi) >= VIR_SECURITY_DOI_BUFLEN) {
-        virSecurityReportError(VIR_ERR_INTERNAL_ERROR,
-                               _("%s: DOI \'%s\' is "
-                               "longer than the maximum allowed length of %d"),
-                               __func__, doi, VIR_SECURITY_DOI_BUFLEN - 1);
-        return -1;
+    if (!drv) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Security driver %s not found"),
+                       NULLSTR(name));
+        return NULL;
     }
-    strcpy(drv->_private.doi, doi);
-    return 0;
-}
 
-const char *
-virSecurityDriverGetDOI(virSecurityDriverPtr drv)
-{
-    return drv->_private.doi;
-}
-
-const char *
-virSecurityDriverGetModel(virSecurityDriverPtr drv)
-{
-    return drv->name;
-}
-
-void virSecurityDriverSetAllowDiskFormatProbing(virSecurityDriverPtr drv,
-                                                bool allowDiskFormatProbing)
-{
-    drv->_private.allowDiskFormatProbing = allowDiskFormatProbing;
-}
-
-bool virSecurityDriverGetAllowDiskFormatProbing(virSecurityDriverPtr drv)
-{
-    return drv->_private.allowDiskFormatProbing;
+    return drv;
 }

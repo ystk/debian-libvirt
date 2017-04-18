@@ -1,5 +1,5 @@
 /*
- * openvz_config.h: config information for OpenVZ VPSs
+ * openvz_conf.h: config information for OpenVZ VPSs
  *
  * Copyright (C) 2010 Red Hat, Inc.
  * Copyright (C) 2006, 2007 Binary Karma.
@@ -17,8 +17,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  * Shuveb Hussain <shuveb@binarykarma.com>
@@ -30,18 +30,15 @@
 # define OPENVZ_CONF_H
 
 # include "internal.h"
-# include "domain_conf.h"
-# include "threads.h"
-
-# define openvzError(code, ...)                                            \
-        virReportErrorHelper(NULL, VIR_FROM_OPENVZ, code, __FILE__,        \
-                             __FUNCTION__, __LINE__, __VA_ARGS__)
+# include "virdomainobjlist.h"
+# include "virthread.h"
 
 
 /* OpenVZ commands - Replace with wrapper scripts later? */
-# define VZLIST  "/usr/sbin/vzlist"
-# define VZCTL   "/usr/sbin/vzctl"
-# define VZ_CONF_FILE "/etc/vz/vz.conf"
+# define VZLIST         "/usr/sbin/vzlist"
+# define VZCTL          "/usr/sbin/vzctl"
+# define VZMIGRATE      "/usr/sbin/vzmigrate"
+# define VZ_CONF_FILE   "/etc/vz/vz.conf"
 
 # define VZCTL_BRIDGE_MIN_VERSION ((3 * 1000 * 1000) + (0 * 1000) + 22 + 1)
 
@@ -49,14 +46,21 @@ struct openvz_driver {
     virMutex lock;
 
     virCapsPtr caps;
-    virDomainObjList domains;
+    virDomainXMLOptionPtr xmlopt;
+    virDomainObjListPtr domains;
     int version;
 };
 
+typedef int (*openvzLocateConfFileFunc)(int vpsid, char **conffile, const char *ext);
+
+/* this allows the testsuite to replace the conf file locator function */
+extern openvzLocateConfFileFunc openvzLocateConfFile;
+
 int openvz_readline(int fd, char *ptr, int maxlen);
 int openvzExtractVersion(struct openvz_driver *driver);
-int openvzReadVPSConfigParam(int vpsid ,const char * param, char *value, int maxlen);
+int openvzReadVPSConfigParam(int vpsid, const char *param, char **value);
 int openvzWriteVPSConfigParam(int vpsid, const char *param, const char *value);
+int openvzReadConfigParam(const char *conf_file, const char *param, char **value);
 int openvzCopyDefaultConfig(int vpsid);
 virCapsPtr openvzCapsInit(void);
 int openvzLoadDomains(struct openvz_driver *driver);
@@ -65,5 +69,6 @@ int strtoI(const char *str);
 int openvzSetDefinedUUID(int vpsid, unsigned char *uuid);
 unsigned int openvzGetNodeCPUs(void);
 int openvzGetVEID(const char *name);
+int openvzReadNetworkConf(virDomainDefPtr def, int veid);
 
 #endif /* OPENVZ_CONF_H */

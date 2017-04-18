@@ -1,7 +1,7 @@
 /*
  * cpu.h: internal functions for CPU manipulation
  *
- * Copyright (C) 2009-2010 Red Hat, Inc.
+ * Copyright (C) 2009-2010, 2013 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *      Jiri Denemark <jdenemar@redhat.com>
@@ -24,131 +24,212 @@
 #ifndef __VIR_CPU_H__
 # define __VIR_CPU_H__
 
-# include "virterror_internal.h"
+# include "virerror.h"
 # include "datatypes.h"
+# include "virarch.h"
 # include "conf/cpu_conf.h"
 # include "cpu_x86_data.h"
+# include "cpu_ppc64_data.h"
 
 
-# define virCPUReportError(code, ...)                              \
-    virReportErrorHelper(NULL, VIR_FROM_CPU, code, __FILE__,      \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
-
-
-union cpuData {
-    struct cpuX86Data x86;
-    /* generic driver needs no data */
+typedef struct _virCPUData virCPUData;
+typedef virCPUData *virCPUDataPtr;
+struct _virCPUData {
+    virArch arch;
+    union {
+        virCPUx86Data x86;
+        virCPUppc64Data ppc64;
+        /* generic driver needs no data */
+    } data;
 };
 
 
 typedef virCPUCompareResult
-(*cpuArchCompare)   (virCPUDefPtr host,
-                     virCPUDefPtr cpu);
+(*virCPUArchCompare)(virCPUDefPtr host,
+                     virCPUDefPtr cpu,
+                     bool failIncompatible);
 
 typedef int
 (*cpuArchDecode)    (virCPUDefPtr cpu,
-                     const union cpuData *data,
+                     const virCPUData *data,
                      const char **models,
                      unsigned int nmodels,
-                     const char *preferred);
+                     const char *preferred,
+                     unsigned int flags);
 
 typedef int
-(*cpuArchEncode)    (const virCPUDefPtr cpu,
-                     union cpuData **forced,
-                     union cpuData **required,
-                     union cpuData **optional,
-                     union cpuData **disabled,
-                     union cpuData **forbidden,
-                     union cpuData **vendor);
+(*cpuArchEncode)    (virArch arch,
+                     const virCPUDef *cpu,
+                     virCPUDataPtr *forced,
+                     virCPUDataPtr *required,
+                     virCPUDataPtr *optional,
+                     virCPUDataPtr *disabled,
+                     virCPUDataPtr *forbidden,
+                     virCPUDataPtr *vendor);
 
 typedef void
-(*cpuArchDataFree)  (union cpuData *data);
+(*cpuArchDataFree)  (virCPUDataPtr data);
 
-typedef union cpuData *
-(*cpuArchNodeData)  (void);
-
-typedef virCPUCompareResult
-(*cpuArchGuestData) (virCPUDefPtr host,
-                     virCPUDefPtr guest,
-                     union cpuData **data);
+typedef virCPUDataPtr
+(*cpuArchNodeData)  (virArch arch);
 
 typedef virCPUDefPtr
 (*cpuArchBaseline)  (virCPUDefPtr *cpus,
                      unsigned int ncpus,
                      const char **models,
-                     unsigned int nmodels);
+                     unsigned int nmodels,
+                     unsigned int flags);
 
 typedef int
-(*cpuArchUpdate)    (virCPUDefPtr guest,
-                     const virCPUDefPtr host);
+(*virCPUArchUpdate)(virCPUDefPtr guest,
+                    const virCPUDef *host);
 
+typedef int
+(*virCPUArchCheckFeature)(const virCPUDef *cpu,
+                          const char *feature);
+
+typedef int
+(*virCPUArchDataCheckFeature)(const virCPUData *data,
+                              const char *feature);
+
+typedef char *
+(*virCPUArchDataFormat)(const virCPUData *data);
+
+typedef virCPUDataPtr
+(*virCPUArchDataParse)(xmlXPathContextPtr ctxt);
+
+typedef int
+(*virCPUArchGetModels)(char ***models);
+
+typedef int
+(*virCPUArchTranslate)(virCPUDefPtr cpu,
+                       const char **models,
+                       unsigned int nmodels);
+
+typedef int
+(*virCPUArchConvertLegacy)(virCPUDefPtr cpu);
 
 struct cpuArchDriver {
     const char *name;
-    const char **arch;
+    const virArch *arch;
     unsigned int narch;
-    cpuArchCompare      compare;
+    virCPUArchCompare   compare;
     cpuArchDecode       decode;
     cpuArchEncode       encode;
     cpuArchDataFree     free;
     cpuArchNodeData     nodeData;
-    cpuArchGuestData    guestData;
     cpuArchBaseline     baseline;
-    cpuArchUpdate       update;
+    virCPUArchUpdate    update;
+    virCPUArchCheckFeature checkFeature;
+    virCPUArchDataCheckFeature dataCheckFeature;
+    virCPUArchDataFormat dataFormat;
+    virCPUArchDataParse dataParse;
+    virCPUArchGetModels getModels;
+    virCPUArchTranslate translate;
+    virCPUArchConvertLegacy convertLegacy;
 };
 
 
-extern virCPUCompareResult
-cpuCompareXML(virCPUDefPtr host,
-              const char *xml);
+virCPUCompareResult
+virCPUCompareXML(virArch arch,
+                 virCPUDefPtr host,
+                 const char *xml,
+                 bool failIncompatible);
 
-extern virCPUCompareResult
-cpuCompare  (virCPUDefPtr host,
-             virCPUDefPtr cpu);
+virCPUCompareResult
+virCPUCompare(virArch arch,
+              virCPUDefPtr host,
+              virCPUDefPtr cpu,
+              bool failIncompatible)
+    ATTRIBUTE_NONNULL(3);
 
-extern int
+int
 cpuDecode   (virCPUDefPtr cpu,
-             const union cpuData *data,
+             const virCPUData *data,
              const char **models,
              unsigned int nmodels,
-             const char *preferred);
+             const char *preferred)
+    ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2);
 
-extern int
-cpuEncode   (const char *arch,
-             const virCPUDefPtr cpu,
-             union cpuData **forced,
-             union cpuData **required,
-             union cpuData **optional,
-             union cpuData **disabled,
-             union cpuData **forbidden,
-             union cpuData **vendor);
+int
+cpuEncode   (virArch arch,
+             const virCPUDef *cpu,
+             virCPUDataPtr *forced,
+             virCPUDataPtr *required,
+             virCPUDataPtr *optional,
+             virCPUDataPtr *disabled,
+             virCPUDataPtr *forbidden,
+             virCPUDataPtr *vendor)
+    ATTRIBUTE_NONNULL(2);
 
-extern void
-cpuDataFree (const char *arch,
-             union cpuData *data);
+void
+cpuDataFree (virCPUDataPtr data);
 
-extern union cpuData *
-cpuNodeData (const char *arch);
+virCPUDataPtr
+cpuNodeData (virArch arch);
 
-extern virCPUCompareResult
-cpuGuestData(virCPUDefPtr host,
-             virCPUDefPtr guest,
-             union cpuData **data);
-
-extern char *
+char *
 cpuBaselineXML(const char **xmlCPUs,
                unsigned int ncpus,
                const char **models,
-               unsigned int nmodels);
+               unsigned int nmodels,
+               unsigned int flags);
 
-extern virCPUDefPtr
+virCPUDefPtr
 cpuBaseline (virCPUDefPtr *cpus,
              unsigned int ncpus,
              const char **models,
-             unsigned int nmodels);
+             unsigned int nmodels,
+             unsigned int flags)
+    ATTRIBUTE_NONNULL(1);
 
-extern int
-cpuUpdate   (virCPUDefPtr guest,
-             const virCPUDefPtr host);
+int
+virCPUUpdate(virArch arch,
+             virCPUDefPtr guest,
+             const virCPUDef *host)
+    ATTRIBUTE_NONNULL(2);
+
+
+int
+virCPUCheckFeature(virArch arch,
+                   const virCPUDef *cpu,
+                   const char *feature)
+    ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3);
+
+
+int
+virCPUDataCheckFeature(const virCPUData *data,
+                       const char *feature)
+    ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2);
+
+
+bool
+virCPUModelIsAllowed(const char *model,
+                     const char **models,
+                     unsigned int nmodels)
+    ATTRIBUTE_NONNULL(1);
+
+int
+virCPUGetModels(virArch arch, char ***models);
+
+int
+virCPUTranslate(virArch arch,
+                virCPUDefPtr cpu,
+                const char **models,
+                unsigned int nmodels)
+    ATTRIBUTE_NONNULL(2);
+
+int
+virCPUConvertLegacy(virArch arch,
+                    virCPUDefPtr cpu)
+    ATTRIBUTE_NONNULL(2);
+
+/* virCPUDataFormat and virCPUDataParse are implemented for unit tests only and
+ * have no real-life usage
+ */
+char *virCPUDataFormat(const virCPUData *data)
+    ATTRIBUTE_NONNULL(1);
+virCPUDataPtr virCPUDataParse(const char *xmlStr)
+    ATTRIBUTE_NONNULL(1);
 
 #endif /* __VIR_CPU_H__ */

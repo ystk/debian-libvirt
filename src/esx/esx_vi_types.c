@@ -1,9 +1,8 @@
-
 /*
  * esx_vi_types.c: client for the VMware VI API 2.5 to manage ESX hosts
  *
- * Copyright (C) 2010 Red Hat, Inc.
- * Copyright (C) 2009-2010 Matthias Bolte <matthias.bolte@googlemail.com>
+ * Copyright (C) 2010, 2014 Red Hat, Inc.
+ * Copyright (C) 2009-2011 Matthias Bolte <matthias.bolte@googlemail.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,25 +26,29 @@
 #include <libxml/parser.h>
 #include <libxml/xpathInternals.h>
 
-#include "buf.h"
+#include "virbuffer.h"
 #include "datatypes.h"
-#include "memory.h"
-#include "logging.h"
-#include "util.h"
+#include "viralloc.h"
+#include "virlog.h"
 #include "esx_vi.h"
 #include "esx_vi_types.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_ESX
 
-
+VIR_LOG_INIT("esx.esx_vi_types");
 
 #define ESX_VI__TEMPLATE__ALLOC(__type)                                       \
     int                                                                       \
     esxVI_##__type##_Alloc(esxVI_##__type **ptrptr)                           \
     {                                                                         \
-        if (esxVI_Alloc((void **)ptrptr, sizeof (esxVI_##__type)) < 0) {      \
-            return -1;                                                        \
-        }                                                                     \
+        if (!ptrptr || *ptrptr) {                                             \
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument")); \
+            return -1;                                                  \
+        }                                                               \
+                                                                        \
+        if (VIR_ALLOC(*ptrptr) < 0)                                     \
+            return -1;                                                  \
                                                                               \
         (*ptrptr)->_type = esxVI_Type_##__type;                               \
                                                                               \
@@ -58,9 +61,9 @@
     void                                                                      \
     esxVI_##_type##_Free(esxVI_##_type **ptrptr)                              \
     {                                                                         \
-        esxVI_##_type *item = NULL;                                           \
+        esxVI_##_type *item ATTRIBUTE_UNUSED;                                 \
                                                                               \
-        if (ptrptr == NULL || *ptrptr == NULL) {                              \
+        if (!ptrptr || !(*ptrptr)) {                                          \
             return;                                                           \
         }                                                                     \
                                                                               \
@@ -77,12 +80,12 @@
     int                                                                       \
     esxVI_##__type##_Validate(esxVI_##__type *item)                           \
     {                                                                         \
-        const char *type_name = esxVI_Type_ToString(esxVI_Type_##__type);     \
+        const char *typeName = esxVI_Type_ToString(esxVI_Type_##__type);      \
                                                                               \
         if (item->_type <= esxVI_Type_Undefined ||                            \
             item->_type >= esxVI_Type_Other) {                                \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                              \
-                         "%s object has invalid dynamic type", type_name);    \
+            virReportError(VIR_ERR_INTERNAL_ERROR,                            \
+                           _("%s object has invalid dynamic type"), typeName);\
             return -1;                                                        \
         }                                                                     \
                                                                               \
@@ -97,13 +100,13 @@
     int                                                                       \
     esxVI_##_type##_DeepCopy(esxVI_##_type **dest, esxVI_##_type *src)        \
     {                                                                         \
-        if (dest == NULL || *dest != NULL) {                                  \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",                        \
-                         _("Invalid argument"));                              \
+        if (!dest || *dest) {                                                 \
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",                      \
+                           _("Invalid argument"));                            \
             return -1;                                                        \
         }                                                                     \
                                                                               \
-        if (src == NULL) {                                                    \
+        if (!src) {                                                           \
             return 0;                                                         \
         }                                                                     \
                                                                               \
@@ -183,32 +186,57 @@
 
 
 
-#define ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(_type, _dispatch)                \
+#define ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE_EXTRA(_type, _dest_type, _extra, \
+                                                   _dest_extra)               \
     int                                                                       \
-    esxVI_##_type##_CastFromAnyType(esxVI_AnyType *anyType,                   \
-                                    esxVI_##_type **ptrptr)                   \
+    esxVI_##_type##_Cast##_dest_extra##FromAnyType(esxVI_AnyType *anyType,    \
+                                                   _dest_type **ptrptr)       \
     {                                                                         \
-        if (anyType == NULL || ptrptr == NULL || *ptrptr != NULL) {           \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",                        \
-                         _("Invalid argument"));                              \
+        _dest_type *item ATTRIBUTE_UNUSED;                                    \
+                                                                              \
+        if (!anyType || !ptrptr || *ptrptr) {                                 \
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",                      \
+                           _("Invalid argument"));                            \
             return -1;                                                        \
         }                                                                     \
                                                                               \
-        switch (anyType->type) {                                              \
-          _dispatch                                                           \
+        item = *ptrptr;                                                       \
                                                                               \
-          case esxVI_Type_##_type:                                            \
-            break;                                                            \
+        _extra                                                                \
                                                                               \
-          default:                                                            \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                              \
-                         _("Call to %s for unexpected type '%s'"),            \
-                         __FUNCTION__, anyType->other);                       \
-            return -1;                                                        \
-        }                                                                     \
-                                                                              \
-        return esxVI_##_type##_Deserialize(anyType->node, ptrptr);            \
+        return esxVI_##_type##_Deserialize##_dest_extra(anyType->node,        \
+                                                        ptrptr);              \
     }
+
+
+
+#define ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(_type)                           \
+    ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE_EXTRA(_type, esxVI_##_type,          \
+    {                                                                         \
+        if (anyType->type != esxVI_Type_##_type) {                            \
+            virReportError(VIR_ERR_INTERNAL_ERROR,                            \
+                           _("Call to %s for unexpected type '%s', "          \
+                             "expected '%s'"),                                \
+                           __FUNCTION__, anyType->other,                      \
+                           esxVI_Type_ToString(esxVI_Type_##_type));          \
+            return -1;                                                        \
+        }                                                                     \
+    }, /* nothing */)
+
+
+
+#define ESX_VI__TEMPLATE__CAST_VALUE_FROM_ANY_TYPE(_type, _value_type)        \
+    ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE_EXTRA(_type, _value_type,            \
+    {                                                                         \
+        if (anyType->type != esxVI_Type_##_type) {                            \
+            virReportError(VIR_ERR_INTERNAL_ERROR,                            \
+                           _("Call to %s for unexpected type '%s', "          \
+                             "expected '%s'"),                                \
+                           __FUNCTION__, anyType->other,                      \
+                           esxVI_Type_ToString(esxVI_Type_##_type));          \
+            return -1;                                                        \
+        }                                                                     \
+    }, Value)
 
 
 
@@ -217,13 +245,13 @@
     esxVI_##_type##_Serialize(esxVI_##_type *item,                            \
                               const char *element, virBufferPtr output)       \
     {                                                                         \
-        if (element == NULL || output == NULL ) {                             \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",                        \
-                         _("Invalid argument"));                              \
+        if (!element || !output) {                                            \
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",                      \
+                           _("Invalid argument"));                            \
             return -1;                                                        \
         }                                                                     \
                                                                               \
-        if (item == NULL) {                                                   \
+        if (!item) {                                                          \
             return 0;                                                         \
         }                                                                     \
                                                                               \
@@ -250,17 +278,18 @@
 
 
 
-#define ESX_VI__TEMPLATE__DESERIALIZE_EXTRA(_type, _extra, _deserialize)      \
+#define ESX_VI__TEMPLATE__DESERIALIZE_EXTRA(_type, _extra1, _extra2,          \
+                                            _deserialize)                     \
     int                                                                       \
     esxVI_##_type##_Deserialize(xmlNodePtr node, esxVI_##_type **ptrptr)      \
     {                                                                         \
         xmlNodePtr childNode = NULL;                                          \
                                                                               \
-        _extra                                                                \
+        _extra1                                                               \
                                                                               \
-        if (ptrptr == NULL || *ptrptr != NULL) {                              \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",                        \
-                         _("Invalid argument"));                              \
+        if (!ptrptr || *ptrptr) {                                             \
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",                      \
+                           _("Invalid argument"));                            \
             return -1;                                                        \
         }                                                                     \
                                                                               \
@@ -268,11 +297,14 @@
             return -1;                                                        \
         }                                                                     \
                                                                               \
-        for (childNode = node->children; childNode != NULL;                   \
+        _extra2                                                               \
+                                                                              \
+        for (childNode = node->children; childNode;                           \
              childNode = childNode->next) {                                   \
             if (childNode->type != XML_ELEMENT_NODE) {                        \
-                ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                          \
-                             "Wrong XML element type %d", childNode->type);   \
+                virReportError(VIR_ERR_INTERNAL_ERROR,                        \
+                               _("Wrong XML element type %d"),                \
+                               childNode->type);                              \
                 goto failure;                                                 \
             }                                                                 \
                                                                               \
@@ -296,7 +328,8 @@
 
 
 #define ESX_VI__TEMPLATE__DESERIALIZE(_type, _deserialize)                    \
-    ESX_VI__TEMPLATE__DESERIALIZE_EXTRA(_type, /* nothing */, _deserialize)
+    ESX_VI__TEMPLATE__DESERIALIZE_EXTRA(_type, /* nothing */, /* nothing */,  \
+                                        _deserialize)
 
 
 
@@ -308,9 +341,9 @@
         char *string;                                                         \
         long long value;                                                      \
                                                                               \
-        if (number == NULL || *number != NULL) {                              \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",                        \
-                         _("Invalid argument"));                              \
+        if (!number || *number) {                                             \
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",                      \
+                           _("Invalid argument"));                            \
             return -1;                                                        \
         }                                                                     \
                                                                               \
@@ -320,24 +353,24 @@
                                                                               \
         string = (char *)xmlNodeListGetString(node->doc, node->children, 1);  \
                                                                               \
-        if (string == NULL) {                                                 \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                              \
-                         "XML node doesn't contain text, expecting an "       \
-                         _xsdType" value");                                   \
+        if (!string) {                                                        \
+            virReportError(VIR_ERR_INTERNAL_ERROR,                            \
+                           _("XML node doesn't contain text, expecting an %s "\
+                             "value"), _xsdType);                             \
             goto cleanup;                                                     \
         }                                                                     \
                                                                               \
         if (virStrToLong_ll(string, NULL, 10, &value) < 0) {                  \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                              \
-                         "Unknown value '%s' for "_xsdType, string);          \
+            virReportError(VIR_ERR_INTERNAL_ERROR,                            \
+                           _("Unknown value '%s' for %s"), string, _xsdType); \
             goto cleanup;                                                     \
         }                                                                     \
                                                                               \
         if (((_min) != INT64_MIN && value < (_min))                           \
             || ((_max) != INT64_MAX && value > (_max))) {                     \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                              \
-                         "Value '%s' is not representable as "_xsdType,       \
-                         (const char *)string);                               \
+            virReportError(VIR_ERR_INTERNAL_ERROR,                            \
+                           _("Value '%s' is not representable as %s"),        \
+                           string, _xsdType);                                 \
             goto cleanup;                                                     \
         }                                                                     \
                                                                               \
@@ -460,9 +493,9 @@
  */
 #define ESX_VI__TEMPLATE__PROPERTY__REQUIRE(_name)                            \
     if (item->_name == 0) {                                                   \
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                                  \
-                     "%s object is missing the required '%s' property",       \
-                     type_name, #_name);                                      \
+        virReportError(VIR_ERR_INTERNAL_ERROR,                                \
+                       _("%s object is missing the required '%s' property"),  \
+                       typeName, #_name);                                     \
         return -1;                                                            \
     }
 
@@ -508,17 +541,18 @@
  * Macros to implement dynamic dispatched functions
  */
 
-#define ESX_VI__TEMPLATE__DISPATCH(__type, _dispatch, _error_return)          \
-    switch (item->_type) {                                                    \
+#define ESX_VI__TEMPLATE__DISPATCH(_actual_type, _actual_type_name, __type,   \
+                                   _dispatch,  _error_return)                 \
+    switch (_actual_type) {                                                   \
       _dispatch                                                               \
                                                                               \
       case esxVI_Type_##__type:                                               \
         break;                                                                \
                                                                               \
       default:                                                                \
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                                  \
-                     _("Call to %s for unexpected type '%s'"), __FUNCTION__,  \
-                     esxVI_Type_ToString(item->_type));                       \
+        virReportError(VIR_ERR_INTERNAL_ERROR,                                \
+                       _("Call to %s for unexpected type '%s'"),              \
+                       __FUNCTION__, _actual_type_name);                      \
         return _error_return;                                                 \
     }
 
@@ -533,7 +567,7 @@
 
 #define ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(_type)                          \
     case esxVI_Type_##_type:                                                  \
-      return esxVI_##_type##_DeepCopy((esxVI_##_type **)dst,                  \
+      return esxVI_##_type##_DeepCopy((esxVI_##_type **)dest,                 \
                                       (esxVI_##_type *)src);
 
 
@@ -560,7 +594,10 @@
 
 #define ESX_VI__TEMPLATE__DYNAMIC_FREE(__type, _dispatch, _body)              \
     ESX_VI__TEMPLATE__FREE(__type,                                            \
-      ESX_VI__TEMPLATE__DISPATCH(__type, _dispatch, /* nothing */)            \
+      ESX_VI__TEMPLATE__DISPATCH(item->_type,                                 \
+                                 esxVI_Type_ToString(item->_type),            \
+                                 __type, _dispatch,                           \
+                                 /* nothing */)                               \
       _body)
 
 
@@ -576,9 +613,9 @@
     esxVI_##__type *                                                          \
     esxVI_##__type##_DynamicCast(void *item)                                  \
     {                                                                         \
-        if (item == NULL) {                                                   \
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",                        \
-                         _("Invalid argument"));                              \
+        if (!item) {                                                          \
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",                      \
+                           _("Invalid argument"));                            \
             return NULL;                                                      \
         }                                                                     \
                                                                               \
@@ -591,9 +628,54 @@
 
 
 
+#define ESX_VI__TEMPLATE__DYNAMIC_DEEP_COPY(__type, _dispatch, _deep_copy)    \
+    int                                                                       \
+    esxVI_##__type##_DeepCopy(esxVI_##__type **dest, esxVI_##__type *src)     \
+    {                                                                         \
+        if (!dest || *dest) {                                                 \
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",                      \
+                           _("Invalid argument"));                            \
+            return -1;                                                        \
+        }                                                                     \
+                                                                              \
+        if (!src) {                                                           \
+            return 0;                                                         \
+        }                                                                     \
+                                                                              \
+        ESX_VI__TEMPLATE__DISPATCH(src->_type,                                \
+                                   esxVI_Type_ToString(src->_type),           \
+                                   __type, _dispatch, -1)                     \
+                                                                              \
+        if (esxVI_##__type##_Alloc(dest) < 0) {                               \
+            goto failure;                                                     \
+        }                                                                     \
+                                                                              \
+        _deep_copy                                                            \
+                                                                              \
+        return 0;                                                             \
+                                                                              \
+      failure:                                                                \
+        esxVI_##__type##_Free(dest);                                          \
+                                                                              \
+        return -1;                                                            \
+    }
+
+
+
+#define ESX_VI__TEMPLATE__DYNAMIC_CAST_FROM_ANY_TYPE(__type, _dispatch)       \
+    ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE_EXTRA(__type, esxVI_##__type,        \
+      ESX_VI__TEMPLATE__DISPATCH(anyType->type,                               \
+                                 esxVI_AnyType_TypeToString(anyType),         \
+                                __type, _dispatch, -1),                       \
+      /* nothing */)
+
+
+
 #define ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(__type, _dispatch, _serialize)    \
     ESX_VI__TEMPLATE__SERIALIZE_EXTRA(__type,                                 \
-      ESX_VI__TEMPLATE__DISPATCH(__type, _dispatch, -1),                      \
+      ESX_VI__TEMPLATE__DISPATCH(item->_type,                                 \
+                                 esxVI_Type_ToString(item->_type),            \
+                                 __type, _dispatch, -1),                      \
       _serialize)
 
 
@@ -614,11 +696,12 @@
           break;                                                              \
                                                                               \
         default:                                                              \
-          ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                                \
-                       _("Call to %s for unexpected type '%s'"),              \
-                       __FUNCTION__, esxVI_Type_ToString(type));              \
+          virReportError(VIR_ERR_INTERNAL_ERROR,                              \
+                         _("Call to %s for unexpected type '%s'"),            \
+                         __FUNCTION__, esxVI_Type_ToString(type));            \
           return -1;                                                          \
       },                                                                      \
+      /* nothing */,                                                          \
       _deserialize)
 
 
@@ -630,8 +713,8 @@ esxVI_GetActualObjectType(xmlNodePtr node, esxVI_Type baseType,
     int result = -1;
     char *type = NULL;
 
-    if (actualType == NULL || *actualType != esxVI_Type_Undefined) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!actualType || *actualType != esxVI_Type_Undefined) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
@@ -639,29 +722,66 @@ esxVI_GetActualObjectType(xmlNodePtr node, esxVI_Type baseType,
                      (node, BAD_CAST "type",
                       BAD_CAST "http://www.w3.org/2001/XMLSchema-instance");
 
-    if (type == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("%s is missing 'type' property"),
-                     esxVI_Type_ToString(baseType));
-        return -1;
+    if (!type) {
+        /* no actual type specified, use base type instead */
+        *actualType = baseType;
+        return 0;
     }
 
     *actualType = esxVI_Type_FromString(type);
 
-    if (*actualType == esxVI_Type_Undefined) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("Unknown value '%s' for %s 'type' property"),
-                     type, esxVI_Type_ToString(baseType));
+    if (*actualType == esxVI_Type_Undefined || *actualType == esxVI_Type_Other) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unknown value '%s' for %s 'type' property"),
+                       type, esxVI_Type_ToString(baseType));
         goto cleanup;
     }
 
     result = 0;
 
-  cleanup:
+ cleanup:
     VIR_FREE(type);
 
     return result;
 }
+
+
+
+/*
+ * Macros to implement managed objects
+ */
+
+#define ESX_VI__TEMPLATE__PROPERTY__MANAGED_REQUIRE(_name)                    \
+    /* FIXME: This results in O(n^2) runtime in case of missing required, but \
+     * unselected properties. */                                              \
+    if (item->_name == 0 &&                                                   \
+        esxVI_String_ListContainsValue(selectedPropertyNameList, #_name)) {   \
+        virReportError(VIR_ERR_INTERNAL_ERROR,                                \
+                       _("%s object is missing the required '%s' property"),  \
+                       typeName, #_name);                                     \
+        return -1;                                                            \
+    }
+
+
+
+#define ESX_VI__TEMPLATE__MANAGED_VALIDATE(__type, _require)                  \
+    int                                                                       \
+    esxVI_##__type##_Validate(esxVI_##__type *item,                           \
+                              esxVI_String *selectedPropertyNameList)         \
+    {                                                                         \
+        const char *typeName = esxVI_Type_ToString(esxVI_Type_##__type);      \
+                                                                              \
+        if (item->_type <= esxVI_Type_Undefined ||                            \
+            item->_type >= esxVI_Type_Other) {                                \
+            virReportError(VIR_ERR_INTERNAL_ERROR,                            \
+                           _("%s object has invalid dynamic type"), typeName);\
+            return -1;                                                        \
+        }                                                                     \
+                                                                              \
+        _require                                                              \
+                                                                              \
+        return 0;                                                             \
+    }
 
 
 
@@ -686,6 +806,9 @@ esxVI_Type_ToString(esxVI_Type type)
       case esxVI_Type_String:
         return "xsd:string";
 
+      case esxVI_Type_Byte:
+        return "xsd:byte";
+
       case esxVI_Type_Short:
         return "xsd:short";
 
@@ -701,17 +824,14 @@ esxVI_Type_ToString(esxVI_Type type)
       case esxVI_Type_Fault:
         return "Fault";
 
+      case esxVI_Type_MethodFault:
+        return "MethodFault";
+
       case esxVI_Type_ManagedObjectReference:
         return "ManagedObjectReference";
 
-      case esxVI_Type_Datacenter:
-        return "Datacenter";
-
-      case esxVI_Type_ComputeResource:
-        return "ComputeResource";
-
-      case esxVI_Type_HostSystem:
-        return "HostSystem";
+      case esxVI_Type_Event:
+        return "Event";
 
 #include "esx_vi_types.generated.typetostring"
 
@@ -723,7 +843,7 @@ esxVI_Type_ToString(esxVI_Type type)
 esxVI_Type
 esxVI_Type_FromString(const char *type)
 {
-    if (type == NULL || STREQ(type, "<undefined>")) {
+    if (!type || STREQ(type, "<undefined>")) {
         return esxVI_Type_Undefined;
     } else if (STREQ(type, "xsd:boolean")) {
         return esxVI_Type_Boolean;
@@ -731,6 +851,8 @@ esxVI_Type_FromString(const char *type)
         return esxVI_Type_AnyType;
     } else if (STREQ(type, "xsd:string")) {
         return esxVI_Type_String;
+    } else if (STREQ(type, "xsd:byte")) {
+        return esxVI_Type_Byte;
     } else if (STREQ(type, "xsd:short")) {
         return esxVI_Type_Short;
     } else if (STREQ(type, "xsd:int")) {
@@ -741,22 +863,17 @@ esxVI_Type_FromString(const char *type)
         return esxVI_Type_DateTime;
     } else if (STREQ(type, "Fault")) {
         return esxVI_Type_Fault;
+    } else if (STREQ(type, "MethodFault")) {
+        return esxVI_Type_MethodFault;
     } else if (STREQ(type, "ManagedObjectReference")) {
         return esxVI_Type_ManagedObjectReference;
-    } else if (STREQ(type, "Datacenter")) {
-        return esxVI_Type_Datacenter;
-    } else if (STREQ(type, "ComputeResource")) {
-        return esxVI_Type_ComputeResource;
-    } else if (STREQ(type, "HostSystem")) {
-        return esxVI_Type_HostSystem;
+    } else if (STREQ(type, "Event")) {
+        return esxVI_Type_Event;
     }
-
 
 #include "esx_vi_types.generated.typefromstring"
 
-    else {
-        return esxVI_Type_Other;
-    }
+    return esxVI_Type_Other;
 }
 
 
@@ -795,16 +912,24 @@ ESX_VI__TEMPLATE__FREE(AnyType,
     VIR_FREE(item->value);
 })
 
+const char *
+esxVI_AnyType_TypeToString(esxVI_AnyType *anyType)
+{
+    if (anyType->type == esxVI_Type_Other) {
+        return anyType->other;
+    } else {
+        return esxVI_Type_ToString(anyType->type);
+    }
+}
+
 int
 esxVI_AnyType_ExpectType(esxVI_AnyType *anyType, esxVI_Type type)
 {
     if (anyType->type != type) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("Expecting type '%s' but found '%s'"),
-                     esxVI_Type_ToString(type),
-                     anyType->type != esxVI_Type_Other
-                       ? esxVI_Type_ToString(anyType->type)
-                       : anyType->other);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Expecting type '%s' but found '%s'"),
+                       esxVI_Type_ToString(type),
+                       esxVI_AnyType_TypeToString(anyType));
         return -1;
     }
 
@@ -814,32 +939,30 @@ esxVI_AnyType_ExpectType(esxVI_AnyType *anyType, esxVI_Type type)
 int
 esxVI_AnyType_DeepCopy(esxVI_AnyType **dest, esxVI_AnyType *src)
 {
-    if (dest == NULL || *dest != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!dest || *dest) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (src == NULL) {
+    if (!src)
         return 0;
-    }
 
-    if (esxVI_AnyType_Alloc(dest) < 0) {
+    if (esxVI_AnyType_Alloc(dest) < 0)
         goto failure;
-    }
 
     (*dest)->_type = src->_type;
     (*dest)->node = xmlCopyNode(src->node, 1);
 
-    if ((*dest)->node == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                     _("Could not copy an XML node"));
+    if (!(*dest)->node) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("Could not copy an XML node"));
         goto failure;
     }
 
     (*dest)->type = src->type;
 
-    if (esxVI_String_DeepCopyValue(&(*dest)->other, src->other) < 0 ||
-        esxVI_String_DeepCopyValue(&(*dest)->value, src->value) < 0) {
+    if (VIR_STRDUP((*dest)->other, src->other) < 0 ||
+        VIR_STRDUP((*dest)->value, src->value) < 0) {
         goto failure;
     }
 
@@ -850,6 +973,10 @@ esxVI_AnyType_DeepCopy(esxVI_AnyType **dest, esxVI_AnyType *src)
 
       case esxVI_Type_String:
         (*dest)->string = (*dest)->value;
+        break;
+
+      case esxVI_Type_Byte:
+        (*dest)->int8 = src->int8;
         break;
 
       case esxVI_Type_Short:
@@ -870,7 +997,7 @@ esxVI_AnyType_DeepCopy(esxVI_AnyType **dest, esxVI_AnyType *src)
 
     return 0;
 
-  failure:
+ failure:
     esxVI_AnyType_Free(dest);
 
     return -1;
@@ -881,20 +1008,19 @@ esxVI_AnyType_Deserialize(xmlNodePtr node, esxVI_AnyType **anyType)
 {
     long long int number;
 
-    if (anyType == NULL || *anyType != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!anyType || *anyType) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (esxVI_AnyType_Alloc(anyType) < 0) {
+    if (esxVI_AnyType_Alloc(anyType) < 0)
         return -1;
-    }
 
     (*anyType)->node = xmlCopyNode(node, 1);
 
-    if ((*anyType)->node == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                     _("Could not copy an XML node"));
+    if (!(*anyType)->node) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("Could not copy an XML node"));
         goto failure;
     }
 
@@ -903,47 +1029,41 @@ esxVI_AnyType_Deserialize(xmlNodePtr node, esxVI_AnyType **anyType)
                 (node, BAD_CAST "type",
                  BAD_CAST "http://www.w3.org/2001/XMLSchema-instance");
 
-    if ((*anyType)->other == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                     _("AnyType is missing 'type' property"));
+    if (!(*anyType)->other) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("AnyType is missing 'type' property"));
         goto failure;
     }
 
     (*anyType)->type = esxVI_Type_FromString((*anyType)->other);
 
     if ((*anyType)->type == esxVI_Type_Undefined) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("Unknown value '%s' for AnyType 'type' property"),
-                     (*anyType)->other);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unknown value '%s' for AnyType 'type' property"),
+                       (*anyType)->other);
         goto failure;
     }
 
     (*anyType)->value =
       (char *)xmlNodeListGetString(node->doc, node->children, 1);
 
-    if ((*anyType)->value == NULL) {
-        (*anyType)->value = strdup("");
-
-        if ((*anyType)->value == NULL) {
-            virReportOOMError();
-            goto failure;
-        }
-    }
+    if (!(*anyType)->value && VIR_STRDUP((*anyType)->value, "") < 0)
+        goto failure;
 
 #define _DESERIALIZE_NUMBER(_type, _xsdType, _name, _min, _max)               \
         do {                                                                  \
             if (virStrToLong_ll((*anyType)->value, NULL, 10, &number) < 0) {  \
-                ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                          \
-                             _("Unknown value '%s' for %s"),                  \
-                             (*anyType)->value, _xsdType);                    \
+                virReportError(VIR_ERR_INTERNAL_ERROR,                        \
+                               _("Unknown value '%s' for %s"),                \
+                               (*anyType)->value, _xsdType);                  \
                 goto failure;                                                 \
             }                                                                 \
                                                                               \
             if (((_min) != INT64_MIN && number < (_min))                      \
                 || ((_max) != INT64_MAX && number > (_max))) {                \
-                ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,                          \
-                             _("Value '%s' is out of %s range"),              \
-                             (*anyType)->value, _xsdType);                    \
+                virReportError(VIR_ERR_INTERNAL_ERROR,                        \
+                               _("Value '%s' is out of %s range"),            \
+                               (*anyType)->value, _xsdType);                  \
                 goto failure;                                                 \
             }                                                                 \
                                                                               \
@@ -957,9 +1077,9 @@ esxVI_AnyType_Deserialize(xmlNodePtr node, esxVI_AnyType **anyType)
         } else if (STREQ((*anyType)->value, "false")) {
             (*anyType)->boolean = esxVI_Boolean_False;
         } else {
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,
-                         _("Unknown value '%s' for xsd:boolean"),
-                         (*anyType)->value);
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("Unknown value '%s' for xsd:boolean"),
+                           (*anyType)->value);
             goto failure;
         }
 
@@ -967,6 +1087,10 @@ esxVI_AnyType_Deserialize(xmlNodePtr node, esxVI_AnyType **anyType)
 
       case esxVI_Type_String:
         (*anyType)->string = (*anyType)->value;
+        break;
+
+      case esxVI_Type_Byte:
+        _DESERIALIZE_NUMBER(Byte, "xsd:byte", int8, INT8_MIN, INT8_MAX);
         break;
 
       case esxVI_Type_Short:
@@ -989,7 +1113,7 @@ esxVI_AnyType_Deserialize(xmlNodePtr node, esxVI_AnyType **anyType)
 
     return 0;
 
-  failure:
+ failure:
     esxVI_AnyType_Free(anyType);
 
     return -1;
@@ -1018,6 +1142,19 @@ ESX_VI__TEMPLATE__VALIDATE(String,
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(value)
 })
 
+bool
+esxVI_String_ListContainsValue(esxVI_String *stringList, const char *value)
+{
+    esxVI_String *string;
+
+    for (string = stringList; string; string = string->_next) {
+        if (STREQ(string->value, value))
+            return true;
+    }
+
+    return false;
+}
+
 /* esxVI_String_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(String)
 
@@ -1026,24 +1163,18 @@ esxVI_String_AppendValueToList(esxVI_String **stringList, const char *value)
 {
     esxVI_String *string = NULL;
 
-    if (esxVI_String_Alloc(&string) < 0) {
+    if (esxVI_String_Alloc(&string) < 0)
         return -1;
-    }
 
-    string->value = strdup(value);
-
-    if (string->value == NULL) {
-        virReportOOMError();
+    if (VIR_STRDUP(string->value, value) < 0)
         goto failure;
-    }
 
-    if (esxVI_String_AppendToList(stringList, string) < 0) {
+    if (esxVI_String_AppendToList(stringList, string) < 0)
         goto failure;
-    }
 
     return 0;
 
-  failure:
+ failure:
     esxVI_String_Free(&string);
 
     return -1;
@@ -1056,21 +1187,19 @@ esxVI_String_AppendValueListToList(esxVI_String **stringList,
     esxVI_String *stringListToAppend = NULL;
     const char *value = valueList;
 
-    while (value != NULL && *value != '\0') {
-        if (esxVI_String_AppendValueToList(&stringListToAppend, value) < 0) {
+    while (value && *value != '\0') {
+        if (esxVI_String_AppendValueToList(&stringListToAppend, value) < 0)
             goto failure;
-        }
 
         value += strlen(value) + 1;
     }
 
-    if (esxVI_String_AppendToList(stringList, stringListToAppend) < 0) {
+    if (esxVI_String_AppendToList(stringList, stringListToAppend) < 0)
         goto failure;
-    }
 
     return 0;
 
-  failure:
+ failure:
     esxVI_String_Free(&stringListToAppend);
 
     return -1;
@@ -1088,30 +1217,28 @@ ESX_VI__TEMPLATE__LIST__DEEP_COPY(String)
 int
 esxVI_String_DeepCopyValue(char **dest, const char *src)
 {
-    if (dest == NULL || *dest != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!dest || *dest) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (src == NULL) {
+    if (!src)
         return 0;
-    }
 
-    *dest = strdup(src);
-
-    if (*dest == NULL) {
-        virReportOOMError();
-        return -1;
-    }
-
-    return 0;
+    return VIR_STRDUP(*dest, src);
 }
+
+/* esxVI_String_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(String)
+
+/* esxVI_String_CastValueFromAnyType */
+ESX_VI__TEMPLATE__CAST_VALUE_FROM_ANY_TYPE(String, char)
 
 int
 esxVI_String_Serialize(esxVI_String *string, const char *element,
                        virBufferPtr output)
 {
-    return esxVI_String_SerializeValue(string != NULL ? string->value : NULL,
+    return esxVI_String_SerializeValue(string ? string->value : NULL,
                                        element, output);
 }
 
@@ -1122,14 +1249,13 @@ int
 esxVI_String_SerializeValue(const char *value, const char *element,
                             virBufferPtr output)
 {
-    if (element == NULL || output == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!element || !output) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (value == NULL) {
+    if (!value)
         return 0;
-    }
 
     ESV_VI__XML_TAG__OPEN(output, element, "xsd:string");
 
@@ -1140,11 +1266,26 @@ esxVI_String_SerializeValue(const char *value, const char *element,
     return 0;
 }
 
-/* esxVI_String_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(String,
+int
+esxVI_String_Deserialize(xmlNodePtr node, esxVI_String **string)
 {
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, value)
-})
+    if (!string || *string) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+        return -1;
+    }
+
+    if (esxVI_String_Alloc(string) < 0 ||
+        esxVI_String_DeserializeValue(node, &(*string)->value) < 0) {
+        goto failure;
+    }
+
+    return 0;
+
+ failure:
+    esxVI_String_Free(string);
+
+    return -1;
+}
 
 /* esxVI_String_DeserializeList */
 ESX_VI__TEMPLATE__LIST__DESERIALIZE(String)
@@ -1152,24 +1293,59 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(String)
 int
 esxVI_String_DeserializeValue(xmlNodePtr node, char **value)
 {
-    if (value == NULL || *value != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!value || *value) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
     *value = (char *)xmlNodeListGetString(node->doc, node->children, 1);
 
-    if (*value == NULL) {
-        *value = strdup("");
-
-        if (*value == NULL) {
-            virReportOOMError();
-            return -1;
-        }
-    }
-
-    return 0;
+    return *value ? 0 : VIR_STRDUP(*value, "");
 }
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * XSD: Byte
+ */
+
+/* esxVI_Byte_Alloc */
+ESX_VI__TEMPLATE__ALLOC(Byte)
+
+/* esxVI_Byte_Free */
+ESX_VI__TEMPLATE__FREE(Byte,
+{
+    esxVI_Byte_Free(&item->_next);
+})
+
+/* esxVI_Byte_Validate */
+ESX_VI__TEMPLATE__VALIDATE(Byte,
+{
+})
+
+/* esxVI_Byte_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(Byte)
+
+/* esxVI_Byte_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(Byte,
+{
+    (*dest)->value = src->value;
+})
+
+/* esxVI_Byte_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(Byte)
+
+/* esxVI_Byte_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(Byte,
+{
+    virBufferAsprintf(output, "%d", (int)item->value);
+})
+
+/* esxVI_Byte_SerializeList */
+ESX_VI__TEMPLATE__LIST__SERIALIZE(Byte)
+
+/* esxVI_Byte_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE_NUMBER(Byte, "xsd:byte", INT8_MIN, INT8_MAX);
 
 
 
@@ -1200,10 +1376,13 @@ ESX_VI__TEMPLATE__DEEP_COPY(Int,
     (*dest)->value = src->value;
 })
 
+/* esxVI_Int_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(Int)
+
 /* esxVI_Int_Serialize */
 ESX_VI__TEMPLATE__SERIALIZE(Int,
 {
-    virBufferVSprintf(output, "%d", (int)item->value);
+    virBufferAsprintf(output, "%d", (int)item->value);
 })
 
 /* esxVI_Int_SerializeList */
@@ -1235,10 +1414,19 @@ ESX_VI__TEMPLATE__VALIDATE(Long,
 /* esxVI_Long_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(Long)
 
+/* esxVI_Long_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(Long,
+{
+    (*dest)->value = src->value;
+})
+
+/* esxVI_Long_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(Long)
+
 /* esxVI_Long_Serialize */
 ESX_VI__TEMPLATE__SERIALIZE(Long,
 {
-    virBufferVSprintf(output, "%lld", (long long int)item->value);
+    virBufferAsprintf(output, "%lld", (long long int)item->value);
 })
 
 /* esxVI_Long_SerializeList */
@@ -1283,28 +1471,27 @@ ESX_VI__TEMPLATE__SERIALIZE(DateTime,
 int
 esxVI_DateTime_Deserialize(xmlNodePtr node, esxVI_DateTime **dateTime)
 {
-    if (dateTime == NULL || *dateTime != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!dateTime || *dateTime) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (esxVI_DateTime_Alloc(dateTime) < 0) {
+    if (esxVI_DateTime_Alloc(dateTime) < 0)
         return -1;
-    }
 
     (*dateTime)->value =
       (char *)xmlNodeListGetString(node->doc, node->children, 1);
 
-    if ((*dateTime)->value == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                     _("XML node doesn't contain text, expecting an "
-                       "xsd:dateTime value"));
+    if (!(*dateTime)->value) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("XML node doesn't contain text, expecting an "
+                         "xsd:dateTime value"));
         goto failure;
     }
 
     return 0;
 
-  failure:
+ failure:
     esxVI_DateTime_Free(dateTime);
 
     return -1;
@@ -1312,7 +1499,7 @@ esxVI_DateTime_Deserialize(xmlNodePtr node, esxVI_DateTime **dateTime)
 
 int
 esxVI_DateTime_ConvertToCalendarTime(esxVI_DateTime *dateTime,
-                                     time_t *secondsSinceEpoch)
+                                     long long *secondsSinceEpoch)
 {
     char value[64] = "";
     char *tmp;
@@ -1323,15 +1510,15 @@ esxVI_DateTime_ConvertToCalendarTime(esxVI_DateTime *dateTime,
     int tz_minutes;
     int tz_offset = 0;
 
-    if (dateTime == NULL || secondsSinceEpoch == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!dateTime || !secondsSinceEpoch) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (virStrcpyStatic(value, dateTime->value) == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("xsd:dateTime value '%s' too long for destination"),
-                     dateTime->value);
+    if (!virStrcpyStatic(value, dateTime->value)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("xsd:dateTime value '%s' too long for destination"),
+                       dateTime->value);
         return -1;
     }
 
@@ -1350,10 +1537,10 @@ esxVI_DateTime_ConvertToCalendarTime(esxVI_DateTime *dateTime,
 
     tmp = strptime(value, "%Y-%m-%dT%H:%M:%S", &tm);
 
-    if (tmp == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,
-                     _("xsd:dateTime value '%s' has unexpected format"),
-                     dateTime->value);
+    if (!tmp) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("xsd:dateTime value '%s' has unexpected format"),
+                       dateTime->value);
         return -1;
     }
 
@@ -1361,9 +1548,9 @@ esxVI_DateTime_ConvertToCalendarTime(esxVI_DateTime *dateTime,
         /* skip .ssssss part if present */
         if (*tmp == '.' &&
             virStrToLong_i(tmp + 1, &tmp, 10, &milliseconds) < 0) {
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,
-                         _("xsd:dateTime value '%s' has unexpected format"),
-                         dateTime->value);
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("xsd:dateTime value '%s' has unexpected format"),
+                           dateTime->value);
             return -1;
         }
 
@@ -1374,23 +1561,22 @@ esxVI_DateTime_ConvertToCalendarTime(esxVI_DateTime *dateTime,
             if (virStrToLong_i(tmp + 1, &tmp, 10, &tz_hours) < 0 ||
                 *tmp != ':' ||
                 virStrToLong_i(tmp + 1, NULL, 10, &tz_minutes) < 0) {
-                ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,
-                             _("xsd:dateTime value '%s' has unexpected format"),
-                             dateTime->value);
+                virReportError(VIR_ERR_INTERNAL_ERROR,
+                               _("xsd:dateTime value '%s' has unexpected format"),
+                               dateTime->value);
                 return -1;
             }
 
             tz_offset = tz_hours * 60 * 60 + tz_minutes * 60;
 
-            if (sign == '-') {
+            if (sign == '-')
                 tz_offset = -tz_offset;
-            }
         } else if (STREQ(tmp, "Z")) {
             /* Z refers to UTC. tz_offset is already initialized to zero */
         } else {
-            ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR,
-                         _("xsd:dateTime value '%s' has unexpected format"),
-                         dateTime->value);
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("xsd:dateTime value '%s' has unexpected format"),
+                           dateTime->value);
             return -1;
         }
     }
@@ -1411,7 +1597,7 @@ esxVI_DateTime_ConvertToCalendarTime(esxVI_DateTime *dateTime,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: Fault
+ * SOAP: Fault
  */
 
 /* esxVI_Fault_Alloc */
@@ -1442,7 +1628,51 @@ ESX_VI__TEMPLATE__DESERIALIZE(Fault,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: ManagedObjectReference
+ * VI Object: MethodFault
+ */
+
+/* esxVI_MethodFault_Alloc */
+ESX_VI__TEMPLATE__ALLOC(MethodFault);
+
+/* esxVI_MethodFault_Free */
+ESX_VI__TEMPLATE__FREE(MethodFault,
+{
+    VIR_FREE(item->_actualType);
+})
+
+int
+esxVI_MethodFault_Deserialize(xmlNodePtr node, esxVI_MethodFault **methodFault)
+{
+    if (!methodFault || *methodFault) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+        return -1;
+    }
+
+    if (esxVI_MethodFault_Alloc(methodFault) < 0)
+        return -1;
+
+    (*methodFault)->_actualType =
+      (char *)xmlGetNsProp(node, BAD_CAST "type",
+                           BAD_CAST "http://www.w3.org/2001/XMLSchema-instance");
+
+    if (!(*methodFault)->_actualType) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("MethodFault is missing 'type' property"));
+        goto failure;
+    }
+
+    return 0;
+
+ failure:
+    esxVI_MethodFault_Free(methodFault);
+
+    return -1;
+}
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: ManagedObjectReference
  */
 
 /* esxVI_ManagedObjectReference_Alloc */
@@ -1468,9 +1698,7 @@ ESX_VI__TEMPLATE__DEEP_COPY(ManagedObjectReference,
 ESX_VI__TEMPLATE__LIST__APPEND(ManagedObjectReference)
 
 /* esxVI_ManagedObjectReference_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(ManagedObjectReference,
-{
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(ManagedObjectReference)
 
 /* esxVI_ManagedObjectReference_CastListFromAnyType */
 ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(ManagedObjectReference)
@@ -1480,18 +1708,17 @@ esxVI_ManagedObjectReference_Serialize
   (esxVI_ManagedObjectReference *managedObjectReference,
    const char *element, virBufferPtr output)
 {
-    if (element == NULL || output == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!element || !output) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (managedObjectReference == NULL) {
+    if (!managedObjectReference)
         return 0;
-    }
 
     virBufferAddLit(output, "<");
     virBufferAdd(output, element, -1);
-    virBufferVSprintf(output,
+    virBufferAsprintf(output,
                       " xmlns=\"urn:vim25\" "
                       "xsi:type=\"ManagedObjectReference\" type=\"%s\">",
                       managedObjectReference->type);
@@ -1510,21 +1737,20 @@ int
 esxVI_ManagedObjectReference_Deserialize
   (xmlNodePtr node, esxVI_ManagedObjectReference **managedObjectReference)
 {
-    if (managedObjectReference == NULL || *managedObjectReference != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!managedObjectReference || *managedObjectReference) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (esxVI_ManagedObjectReference_Alloc(managedObjectReference) < 0) {
+    if (esxVI_ManagedObjectReference_Alloc(managedObjectReference) < 0)
         return -1;
-    }
 
     (*managedObjectReference)->type =
       (char *)xmlGetNoNsProp(node, BAD_CAST "type");
 
-    if ((*managedObjectReference)->type == NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s",
-                     _("ManagedObjectReference is missing 'type' property"));
+    if (!(*managedObjectReference)->type) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("ManagedObjectReference is missing 'type' property"));
         goto failure;
     }
 
@@ -1535,7 +1761,7 @@ esxVI_ManagedObjectReference_Deserialize
 
     return 0;
 
-  failure:
+ failure:
     esxVI_ManagedObjectReference_Free(managedObjectReference);
 
     return -1;
@@ -1543,274 +1769,91 @@ esxVI_ManagedObjectReference_Deserialize
 
 
 
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Type: Event
+ */
+
+/* esxVI_Event_Alloc */
+ESX_VI__TEMPLATE__ALLOC(Event)
+
+/* esxVI_Event_Free */
+ESX_VI__TEMPLATE__FREE(Event,
+{
+    esxVI_Event_Free(&item->_next);
+    VIR_FREE(item->_actualType);
+
+    esxVI_Int_Free(&item->key);
+    esxVI_Int_Free(&item->chainId);
+    esxVI_DateTime_Free(&item->createdTime);
+    VIR_FREE(item->userName);
+    /* FIXME: datacenter is currently ignored */
+    /* FIXME: computeResource is currently ignored */
+    /* FIXME: host is currently ignored */
+    esxVI_VmEventArgument_Free(&item->vm);
+    VIR_FREE(item->fullFormattedMessage);
+})
+
+/* esxVI_Event_Validate */
+ESX_VI__TEMPLATE__VALIDATE(Event,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(chainId)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(createdTime)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(userName)
+    /* FIXME: datacenter is currently ignored */
+    /* FIXME: computeResource is currently ignored */
+    /* FIXME: host is currently ignored */
+})
+
+/* esxVI_Event_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(Event)
+
+/* esxVI_Event_CastFromAnyType */
+ESX_VI__TEMPLATE__DYNAMIC_CAST_FROM_ANY_TYPE(Event,
+{
+      case esxVI_Type_Other:
+        /* Just accept everything here */
+        break;
+})
+
+/* esxVI_Event_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(Event)
+
+/* esxVI_Event_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE_EXTRA(Event, /* nothing */,
+{
+    (*ptrptr)->_actualType =
+      (char *)xmlGetNsProp(node, BAD_CAST "type",
+                           BAD_CAST "http://www.w3.org/2001/XMLSchema-instance");
+
+    if (!(*ptrptr)->_actualType) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("%s is missing 'type' property"),
+                       esxVI_Type_ToString((*ptrptr)->_type));
+        goto failure;
+    }
+},
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, chainId)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, createdTime)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, userName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(datacenter) /* FIXME */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(computeResource) /* FIXME */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(host) /* FIXME */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(VmEventArgument, vm)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, fullFormattedMessage)
+
+    /* Don't warn about unexpected properties */
+    continue;
+})
+
+/* esxVI_Event_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(Event)
+
+
+
 #include "esx_vi_types.generated.c"
-
-
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Managed Object: Datacenter
- *                    extends ManagedEntity
- */
-
-/* esxVI_Datacenter_Alloc */
-ESX_VI__TEMPLATE__ALLOC(Datacenter)
-
-/* esxVI_Datacenter_Free */
-ESX_VI__TEMPLATE__FREE(Datacenter,
-{
-    esxVI_Datacenter_Free(&item->_next);
-    esxVI_ManagedObjectReference_Free(&item->_reference);
-
-    /* ManagedEntity */
-    VIR_FREE(item->name);
-
-    /* Datacenter */
-    esxVI_ManagedObjectReference_Free(&item->hostFolder);
-    esxVI_ManagedObjectReference_Free(&item->vmFolder);
-})
-
-/* esxVI_Datacenter_Validate */
-ESX_VI__TEMPLATE__VALIDATE(Datacenter,
-{
-    /* ManagedEntity */
-    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(name);
-
-    /* Datacenter */
-    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(hostFolder);
-    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(vmFolder);
-})
-
-int
-esxVI_Datacenter_CastFromObjectContent(esxVI_ObjectContent *objectContent,
-                                       esxVI_Datacenter **datacenter)
-{
-    esxVI_DynamicProperty *dynamicProperty = NULL;
-
-    if (objectContent == NULL || datacenter == NULL || *datacenter != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
-        return -1;
-    }
-
-    if (esxVI_Datacenter_Alloc(datacenter) < 0) {
-        return -1;
-    }
-
-    if (esxVI_ManagedObjectReference_DeepCopy(&(*datacenter)->_reference,
-                                              objectContent->obj) < 0) {
-        goto failure;
-    }
-
-    for (dynamicProperty = objectContent->propSet; dynamicProperty != NULL;
-         dynamicProperty = dynamicProperty->_next) {
-        if (STREQ(dynamicProperty->name, "name")) {
-            if (esxVI_AnyType_ExpectType(dynamicProperty->val,
-                                         esxVI_Type_String) < 0) {
-                goto failure;
-            }
-
-            (*datacenter)->name = strdup(dynamicProperty->val->string);
-
-            if ((*datacenter)->name == NULL) {
-                virReportOOMError();
-                goto failure;
-            }
-        } else if (STREQ(dynamicProperty->name, "hostFolder")) {
-            if (esxVI_ManagedObjectReference_CastFromAnyType
-                  (dynamicProperty->val, &(*datacenter)->hostFolder) < 0) {
-                goto failure;
-            }
-        } else if (STREQ(dynamicProperty->name, "vmFolder")) {
-            if (esxVI_ManagedObjectReference_CastFromAnyType
-                  (dynamicProperty->val, &(*datacenter)->vmFolder) < 0) {
-                goto failure;
-            }
-        }
-    }
-
-    if (esxVI_Datacenter_Validate(*datacenter) < 0) {
-        goto failure;
-    }
-
-    return 0;
-
-  failure:
-    esxVI_Datacenter_Free(datacenter);
-
-    return -1;
-}
-
-
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Managed Object: ComputeResource
- *                    extends ManagedEntity
- */
-
-/* esxVI_ComputeResource_Alloc */
-ESX_VI__TEMPLATE__ALLOC(ComputeResource)
-
-/* esxVI_ComputeResource_Free */
-ESX_VI__TEMPLATE__FREE(ComputeResource,
-{
-    esxVI_ComputeResource_Free(&item->_next);
-    esxVI_ManagedObjectReference_Free(&item->_reference);
-
-    /* ManagedEntity */
-    VIR_FREE(item->name);
-
-    /* ComputeResource */
-    esxVI_ManagedObjectReference_Free(&item->host);
-    esxVI_ManagedObjectReference_Free(&item->resourcePool);
-})
-
-/* esxVI_ComputeResource_Validate */
-ESX_VI__TEMPLATE__VALIDATE(ComputeResource,
-{
-    /* ManagedEntity */
-    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(name);
-
-    /* ComputeResource */
-})
-
-int
-esxVI_ComputeResource_CastFromObjectContent
-  (esxVI_ObjectContent *objectContent, esxVI_ComputeResource **computeResource)
-{
-    esxVI_DynamicProperty *dynamicProperty = NULL;
-
-    if (objectContent == NULL || computeResource == NULL ||
-        *computeResource != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
-        return -1;
-    }
-
-    if (esxVI_ComputeResource_Alloc(computeResource) < 0) {
-        return -1;
-    }
-
-    if (esxVI_ManagedObjectReference_DeepCopy(&(*computeResource)->_reference,
-                                              objectContent->obj) < 0) {
-        goto failure;
-    }
-
-    for (dynamicProperty = objectContent->propSet; dynamicProperty != NULL;
-         dynamicProperty = dynamicProperty->_next) {
-        if (STREQ(dynamicProperty->name, "name")) {
-            if (esxVI_AnyType_ExpectType(dynamicProperty->val,
-                                         esxVI_Type_String) < 0) {
-                goto failure;
-            }
-
-            (*computeResource)->name = strdup(dynamicProperty->val->string);
-
-            if ((*computeResource)->name == NULL) {
-                virReportOOMError();
-                goto failure;
-            }
-        } else if (STREQ(dynamicProperty->name, "host")) {
-            if (esxVI_ManagedObjectReference_CastListFromAnyType
-                  (dynamicProperty->val, &(*computeResource)->host) < 0) {
-                goto failure;
-            }
-        } else if (STREQ(dynamicProperty->name, "resourcePool")) {
-            if (esxVI_ManagedObjectReference_CastFromAnyType
-                  (dynamicProperty->val, &(*computeResource)->resourcePool) < 0) {
-                goto failure;
-            }
-        }
-    }
-
-    if (esxVI_ComputeResource_Validate(*computeResource) < 0) {
-        goto failure;
-    }
-
-    return 0;
-
-  failure:
-    esxVI_ComputeResource_Free(computeResource);
-
-    return -1;
-}
-
-
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Managed Object: HostSystem
- *                    extends ManagedEntity
- */
-
-/* esxVI_HostSystem_Alloc */
-ESX_VI__TEMPLATE__ALLOC(HostSystem)
-
-/* esxVI_HostSystem_Free */
-ESX_VI__TEMPLATE__FREE(HostSystem,
-{
-    esxVI_HostSystem_Free(&item->_next);
-    esxVI_ManagedObjectReference_Free(&item->_reference);
-
-    /* ManagedEntity */
-    VIR_FREE(item->name);
-
-    /* HostSystem */
-})
-
-/* esxVI_HostSystem_Validate */
-ESX_VI__TEMPLATE__VALIDATE(HostSystem,
-{
-    /* ManagedEntity */
-    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(name);
-
-    /* HostSystem */
-})
-
-int
-esxVI_HostSystem_CastFromObjectContent(esxVI_ObjectContent *objectContent,
-                                       esxVI_HostSystem **hostSystem)
-{
-    esxVI_DynamicProperty *dynamicProperty = NULL;
-
-    if (objectContent == NULL || hostSystem == NULL || *hostSystem != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
-        return -1;
-    }
-
-    if (esxVI_HostSystem_Alloc(hostSystem) < 0) {
-        return -1;
-    }
-
-    if (esxVI_ManagedObjectReference_DeepCopy(&(*hostSystem)->_reference,
-                                              objectContent->obj) < 0) {
-        goto failure;
-    }
-
-    for (dynamicProperty = objectContent->propSet; dynamicProperty != NULL;
-         dynamicProperty = dynamicProperty->_next) {
-        if (STREQ(dynamicProperty->name, "name")) {
-            if (esxVI_AnyType_ExpectType(dynamicProperty->val,
-                                         esxVI_Type_String) < 0) {
-                goto failure;
-            }
-
-            (*hostSystem)->name = strdup(dynamicProperty->val->string);
-
-            if ((*hostSystem)->name == NULL) {
-                virReportOOMError();
-                goto failure;
-            }
-        }
-    }
-
-    if (esxVI_HostSystem_Validate(*hostSystem) < 0) {
-        goto failure;
-    }
-
-    return 0;
-
-  failure:
-    esxVI_HostSystem_Free(hostSystem);
-
-    return -1;
-}
 
 
 

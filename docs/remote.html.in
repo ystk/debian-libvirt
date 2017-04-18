@@ -1,5 +1,6 @@
-<?xml version="1.0"?>
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <h1 >Remote support</h1>
     <p>
@@ -53,18 +54,21 @@ machines through authenticated and encrypted connections.
       <li>
         <a href="#Remote_limitations">Limitations</a>
       </li>
-      <li>
-        <a href="#Remote_implementation_notes">Implementation notes</a>
-      </li>
     </ul>
     <h3>
-      <a name="Remote_basic_usage" id="Remote_basic_usage">Basic usage</a>
+      <a name="Remote_basic_usage">Basic usage</a>
     </h3>
     <p>
-On the remote machine, <code>libvirtd</code> should be running.
+On the remote machine, <code>libvirtd</code> should be running in general.
 See <a href="#Remote_libvirtd_configuration">the section
 on configuring libvirtd</a> for more information.
 </p>
+    <p>
+    Not all hypervisors supported by libvirt require a running
+    <code>libvirtd</code>. If you want to connect to a VMware ESX/ESXi or
+    GSX server then <code>libvirtd</code> is not necessary. See the
+    <a href="drvesx.html">VMware ESX page</a> for details.
+    </p>
     <p>
 To tell libvirt that you want to access a remote resource,
 you should supply a hostname in the normal <a href="uri.html">URI</a> that is passed
@@ -92,13 +96,13 @@ relating to failures in the remote transport itself. </li>
 much slower than, say, direct hypervisor calls. </li>
     </ul>
     <h3>
-      <a name="Remote_transports" id="Remote_transports">Transports</a>
+      <a name="Remote_transports">Transports</a>
     </h3>
     <p>
 Remote libvirt supports a range of transports:
 </p>
     <dl>
-      <dt> tls </dt>
+      <dt><code>tls</code></dt>
       <dd><a href="http://en.wikipedia.org/wiki/Transport_Layer_Security" title="Transport Layer Security">TLS</a>
  1.0 (SSL 3.1) authenticated and encrypted TCP/IP socket, usually
  listening on a public port number.  To use this you will need to
@@ -106,7 +110,7 @@ Remote libvirt supports a range of transports:
  server certificates</a>.
  The standard port is 16514.
  </dd>
-      <dt> unix </dt>
+      <dt><code>unix</code></dt>
       <dd> Unix domain socket.  Since this is only accessible on the
  local machine, it is not encrypted, and uses Unix permissions or
  SELinux for authentication.
@@ -115,7 +119,7 @@ Remote libvirt supports a range of transports:
  <code>/var/run/libvirt/libvirt-sock-ro</code> (the latter
  for read-only connections).
  </dd>
-      <dt> ssh </dt>
+      <dt><code>ssh</code></dt>
       <dd> Transported over an ordinary
  <a href="http://www.openssh.com/" title="OpenSSH homepage">ssh
  (secure shell)</a> connection.
@@ -126,21 +130,34 @@ Remote libvirt supports a range of transports:
  <a href="http://mah.everybody.org/docs/ssh" title="Using ssh-agent with ssh">ssh-agent</a>)
  otherwise programs which use
  this transport will stop to ask for a password. </dd>
-      <dt> ext </dt>
+      <dt><code>ext</code></dt>
       <dd> Any external program which can make a connection to the
  remote machine by means outside the scope of libvirt. </dd>
-      <dt> tcp </dt>
+      <dt><code>tcp</code></dt>
       <dd> Unencrypted TCP/IP socket.  Not recommended for production
  use, this is normally disabled, but an administrator can enable
  it for testing or use over a trusted network.
- The standard port is 16509.
- </dd>
+ The standard port is 16509. </dd>
+      <dt><code>libssh2</code></dt>
+      <dd> Transport over the SSH protocol using
+      <a href="http://libssh2.org/" title="libssh2 homepage">libssh2</a> instead
+of the OpenSSH binary. This transport uses the libvirt authentication callback for
+all ssh authentication calls and therefore supports keyboard-interactive authentication
+even with graphical management applications. As with the classic ssh transport
+netcat is required on the remote side.</dd>
+      <dt><code>libssh</code></dt>
+      <dd> Transport over the SSH protocol using
+      <a href="http://libssh.org/" title="libssh homepage">libssh</a> instead
+of the OpenSSH binary. This transport uses the libvirt authentication callback for
+all ssh authentication calls and therefore supports keyboard-interactive authentication
+even with graphical management applications. As with the classic ssh transport
+netcat is required on the remote side.</dd>
     </dl>
     <p>
 The default transport, if no other is specified, is <code>tls</code>.
 </p>
     <h3>
-      <a name="Remote_URI_reference" id="Remote_URI_reference">Remote URIs</a>
+      <a name="Remote_URI_reference">Remote URIs</a>
     </h3>
     <p>
 See also: <a href="uri.html">documentation on ordinary ("local") URIs</a>.
@@ -179,9 +196,15 @@ Connect to a libvirtd daemon offering unencrypted TCP/IP connections
 on localhost port 5000 and use the test driver with default
 settings.
 </li>
+<li><code>qemu+libssh2://user@host/system?known_hosts=/home/user/.ssh/known_hosts</code><br/> &#x2014;
+Connect to a remote host using a ssh connection with the libssh2 driver
+and use a different known_hosts file.</li>
+<li><code>qemu+libssh://user@host/system?known_hosts=/home/user/.ssh/known_hosts</code><br/> &#x2014;
+Connect to a remote host using a ssh connection with the libssh driver
+and use a different known_hosts file.</li>
     </ul>
     <h4>
-      <a name="Remote_URI_parameters" id="Remote_URI_parameters">Extra parameters</a>
+      <a name="Remote_URI_parameters">Extra parameters</a>
     </h4>
     <p>
 Extra parameters can be added to remote URIs as part
@@ -217,6 +240,19 @@ Note that parameter values must be
       </tr>
       <tr>
         <td>
+          <code>tls_priority</code>
+        </td>
+        <td> tls </td>
+        <td>
+  A vaid GNUTLS priority string
+</td>
+      </tr>
+      <tr>
+        <td colspan="2"/>
+        <td> Example: <code>tls_priority=NORMAL:-VERS-SSL3.0</code> </td>
+      </tr>
+      <tr>
+        <td>
           <code>command</code>
         </td>
         <td> ssh, ext </td>
@@ -234,7 +270,7 @@ Note that parameter values must be
         <td>
           <code>socket</code>
         </td>
-        <td> unix, ssh </td>
+        <td> unix, ssh, libssh2, libssh </td>
         <td>
   The path to the Unix domain socket, which overrides the
   compiled-in default.  For ssh transport, this is passed to
@@ -249,7 +285,7 @@ Note that parameter values must be
         <td>
           <code>netcat</code>
         </td>
-        <td> ssh </td>
+        <td> ssh, libssh2, libssh </td>
         <td>
   The name of the netcat command on the remote machine.
   The default is <code>nc</code>.  For ssh transport, libvirt
@@ -269,13 +305,34 @@ Note that parameter values must be
         <td colspan="2"/>
         <td> Example: <code>netcat=/opt/netcat/bin/nc</code> </td>
       </tr>
+
+      <tr>
+        <td>
+          <code>keyfile</code>
+        </td>
+        <td> ssh, libssh2, libssh </td>
+        <td>
+  The name of the private key file to use to authentication to the remote
+  machine.  If this option is not used the default keys are used.
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2"/>
+        <td> Example: <code>keyfile=/root/.ssh/example_key</code> </td>
+      </tr>
+
       <tr>
         <td>
           <code>no_verify</code>
         </td>
-        <td> tls </td>
+        <td> ssh, tls </td>
         <td>
-  If set to a non-zero value, this disables client checks of the
+  SSH: If set to a non-zero value, this disables client's strict host key
+  checking making it auto-accept new host keys.  Existing host keys will
+  still be validated.
+  <br/>
+  <br/>
+  TLS: If set to a non-zero value, this disables client checks of the
   server's certificate.  Note that to disable server checks of
   the client's certificate or IP address you must
   <a href="#Remote_libvirtd_configuration">change the libvirtd
@@ -302,12 +359,61 @@ Note that parameter values must be
         <td colspan="2"/>
         <td> Example: <code>no_tty=1</code> </td>
       </tr>
+      <tr>
+        <td>
+          <code>pkipath</code>
+        </td>
+        <td> tls</td>
+        <td>
+          Specifies x509 certificates path for the client. If any of
+          the CA certificate, client certificate, or client key is
+          missing, the connection will fail with a fatal error.
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2"/>
+        <td> Example: <code>pkipath=/tmp/pki/client</code> </td>
+      </tr>
+      <tr>
+        <td>
+          <code>known_hosts</code>
+        </td>
+        <td> libssh2, libssh </td>
+        <td>
+  Path to the known_hosts file to verify the host key against. LibSSH2 and
+  libssh support OpenSSH-style known_hosts files, although LibSSH2 does not
+  support all key types, so using files created by the OpenSSH binary may
+  result into truncating the known_hosts file. Thus, with LibSSH2 it's
+  recommended to use the default known_hosts file is located in libvirt's
+  client local configuration directory e.g.: ~/.config/libvirt/known_hosts.
+  Note: Use absolute paths.
+</td>
+      </tr>
+      <tr>
+        <td colspan="2"/>
+        <td> Example: <code>known_hosts=/root/.ssh/known_hosts</code> </td>
+      </tr>
+      <tr>
+        <td>
+          <code>sshauth</code>
+        </td>
+        <td> libssh2, libssh </td>
+        <td>
+  A comma separated list of authentication methods to use. Default (is
+  "agent,privkey,password,keyboard-interactive". The order of the methods
+  is preserved. Some methods may require additional parameters.
+</td>
+      </tr>
+      <tr>
+        <td colspan="2"/>
+        <td> Example: <code>sshauth=privkey,agent</code> </td>
+      </tr>
     </table>
     <h3>
-      <a name="Remote_certificates" id="Remote_certificates">Generating TLS certificates</a>
+      <a name="Remote_certificates">Generating TLS certificates</a>
     </h3>
     <h4>
-      <a name="Remote_PKI" id="Remote_PKI">Public Key Infrastructure set up</a>
+      <a name="Remote_PKI">Public Key Infrastructure set up</a>
     </h4>
     <p>
 If you are unsure how to create TLS certificates, skip to the
@@ -324,13 +430,21 @@ next section.
         <td>
           <code>/etc/pki/CA/cacert.pem</code>
         </td>
-        <td> Installed on all clients and servers </td>
+        <td> Installed on the client and server </td>
         <td> CA's certificate (<a href="#Remote_TLS_CA">more info</a>)</td>
         <td> n/a </td>
       </tr>
       <tr>
         <td>
-          <code>/etc/pki/libvirt/ private/serverkey.pem</code>
+          <code>$HOME/.pki/cacert.pem</code>
+        </td>
+        <td> Installed on the client </td>
+        <td> CA's certificate (<a href="#Remote_TLS_CA">more info</a>)</td>
+        <td> n/a </td>
+      </tr>
+      <tr>
+        <td>
+          <code>/etc/pki/libvirt/private/serverkey.pem</code>
         </td>
         <td> Installed on the server </td>
         <td> Server's private key (<a href="#Remote_TLS_server_certificates">more info</a>)</td>
@@ -338,7 +452,7 @@ next section.
       </tr>
       <tr>
         <td>
-          <code>/etc/pki/libvirt/ servercert.pem</code>
+          <code>/etc/pki/libvirt/servercert.pem</code>
         </td>
         <td> Installed on the server </td>
         <td> Server's certificate signed by the CA.
@@ -348,7 +462,7 @@ next section.
       </tr>
       <tr>
         <td>
-          <code>/etc/pki/libvirt/ private/clientkey.pem</code>
+          <code>/etc/pki/libvirt/private/clientkey.pem</code>
         </td>
         <td> Installed on the client </td>
         <td> Client's private key. (<a href="#Remote_TLS_client_certificates">more info</a>) </td>
@@ -356,7 +470,26 @@ next section.
       </tr>
       <tr>
         <td>
-          <code>/etc/pki/libvirt/ clientcert.pem</code>
+          <code>/etc/pki/libvirt/clientcert.pem</code>
+        </td>
+        <td> Installed on the client </td>
+        <td> Client's certificate signed by the CA
+  (<a href="#Remote_TLS_client_certificates">more info</a>) </td>
+        <td> Distinguished Name (DN) can be checked against an access
+  control list (<code>tls_allowed_dn_list</code>).
+  </td>
+      </tr>
+      <tr>
+        <td>
+          <code>$HOME/.pki/libvirt/clientkey.pem</code>
+        </td>
+        <td> Installed on the client </td>
+        <td> Client's private key. (<a href="#Remote_TLS_client_certificates">more info</a>) </td>
+        <td> n/a </td>
+      </tr>
+      <tr>
+        <td>
+          <code>$HOME/.pki/libvirt/clientcert.pem</code>
         </td>
         <td> Installed on the client </td>
         <td> Client's certificate signed by the CA
@@ -366,8 +499,26 @@ next section.
   </td>
       </tr>
     </table>
+    <p>
+      If 'pkipath' is specified in URI, then all the client
+      certificates must be found in the path specified, otherwise the
+      connection will fail with a fatal error. If 'pkipath' is not
+      specified:
+    </p>
+    <ul>
+      <li> For a non-root user, libvirt tries to find the certificates
+        in $HOME/.pki/libvirt first. If the required CA certificate cannot
+        be found, then the global default location
+        (/etc/pki/CA/cacert.pem) will be used.
+        Likewise, if either the client certificate
+        or the client key cannot be found, then the global default
+        locations (/etc/pki/libvirt/clientcert.pem,
+        /etc/pki/libvirt/private/clientkey.pem) will be used.
+      </li>
+      <li> For the root user, the global default locations will always be used.</li>
+    </ul>
     <h4>
-      <a name="Remote_TLS_background" id="Remote_TLS_background">Background to TLS certificates</a>
+      <a name="Remote_TLS_background">Background to TLS certificates</a>
     </h4>
     <p>
 Libvirt supports TLS certificates for verifying the identity
@@ -402,7 +553,7 @@ address.  You may want to change this to make it less (or more)
 permissive, depending on your needs.
 </p>
     <h4>
-      <a name="Remote_TLS_CA" id="Remote_TLS_CA">Setting up a Certificate Authority (CA)</a>
+      <a name="Remote_TLS_CA">Setting up a Certificate Authority (CA)</a>
     </h4>
     <p>
 You will need the <a href="http://www.gnu.org/software/gnutls/manual/html_node/Invoking-certtool.html">GnuTLS
@@ -473,7 +624,7 @@ key carefully as you will need it when you come to issue certificates
 for your clients and servers.
 </p>
     <h4>
-      <a name="Remote_TLS_server_certificates" id="Remote_TLS_server_certificates">Issuing server certificates</a>
+      <a name="Remote_TLS_server_certificates">Issuing server certificates</a>
     </h4>
     <p>
 For each server (libvirtd) you need to issue a certificate
@@ -556,7 +707,7 @@ which can be installed on the server as
 </li>
     </ul>
     <h4>
-      <a name="Remote_TLS_client_certificates" id="Remote_TLS_client_certificates">Issuing client certificates</a>
+      <a name="Remote_TLS_client_certificates">Issuing client certificates</a>
     </h4>
     <p>
 For each client (ie. any program linked with libvirt, such as
@@ -609,7 +760,7 @@ cp clientcert.pem /etc/pki/libvirt/clientcert.pem
 </li>
     </ol>
     <h4>
-      <a name="Remote_TLS_troubleshooting" id="Remote_TLS_troubleshooting">Troubleshooting TLS certificate problems</a>
+      <a name="Remote_TLS_troubleshooting">Troubleshooting TLS certificate problems</a>
     </h4>
     <dl>
       <dt> failed to verify client's certificate </dt>
@@ -627,7 +778,7 @@ to analyze the setup on the client or server machines, preferably as root.
 It will try to point out the possible problems and provide solutions to
 fix the set up up to a point where you have secure remote access.</p>
     <h3>
-      <a name="Remote_libvirtd_configuration" id="Remote_libvirtd_configuration">libvirtd configuration file</a>
+      <a name="Remote_libvirtd_configuration">libvirtd configuration file</a>
     </h3>
     <p>
 Libvirtd (the remote daemon) is configured from a file called
@@ -681,7 +832,7 @@ Blank lines and comments beginning with <code>#</code> are ignored.
       </tr>
       <tr>
         <td> mdns_adv <i>[0|1]</i> </td>
-        <td> 1 (advertise with mDNS) </td>
+        <td> 0 (advertise with mDNS) </td>
         <td>
   If set to 1 then the virtualization service will be advertised over
   mDNS to hosts on the local LAN segment.
@@ -795,7 +946,7 @@ Blank lines and comments beginning with <code>#</code> are ignored.
       </tr>
     </table>
     <h3>
-      <a name="Remote_IPv6" id="Remote_IPv6">IPv6 support</a>
+      <a name="Remote_IPv6">IPv6 support</a>
     </h3>
     <p>
 The libvirtd service and libvirt remote client driver both use the
@@ -808,7 +959,7 @@ connection will be made, otherwise IPv4 will be used. In summary it
 should just 'do the right thing(tm)'.
 </p>
     <h3>
-      <a name="Remote_limitations" id="Remote_limitations">Limitations</a>
+      <a name="Remote_limitations">Limitations</a>
     </h3>
     <ul>
       <li> Fine-grained authentication: libvirt in general,
@@ -819,48 +970,6 @@ just read-write/read-only as at present.
     </ul>
     <p>
 Please come and discuss these issues and more on <a href="https://www.redhat.com/mailman/listinfo/libvir-list" title="libvir-list mailing list">the mailing list</a>.
-</p>
-    <h3>
-      <a name="Remote_implementation_notes" id="Remote_implementation_notes">Implementation notes</a>
-    </h3>
-    <p>
-The current implementation uses <a href="http://en.wikipedia.org/wiki/External_Data_Representation" title="External Data Representation">XDR</a>-encoded packets with a
-simple remote procedure call implementation which also supports
-asynchronous messaging and asynchronous and out-of-order replies,
-although these latter features are not used at the moment.
-</p>
-    <p>
-The implementation should be considered <b>strictly internal</b> to
-libvirt and <b>subject to change at any time without notice</b>.  If
-you wish to talk to libvirtd, link to libvirt.  If there is a problem
-that means you think you need to use the protocol directly, please
-first discuss this on <a href="https://www.redhat.com/mailman/listinfo/libvir-list" title="libvir-list mailing list">the mailing list</a>.
-</p>
-    <p>
-The messaging protocol is described in
-<code>qemud/remote_protocol.x</code>.
-</p>
-    <p>
-Authentication and encryption (for TLS) is done using <a href="http://www.gnu.org/software/gnutls/" title="GnuTLS project&#10;page">GnuTLS</a> and the RPC protocol is unaware of this layer.
-</p>
-    <p>
-Protocol messages are sent using a simple 32 bit length word (encoded
-XDR int) followed by the message header (XDR
-<code>remote_message_header</code>) followed by the message body.  The
-length count includes the length word itself, and is measured in
-bytes.  Maximum message size is <code>REMOTE_MESSAGE_MAX</code> and to
-avoid denial of services attacks on the XDR decoders strings are
-individually limited to <code>REMOTE_STRING_MAX</code> bytes.  In the
-TLS case, messages may be split over TLS records, but a TLS record
-cannot contain parts of more than one message.  In the common RPC case
-a single <code>REMOTE_CALL</code> message is sent from client to
-server, and the server then replies synchronously with a single
-<code>REMOTE_REPLY</code> message, but other forms of messaging are
-also possible.
-</p>
-    <p>
-The protocol contains support for multiple program types and protocol
-versioning, modelled after SunRPC.
 </p>
   </body>
 </html>

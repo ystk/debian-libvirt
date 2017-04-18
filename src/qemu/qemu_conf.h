@@ -1,7 +1,7 @@
 /*
  * qemu_conf.h: QEMU configuration management
  *
- * Copyright (C) 2006-2007, 2009-2010 Red Hat, Inc.
+ * Copyright (C) 2006-2007, 2009-2013 Red Hat, Inc.
  * Copyright (C) 2006 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -24,98 +24,80 @@
 #ifndef __QEMUD_CONF_H
 # define __QEMUD_CONF_H
 
-# include <config.h>
+# include <unistd.h>
 
-# include "ebtables.h"
+# include "virebtables.h"
 # include "internal.h"
-# include "bridge.h"
 # include "capabilities.h"
 # include "network_conf.h"
 # include "domain_conf.h"
+# include "snapshot_conf.h"
 # include "domain_event.h"
-# include "threads.h"
-# include "security/security_driver.h"
-# include "cgroup.h"
-# include "pci.h"
+# include "virthread.h"
+# include "security/security_manager.h"
+# include "virpci.h"
+# include "virusb.h"
+# include "virscsi.h"
 # include "cpu_conf.h"
 # include "driver.h"
-# include "bitmap.h"
+# include "virportallocator.h"
+# include "vircommand.h"
+# include "virthreadpool.h"
+# include "locking/lock_manager.h"
+# include "qemu_capabilities.h"
+# include "virclosecallbacks.h"
+# include "virhostdev.h"
+# include "virfile.h"
+# include "virfirmware.h"
 
-# define qemudDebug(fmt, ...) do {} while(0)
+# ifdef CPU_SETSIZE /* Linux */
+#  define QEMUD_CPUMASK_LEN CPU_SETSIZE
+# elif defined(_SC_NPROCESSORS_CONF) /* Cygwin */
+#  define QEMUD_CPUMASK_LEN (sysconf(_SC_NPROCESSORS_CONF))
+# else
+#  error "Port me"
+# endif
 
-# define QEMUD_CPUMASK_LEN CPU_SETSIZE
+# define QEMU_DRIVER_NAME "QEMU"
 
-/* Internal flags to keep track of qemu command line capabilities */
-enum qemud_cmd_flags {
-    QEMUD_CMD_FLAG_KQEMU          = (1 << 0), /* Whether KQEMU is compiled in */
-    QEMUD_CMD_FLAG_VNC_COLON      = (1 << 1), /* Does the VNC take just port, or address + display */
-    QEMUD_CMD_FLAG_NO_REBOOT      = (1 << 2), /* Is the -no-reboot flag available */
-    QEMUD_CMD_FLAG_DRIVE          = (1 << 3), /* Is the new -drive arg available */
-    QEMUD_CMD_FLAG_DRIVE_BOOT     = (1 << 4), /* Does -drive support boot=on */
-    QEMUD_CMD_FLAG_NAME           = (1 << 5), /* Is the -name flag available */
-    QEMUD_CMD_FLAG_UUID           = (1 << 6), /* Is the -uuid flag available */
-    QEMUD_CMD_FLAG_DOMID          = (1 << 7), /* Xenner only, special -domid flag available */
-    QEMUD_CMD_FLAG_VNET_HDR        = (1 << 8),
-    QEMUD_CMD_FLAG_MIGRATE_KVM_STDIO = (1 << 9),  /* Original migration code from KVM. Also had tcp, but we can't use that
-                                                   * since it had a design bug blocking the entire monitor console */
-    QEMUD_CMD_FLAG_MIGRATE_QEMU_TCP  = (1 << 10), /* New migration syntax after merge to QEMU with TCP transport */
-    QEMUD_CMD_FLAG_MIGRATE_QEMU_EXEC = (1 << 11), /* New migration syntax after merge to QEMU with EXEC transport */
-    QEMUD_CMD_FLAG_DRIVE_CACHE_V2    = (1 << 12), /* Is the cache= flag wanting new v2 values */
-    QEMUD_CMD_FLAG_KVM               = (1 << 13), /* Whether KVM is compiled in */
-    QEMUD_CMD_FLAG_DRIVE_FORMAT      = (1 << 14), /* Is -drive format= avail */
-    QEMUD_CMD_FLAG_VGA               = (1 << 15), /* Is -vga avail */
+typedef struct _virQEMUDriver virQEMUDriver;
+typedef virQEMUDriver *virQEMUDriverPtr;
 
-    /* features added in qemu-0.10.0 or later */
-    QEMUD_CMD_FLAG_0_10         = (1 << 16),
-    QEMUD_CMD_FLAG_NET_NAME     = QEMUD_CMD_FLAG_0_10, /* -net ...,name=str */
-    QEMUD_CMD_FLAG_HOST_NET_ADD = QEMUD_CMD_FLAG_0_10, /* host_net_add monitor command */
+typedef struct _virQEMUDriverConfig virQEMUDriverConfig;
+typedef virQEMUDriverConfig *virQEMUDriverConfigPtr;
 
-    QEMUD_CMD_FLAG_PCIDEVICE     = (1 << 17), /* PCI device assignment only supported by qemu-kvm */
-    QEMUD_CMD_FLAG_MEM_PATH      = (1 << 18), /* mmap'ped guest backing supported */
-    QEMUD_CMD_FLAG_DRIVE_SERIAL  = (1 << 19), /* -driver serial=  available */
-    QEMUD_CMD_FLAG_XEN_DOMID     = (1 << 20), /* -xen-domid (new style xen integration) */
-    QEMUD_CMD_FLAG_MIGRATE_QEMU_UNIX = (1 << 21), /* Does qemu support unix domain sockets for migration? */
-    QEMUD_CMD_FLAG_CHARDEV       = (1 << 22), /* Is the new -chardev arg available */
-    QEMUD_CMD_FLAG_ENABLE_KVM    = (1 << 23), /* Is the -enable-kvm flag available to "enable KVM full virtualization support" */
-    QEMUD_CMD_FLAG_MONITOR_JSON  = (1 << 24), /* JSON mode for monitor */
-    QEMUD_CMD_FLAG_BALLOON       = (1 << 25), /* -balloon available */
-    QEMUD_CMD_FLAG_DEVICE        = (1 << 26), /* Is the new -device arg available */
-    QEMUD_CMD_FLAG_SDL           = (1 << 27), /* Is the new -sdl arg available */
-    QEMUD_CMD_FLAG_SMP_TOPOLOGY  = (1 << 28), /* Is sockets=s,cores=c,threads=t available for -smp? */
-    QEMUD_CMD_FLAG_NETDEV        = (1 << 29), /* The -netdev flag & netdev_add/remove monitor commands */
-    QEMUD_CMD_FLAG_RTC           = (1 << 30), /* The -rtc flag for clock options */
-    QEMUD_CMD_FLAG_VNET_HOST     = (1LL << 31), /* vnet-host support is available in qemu */
-    QEMUD_CMD_FLAG_RTC_TD_HACK   = (1LL << 32), /* -rtc-td-hack available */
-    QEMUD_CMD_FLAG_NO_HPET       = (1LL << 33), /* -no-hpet flag is supported */
-    QEMUD_CMD_FLAG_NO_KVM_PIT    = (1LL << 34), /* -no-kvm-pit-reinjection supported */
-    QEMUD_CMD_FLAG_TDF           = (1LL << 35), /* -tdf flag (user-mode pit catchup) */
-    QEMUD_CMD_FLAG_PCI_CONFIGFD  = (1LL << 36), /* pci-assign.configfd */
-    QEMUD_CMD_FLAG_NODEFCONFIG   = (1LL << 37), /* -nodefconfig */
-    QEMUD_CMD_FLAG_BOOT_MENU     = (1LL << 38), /* -boot menu=on support */
-};
+/* Main driver config. The data in these object
+ * instances is immutable, so can be accessed
+ * without locking. Threads must, however, hold
+ * a valid reference on the object to prevent it
+ * being released while they use it.
+ *
+ * eg
+ *  qemuDriverLock(driver);
+ *  virQEMUDriverConfigPtr cfg = virObjectRef(driver->config);
+ *  qemuDriverUnlock(driver);
+ *
+ *  ...do stuff with 'cfg'..
+ *
+ *  virObjectUnref(cfg);
+ */
+struct _virQEMUDriverConfig {
+    virObject parent;
 
-/* Main driver state */
-struct qemud_driver {
-    virMutex lock;
-
-    int privileged;
+    const char *uri;
 
     uid_t user;
     gid_t group;
-    int dynamicOwnership;
+    bool dynamicOwnership;
 
-    unsigned int qemuVersion;
-    int nextvmid;
+    virBitmapPtr namespaces;
 
-    virCgroupPtr cgroup;
     int cgroupControllers;
     char **cgroupDeviceACL;
 
-    virDomainObjList domains;
-
-    brControl *brctl;
-    /* These four directories are ones libvirtd uses (so must be root:root
+    /* These five directories are ones libvirtd uses (so must be root:root
      * to avoid security risk from QEMU processes */
+    char *configBaseDir;
     char *configDir;
     char *autostartDir;
     char *logDir;
@@ -126,51 +108,176 @@ struct qemud_driver {
     char *cacheDir;
     char *saveDir;
     char *snapshotDir;
-    unsigned int vncTLS : 1;
-    unsigned int vncTLSx509verify : 1;
-    unsigned int vncSASL : 1;
+    char *channelTargetDir;
+    char *nvramDir;
+
+    char *defaultTLSx509certdir;
+    bool defaultTLSx509verify;
+    char *defaultTLSx509secretUUID;
+
+    bool vncAutoUnixSocket;
+    bool vncTLS;
+    bool vncTLSx509verify;
+    bool vncSASL;
     char *vncTLSx509certdir;
     char *vncListen;
     char *vncPassword;
     char *vncSASLdir;
-    char *hugetlbfs_mount;
-    char *hugepage_path;
 
-    unsigned int macFilter : 1;
-    ebtablesContext *ebtables;
+    bool spiceTLS;
+    char *spiceTLSx509certdir;
+    bool spiceSASL;
+    char *spiceSASLdir;
+    char *spiceListen;
+    char *spicePassword;
+    bool spiceAutoUnixSocket;
 
-    unsigned int relaxedACS : 1;
-    unsigned int vncAllowHostAudio : 1;
-    unsigned int clearEmulatorCapabilities : 1;
-    unsigned int allowDiskFormatProbing : 1;
+    bool chardevTLS;
+    char *chardevTLSx509certdir;
+    bool chardevTLSx509verify;
+    char *chardevTLSx509secretUUID;
 
-    virCapsPtr caps;
+    unsigned int remotePortMin;
+    unsigned int remotePortMax;
 
-    /* An array of callbacks */
-    virDomainEventCallbackListPtr domainEventCallbacks;
-    virDomainEventQueuePtr domainEventQueue;
-    int domainEventTimer;
-    int domainEventDispatching;
+    unsigned int webSocketPortMin;
+    unsigned int webSocketPortMax;
 
-    char *securityDriverName;
-    virSecurityDriverPtr securityDriver;
-    virSecurityDriverPtr securityPrimaryDriver;
-    virSecurityDriverPtr securitySecondaryDriver;
+    virHugeTLBFSPtr hugetlbfs;
+    size_t nhugetlbfs;
+
+    char *bridgeHelperName;
+
+    bool macFilter;
+
+    bool relaxedACS;
+    bool vncAllowHostAudio;
+    bool nogfxAllowHostAudio;
+    bool clearEmulatorCapabilities;
+    bool allowDiskFormatProbing;
+    bool setProcessName;
+
+    unsigned int maxProcesses;
+    unsigned int maxFiles;
+    unsigned long long maxCore;
+    bool dumpGuestCore;
+
+    unsigned int maxQueuedJobs;
+
+    char **securityDriverNames;
+    bool securityDefaultConfined;
+    bool securityRequireConfined;
 
     char *saveImageFormat;
+    char *dumpImageFormat;
+    char *snapshotImageFormat;
 
-    pciDeviceList *activePciHostdevs;
+    char *autoDumpPath;
+    bool autoDumpBypassCache;
+    bool autoStartBypassCache;
 
-    virBitmapPtr reservedVNCPorts;
+    char *lockManagerName;
+
+    int keepAliveInterval;
+    unsigned int keepAliveCount;
+
+    int seccompSandbox;
+
+    char *migrateHost;
+    /* The default for -incoming */
+    char *migrationAddress;
+    unsigned int migrationPortMin;
+    unsigned int migrationPortMax;
+
+    bool logTimestamp;
+    bool stdioLogD;
+
+    virFirmwarePtr *firmwares;
+    size_t nfirmwares;
+    unsigned int glusterDebugLevel;
 };
 
-typedef struct _qemuDomainPCIAddressSet qemuDomainPCIAddressSet;
-typedef qemuDomainPCIAddressSet *qemuDomainPCIAddressSetPtr;
+/* Main driver state */
+struct _virQEMUDriver {
+    virMutex lock;
+
+    /* Require lock to get reference on 'config',
+     * then lockless thereafter */
+    virQEMUDriverConfigPtr config;
+
+    /* Immutable pointer, self-locking APIs */
+    virThreadPoolPtr workerPool;
+
+    /* Atomic increment only */
+    int lastvmid;
+
+    /* Atomic inc/dec only */
+    unsigned int nactive;
+
+    /* Immutable value */
+    bool privileged;
+
+    /* Immutable pointers. Caller must provide locking */
+    virStateInhibitCallback inhibitCallback;
+    void *inhibitOpaque;
+
+    /* Immutable pointer, self-locking APIs */
+    virDomainObjListPtr domains;
+
+    /* Immutable pointer */
+    char *qemuImgBinary;
+
+    /* Immutable pointer, lockless APIs. Pointless abstraction */
+    ebtablesContext *ebtables;
+
+    /* Require lock to get a reference on the object,
+     * lockless access thereafter
+     */
+    virCapsPtr caps;
+
+    /* Immutable pointer, Immutable object */
+    virDomainXMLOptionPtr xmlopt;
+
+    /* Immutable pointer, self-locking APIs */
+    virQEMUCapsCachePtr qemuCapsCache;
+
+    /* Immutable pointer, self-locking APIs */
+    virObjectEventStatePtr domainEventState;
+
+    /* Immutable pointer. self-locking APIs */
+    virSecurityManagerPtr securityManager;
+
+    virHostdevManagerPtr hostdevMgr;
+
+    /* Immutable pointer. Unsafe APIs. XXX */
+    virHashTablePtr sharedDevices;
+
+    /* Immutable pointer, self-locking APIs */
+    virPortAllocatorPtr remotePorts;
+
+    /* Immutable pointer, self-locking APIs */
+    virPortAllocatorPtr webSocketPorts;
+
+    /* Immutable pointer, self-locking APIs */
+    virPortAllocatorPtr migrationPorts;
+
+    /* Immutable pointer, lockless APIs*/
+    virSysinfoDefPtr hostsysinfo;
+
+    /* Immutable pointer. lockless access */
+    virLockManagerPluginPtr lockManager;
+
+    /* Immutable pointer, self-clocking APIs */
+    virCloseCallbacksPtr closeCallbacks;
+
+    /* Immutable pointer, self-locking APIs */
+    virHashAtomicPtr migrationErrors;
+};
 
 typedef struct _qemuDomainCmdlineDef qemuDomainCmdlineDef;
 typedef qemuDomainCmdlineDef *qemuDomainCmdlineDefPtr;
 struct _qemuDomainCmdlineDef {
-    unsigned int num_args;
+    size_t num_args;
     char **args;
 
     unsigned int num_env;
@@ -178,172 +285,67 @@ struct _qemuDomainCmdlineDef {
     char **env_value;
 };
 
-/* Port numbers used for KVM migration. */
-# define QEMUD_MIGRATION_FIRST_PORT 49152
-# define QEMUD_MIGRATION_NUM_PORTS 64
-
-/* Config type for XML import/export conversions */
-# define QEMU_CONFIG_FORMAT_ARGV "qemu-argv"
-
-# define QEMU_DRIVE_HOST_PREFIX "drive-"
-# define QEMU_VIRTIO_SERIAL_PREFIX "virtio-serial"
-
-# define qemuReportError(code, ...)                                      \
-    virReportErrorHelper(NULL, VIR_FROM_QEMU, code, __FILE__,           \
-                         __FUNCTION__, __LINE__, __VA_ARGS__)
 
 
-int qemudLoadDriverConfig(struct qemud_driver *driver,
-                          const char *filename);
+void qemuDomainCmdlineDefFree(qemuDomainCmdlineDefPtr def);
 
-virCapsPtr  qemudCapsInit               (virCapsPtr old_caps);
+virQEMUDriverConfigPtr virQEMUDriverConfigNew(bool privileged);
 
-int         qemudExtractVersion         (struct qemud_driver *driver);
-int         qemudExtractVersionInfo     (const char *qemu,
-                                         unsigned int *version,
-                                         unsigned long long *qemuCmdFlags);
+int virQEMUDriverConfigLoadFile(virQEMUDriverConfigPtr cfg,
+                                const char *filename);
 
-int         qemudParseHelpStr           (const char *qemu,
-                                         const char *str,
-                                         unsigned long long *qemuCmdFlags,
-                                         unsigned int *version,
-                                         unsigned int *is_kvm,
-                                         unsigned int *kvm_version);
+virQEMUDriverConfigPtr virQEMUDriverGetConfig(virQEMUDriverPtr driver);
+bool virQEMUDriverIsPrivileged(virQEMUDriverPtr driver);
 
-int         qemudBuildCommandLine       (virConnectPtr conn,
-                                         struct qemud_driver *driver,
-                                         virDomainDefPtr def,
-                                         virDomainChrDefPtr monitor_chr,
-                                         int monitor_json,
-                                         unsigned long long qemuCmdFlags,
-                                         const char ***retargv,
-                                         const char ***retenv,
-                                         int **vmfds,
-                                         int *nvmfds,
-                                         const char *migrateFrom,
-                                         virDomainSnapshotObjPtr current_snapshot)
+virCapsPtr virQEMUDriverCreateCapabilities(virQEMUDriverPtr driver);
+virCapsPtr virQEMUDriverGetCapabilities(virQEMUDriverPtr driver,
+                                        bool refresh);
+
+typedef struct _qemuSharedDeviceEntry qemuSharedDeviceEntry;
+typedef qemuSharedDeviceEntry *qemuSharedDeviceEntryPtr;
+
+bool qemuSharedDeviceEntryDomainExists(qemuSharedDeviceEntryPtr entry,
+                                       const char *name,
+                                       int *idx)
+    ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2);
+
+char *qemuGetSharedDeviceKey(const char *disk_path)
     ATTRIBUTE_NONNULL(1);
 
-/* With vlan == -1, use netdev syntax, else old hostnet */
-char * qemuBuildHostNetStr(virDomainNetDefPtr net,
-                           char type_sep,
-                           int vlan,
-                           const char *tapfd,
-                           const char *vhostfd);
+void qemuSharedDeviceEntryFree(void *payload, const void *name);
 
-/* Legacy, pre device support */
-char * qemuBuildNicStr(virDomainNetDefPtr net,
-                       const char *prefix,
-                       int vlan);
+int qemuAddSharedDevice(virQEMUDriverPtr driver,
+                        virDomainDeviceDefPtr dev,
+                        const char *name)
+    ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3);
 
-/* Current, best practice */
-char * qemuBuildNicDevStr(virDomainNetDefPtr net,
-                          int vlan);
+int qemuRemoveSharedDevice(virQEMUDriverPtr driver,
+                           virDomainDeviceDefPtr dev,
+                           const char *name)
+    ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3);
 
-char *qemuDeviceDriveHostAlias(virDomainDiskDefPtr disk,
-                               unsigned long long qemudCmdFlags);
+int qemuRemoveSharedDisk(virQEMUDriverPtr driver,
+                         virDomainDiskDefPtr disk,
+                         const char *name)
+    ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3);
 
-/* Both legacy & current support */
-char *qemuBuildDriveStr(virDomainDiskDefPtr disk,
-                        int bootable,
-                        unsigned long long qemuCmdFlags);
+int qemuSetUnprivSGIO(virDomainDeviceDefPtr dev);
 
-/* Current, best practice */
-char * qemuBuildDriveDevStr(virDomainDiskDefPtr disk);
-/* Current, best practice */
-char * qemuBuildControllerDevStr(virDomainControllerDefPtr def);
+int qemuDriverAllocateID(virQEMUDriverPtr driver);
+virDomainXMLOptionPtr virQEMUDriverCreateXMLConf(virQEMUDriverPtr driver);
 
-char * qemuBuildWatchdogDevStr(virDomainWatchdogDefPtr dev);
+int qemuTranslateSnapshotDiskSourcePool(virConnectPtr conn,
+                                        virDomainSnapshotDiskDefPtr def);
 
-char * qemuBuildMemballoonDevStr(virDomainMemballoonDefPtr dev);
+char * qemuGetBaseHugepagePath(virHugeTLBFSPtr hugepage);
+char * qemuGetDomainHugepagePath(const virDomainDef *def,
+                                 virHugeTLBFSPtr hugepage);
+char * qemuGetDomainDefaultHugepath(const virDomainDef *def,
+                                    virHugeTLBFSPtr hugetlbfs,
+                                    size_t nhugetlbfs);
 
-char * qemuBuildUSBInputDevStr(virDomainInputDefPtr dev);
-
-char * qemuBuildSoundDevStr(virDomainSoundDefPtr sound);
-
-/* Legacy, pre device support */
-char * qemuBuildPCIHostdevPCIDevStr(virDomainHostdevDefPtr dev);
-/* Current, best practice */
-char * qemuBuildPCIHostdevDevStr(virDomainHostdevDefPtr dev,
-                                 const char *configfd);
-
-int qemudOpenPCIConfig(virDomainHostdevDefPtr dev);
-
-/* Current, best practice */
-char * qemuBuildChrChardevStr(virDomainChrDefPtr dev);
-/* Legacy, pre device support */
-char * qemuBuildChrArgStr(virDomainChrDefPtr dev, const char *prefix);
-
-char * qemuBuildVirtioSerialPortDevStr(virDomainChrDefPtr dev);
-
-/* Legacy, pre device support */
-char * qemuBuildUSBHostdevUsbDevStr(virDomainHostdevDefPtr dev);
-/* Current, best practice */
-char * qemuBuildUSBHostdevDevStr(virDomainHostdevDefPtr dev);
-
-
-
-int         qemudNetworkIfaceConnect    (virConnectPtr conn,
-                                         struct qemud_driver *driver,
-                                         virDomainNetDefPtr net,
-                                         unsigned long long qemuCmdFlags)
-    ATTRIBUTE_NONNULL(1);
-
-int
-qemudOpenVhostNet(virDomainNetDefPtr net,
-                  unsigned long long qemuCmdFlags);
-
-int qemudPhysIfaceConnect(virConnectPtr conn,
-                          struct qemud_driver *driver,
-                          virDomainNetDefPtr net,
-                          unsigned long long qemuCmdFlags,
-                          const unsigned char *vmuuid);
-
-int         qemudProbeMachineTypes      (const char *binary,
-                                         virCapsGuestMachinePtr **machines,
-                                         int *nmachines);
-
-int         qemudProbeCPUModels         (const char *qemu,
-                                         unsigned long long qemuCmdFlags,
-                                         const char *arch,
-                                         unsigned int *count,
-                                         const char ***cpus);
-
-int         qemudCanonicalizeMachine    (struct qemud_driver *driver,
-                                         virDomainDefPtr def);
-
-virDomainDefPtr qemuParseCommandLine(virCapsPtr caps,
-                                     const char **progenv,
-                                     const char **progargv);
-virDomainDefPtr qemuParseCommandLineString(virCapsPtr caps,
-                                           const char *args);
-
-qemuDomainPCIAddressSetPtr qemuDomainPCIAddressSetCreate(virDomainDefPtr def);
-int qemuDomainPCIAddressReserveSlot(qemuDomainPCIAddressSetPtr addrs,
-                                    int slot);
-int qemuDomainPCIAddressReserveAddr(qemuDomainPCIAddressSetPtr addrs,
-                                    virDomainDeviceInfoPtr dev);
-int qemuDomainPCIAddressSetNextAddr(qemuDomainPCIAddressSetPtr addrs,
-                                    virDomainDeviceInfoPtr dev);
-int qemuDomainPCIAddressEnsureAddr(qemuDomainPCIAddressSetPtr addrs,
-                                   virDomainDeviceInfoPtr dev);
-int qemuDomainPCIAddressReleaseAddr(qemuDomainPCIAddressSetPtr addrs,
-                                    virDomainDeviceInfoPtr dev);
-
-void qemuDomainPCIAddressSetFree(qemuDomainPCIAddressSetPtr addrs);
-int  qemuAssignDevicePCISlots(virDomainDefPtr def, qemuDomainPCIAddressSetPtr addrs);
-
-int qemuDomainNetVLAN(virDomainNetDefPtr def);
-int qemuAssignDeviceNetAlias(virDomainDefPtr def, virDomainNetDefPtr net, int idx);
-int qemuAssignDeviceDiskAlias(virDomainDiskDefPtr def, unsigned long long qemuCmdFlags);
-int qemuAssignDeviceHostdevAlias(virDomainDefPtr def, virDomainHostdevDefPtr net, int idx);
-int qemuAssignDeviceControllerAlias(virDomainControllerDefPtr controller);
-
-int
-qemuParseKeywords(const char *str,
-                  char ***retkeywords,
-                  char ***retvalues,
-                  int allowEmptyValue);
-
-
+int qemuGetDomainHupageMemPath(const virDomainDef *def,
+                               virQEMUDriverConfigPtr cfg,
+                               unsigned long long pagesize,
+                               char **memPath);
 #endif /* __QEMUD_CONF_H */

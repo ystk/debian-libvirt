@@ -1,9 +1,8 @@
-
 /*
  * esx_util.c: utility functions for the VMware ESX driver
  *
- * Copyright (C) 2010 Red Hat, Inc.
- * Copyright (C) 2009 Matthias Bolte <matthias.bolte@googlemail.com>
+ * Copyright (C) 2010-2012 Red Hat, Inc.
+ * Copyright (C) 2009-2011 Matthias Bolte <matthias.bolte@googlemail.com>
  * Copyright (C) 2009 Maximilian Wilhelm <max@rfc2324.org>
  *
  * This library is free software; you can redistribute it and/or
@@ -17,8 +16,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,86 +27,63 @@
 
 #include "internal.h"
 #include "datatypes.h"
-#include "qparams.h"
-#include "util.h"
-#include "memory.h"
-#include "logging.h"
-#include "uuid.h"
+#include "viralloc.h"
+#include "virlog.h"
+#include "viruuid.h"
+#include "vmx.h"
 #include "esx_private.h"
 #include "esx_util.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_ESX
 
-
+VIR_LOG_INIT("esx.esx_util");
 
 int
-esxUtil_ParseUri(esxUtil_ParsedUri **parsedUri, xmlURIPtr uri)
+esxUtil_ParseUri(esxUtil_ParsedUri **parsedUri, virURIPtr uri)
 {
     int result = -1;
-    struct qparam_set *queryParamSet = NULL;
-    struct qparam *queryParam = NULL;
-    int i;
+    size_t i;
     int noVerify;
     int autoAnswer;
     char *tmp;
-    char *saveptr;
 
-    if (parsedUri == NULL || *parsedUri != NULL) {
-        ESX_VI_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if (!parsedUri || *parsedUri) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (VIR_ALLOC(*parsedUri) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(*parsedUri) < 0)
         return -1;
-    }
 
-#ifdef HAVE_XMLURI_QUERY_RAW
-    queryParamSet = qparam_query_parse(uri->query_raw);
-#else
-    queryParamSet = qparam_query_parse(uri->query);
-#endif
-
-    if (queryParamSet == NULL) {
-        goto cleanup;
-    }
-
-    for (i = 0; i < queryParamSet->n; i++) {
-        queryParam = &queryParamSet->p[i];
+    for (i = 0; i < uri->paramsCount; i++) {
+        virURIParamPtr queryParam = &uri->params[i];
 
         if (STRCASEEQ(queryParam->name, "transport")) {
             VIR_FREE((*parsedUri)->transport);
 
-            (*parsedUri)->transport = strdup(queryParam->value);
-
-            if ((*parsedUri)->transport == NULL) {
-                virReportOOMError();
+            if (VIR_STRDUP((*parsedUri)->transport, queryParam->value) < 0)
                 goto cleanup;
-            }
 
             if (STRNEQ((*parsedUri)->transport, "http") &&
                 STRNEQ((*parsedUri)->transport, "https")) {
-                ESX_ERROR(VIR_ERR_INVALID_ARG,
-                          _("Query parameter 'transport' has unexpected value "
-                            "'%s' (should be http|https)"),
-                          (*parsedUri)->transport);
+                virReportError(VIR_ERR_INVALID_ARG,
+                               _("Query parameter 'transport' has unexpected value "
+                                 "'%s' (should be http|https)"),
+                               (*parsedUri)->transport);
                 goto cleanup;
             }
         } else if (STRCASEEQ(queryParam->name, "vcenter")) {
             VIR_FREE((*parsedUri)->vCenter);
 
-            (*parsedUri)->vCenter = strdup(queryParam->value);
-
-            if ((*parsedUri)->vCenter == NULL) {
-                virReportOOMError();
+            if (VIR_STRDUP((*parsedUri)->vCenter, queryParam->value) < 0)
                 goto cleanup;
-            }
         } else if (STRCASEEQ(queryParam->name, "no_verify")) {
             if (virStrToLong_i(queryParam->value, NULL, 10, &noVerify) < 0 ||
                 (noVerify != 0 && noVerify != 1)) {
-                ESX_ERROR(VIR_ERR_INVALID_ARG,
-                          _("Query parameter 'no_verify' has unexpected value "
-                            "'%s' (should be 0 or 1)"), queryParam->value);
+                virReportError(VIR_ERR_INVALID_ARG,
+                               _("Query parameter 'no_verify' has unexpected value "
+                                 "'%s' (should be 0 or 1)"), queryParam->value);
                 goto cleanup;
             }
 
@@ -115,9 +91,9 @@ esxUtil_ParseUri(esxUtil_ParsedUri **parsedUri, xmlURIPtr uri)
         } else if (STRCASEEQ(queryParam->name, "auto_answer")) {
             if (virStrToLong_i(queryParam->value, NULL, 10, &autoAnswer) < 0 ||
                 (autoAnswer != 0 && autoAnswer != 1)) {
-                ESX_ERROR(VIR_ERR_INVALID_ARG,
-                          _("Query parameter 'auto_answer' has unexpected "
-                            "value '%s' (should be 0 or 1)"), queryParam->value);
+                virReportError(VIR_ERR_INVALID_ARG,
+                               _("Query parameter 'auto_answer' has unexpected "
+                                 "value '%s' (should be 0 or 1)"), queryParam->value);
                 goto cleanup;
             }
 
@@ -129,39 +105,35 @@ esxUtil_ParseUri(esxUtil_ParsedUri **parsedUri, xmlURIPtr uri)
             VIR_FREE((*parsedUri)->proxy_hostname);
             (*parsedUri)->proxy_port = 1080;
 
-            if ((tmp = STRSKIP(queryParam->value, "http://")) != NULL) {
+            if ((tmp = STRSKIP(queryParam->value, "http://"))) {
                 (*parsedUri)->proxy_type = CURLPROXY_HTTP;
-            } else if ((tmp = STRSKIP(queryParam->value, "socks://")) != NULL ||
-                       (tmp = STRSKIP(queryParam->value, "socks5://")) != NULL) {
+            } else if ((tmp = STRSKIP(queryParam->value, "socks://")) ||
+                       (tmp = STRSKIP(queryParam->value, "socks5://"))) {
                 (*parsedUri)->proxy_type = CURLPROXY_SOCKS5;
-            } else if ((tmp = STRSKIP(queryParam->value, "socks4://")) != NULL) {
+            } else if ((tmp = STRSKIP(queryParam->value, "socks4://"))) {
                 (*parsedUri)->proxy_type = CURLPROXY_SOCKS4;
-            } else if ((tmp = STRSKIP(queryParam->value, "socks4a://")) != NULL) {
+            } else if ((tmp = STRSKIP(queryParam->value, "socks4a://"))) {
                 (*parsedUri)->proxy_type = CURLPROXY_SOCKS4A;
-            } else if ((tmp = strstr(queryParam->value, "://")) != NULL) {
+            } else if ((tmp = strstr(queryParam->value, "://"))) {
                 *tmp = '\0';
 
-                ESX_ERROR(VIR_ERR_INVALID_ARG,
-                          _("Query parameter 'proxy' contains unexpected "
-                            "type '%s' (should be (http|socks(|4|4a|5))"),
-                          queryParam->value);
+                virReportError(VIR_ERR_INVALID_ARG,
+                               _("Query parameter 'proxy' contains unexpected "
+                                 "type '%s' (should be (http|socks(|4|4a|5))"),
+                               queryParam->value);
                 goto cleanup;
             } else {
                 tmp = queryParam->value;
             }
 
-            (*parsedUri)->proxy_hostname = strdup(tmp);
-
-            if ((*parsedUri)->proxy_hostname == NULL) {
-                virReportOOMError();
+            if (VIR_STRDUP((*parsedUri)->proxy_hostname, tmp) < 0)
                 goto cleanup;
-            }
 
-            if ((tmp = strchr((*parsedUri)->proxy_hostname, ':')) != NULL) {
+            if ((tmp = strchr((*parsedUri)->proxy_hostname, ':'))) {
                 if (tmp == (*parsedUri)->proxy_hostname) {
-                    ESX_ERROR(VIR_ERR_INVALID_ARG, "%s",
-                              _("Query parameter 'proxy' doesn't contain a "
-                                "hostname"));
+                    virReportError(VIR_ERR_INVALID_ARG, "%s",
+                                   _("Query parameter 'proxy' doesn't contain a "
+                                     "hostname"));
                     goto cleanup;
                 }
 
@@ -171,9 +143,10 @@ esxUtil_ParseUri(esxUtil_ParsedUri **parsedUri, xmlURIPtr uri)
                                    &(*parsedUri)->proxy_port) < 0 ||
                     (*parsedUri)->proxy_port < 1 ||
                     (*parsedUri)->proxy_port > 65535) {
-                    ESX_ERROR(VIR_ERR_INVALID_ARG,
-                              _("Query parameter 'proxy' has unexpected port"
-                                "value '%s' (should be [1..65535])"), tmp);
+                    virReportError(VIR_ERR_INVALID_ARG,
+                                   _("Query parameter 'proxy' has unexpected "
+                                     "port value '%s' (should be [1..65535])"),
+                                   tmp);
                     goto cleanup;
                 }
             }
@@ -183,47 +156,18 @@ esxUtil_ParseUri(esxUtil_ParsedUri **parsedUri, xmlURIPtr uri)
         }
     }
 
-    /* Expected format: [/]<datacenter>/<computeresource>[/<hostsystem>] */
-    if (uri->path != NULL) {
-        tmp = strdup(uri->path);
+    if (VIR_STRDUP((*parsedUri)->path, uri->path) < 0)
+        goto cleanup;
 
-        if (tmp == NULL) {
-            virReportOOMError();
-            goto cleanup;
-        }
-
-        if (esxVI_String_DeepCopyValue(&(*parsedUri)->path_datacenter,
-                                       strtok_r(tmp, "/", &saveptr)) < 0 ||
-            esxVI_String_DeepCopyValue(&(*parsedUri)->path_computeResource,
-                                       strtok_r(NULL, "/", &saveptr)) < 0 ||
-            esxVI_String_DeepCopyValue(&(*parsedUri)->path_hostSystem,
-                                       strtok_r(NULL, "", &saveptr)) < 0) {
-            VIR_FREE(tmp);
-            goto cleanup;
-        }
-
-        VIR_FREE(tmp);
-    }
-
-    if ((*parsedUri)->transport == NULL) {
-        (*parsedUri)->transport = strdup("https");
-
-        if ((*parsedUri)->transport == NULL) {
-            virReportOOMError();
-            goto cleanup;
-        }
-    }
+    if (!(*parsedUri)->transport &&
+        VIR_STRDUP((*parsedUri)->transport, "https") < 0)
+        goto cleanup;
 
     result = 0;
 
-  cleanup:
-    if (result < 0) {
+ cleanup:
+    if (result < 0)
         esxUtil_FreeParsedUri(parsedUri);
-    }
-
-    if (queryParamSet != NULL) {
-        free_qparam_set(queryParamSet);
-    }
 
     return result;
 }
@@ -234,16 +178,13 @@ esxUtil_ParseUri(esxUtil_ParsedUri **parsedUri, xmlURIPtr uri)
 void
 esxUtil_FreeParsedUri(esxUtil_ParsedUri **parsedUri)
 {
-    if (parsedUri == NULL || *parsedUri == NULL) {
+    if (!parsedUri || !(*parsedUri))
         return;
-    }
 
     VIR_FREE((*parsedUri)->transport);
     VIR_FREE((*parsedUri)->vCenter);
     VIR_FREE((*parsedUri)->proxy_hostname);
-    VIR_FREE((*parsedUri)->path_datacenter);
-    VIR_FREE((*parsedUri)->path_computeResource);
-    VIR_FREE((*parsedUri)->path_hostSystem);
+    VIR_FREE((*parsedUri)->path);
 
     VIR_FREE(*parsedUri);
 }
@@ -254,18 +195,16 @@ int
 esxUtil_ParseVirtualMachineIDString(const char *id_string, int *id)
 {
     /* Try to parse an integer from the complete string. */
-    if (virStrToLong_i(id_string, NULL, 10, id) == 0) {
+    if (virStrToLong_i(id_string, NULL, 10, id) == 0)
         return 0;
-    }
 
     /*
      * If that fails try to parse an integer from the string tail
      * assuming the naming scheme Virtual Center seems to use.
      */
     if (STRPREFIX(id_string, "vm-")) {
-        if (virStrToLong_i(id_string + 3, NULL, 10, id) == 0) {
+        if (virStrToLong_i(id_string + 3, NULL, 10, id) == 0)
             return 0;
-        }
     }
 
     return -1;
@@ -275,75 +214,76 @@ esxUtil_ParseVirtualMachineIDString(const char *id_string, int *id)
 
 int
 esxUtil_ParseDatastorePath(const char *datastorePath, char **datastoreName,
-                           char **directoryName, char **fileName)
+                           char **directoryName, char **directoryAndFileName)
 {
     int result = -1;
     char *copyOfDatastorePath = NULL;
     char *tmp = NULL;
     char *saveptr = NULL;
     char *preliminaryDatastoreName = NULL;
-    char *directoryAndFileName = NULL;
-    char *separator = NULL;
+    char *preliminaryDirectoryAndFileName = NULL;
 
-    if (datastoreName == NULL || *datastoreName != NULL ||
-        directoryName == NULL || *directoryName != NULL ||
-        fileName == NULL || *fileName != NULL) {
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
+    if ((datastoreName && *datastoreName) ||
+        (directoryName && *directoryName) ||
+        (directoryAndFileName && *directoryAndFileName)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s", _("Invalid argument"));
         return -1;
     }
 
-    if (esxVI_String_DeepCopyValue(&copyOfDatastorePath, datastorePath) < 0) {
+    if (VIR_STRDUP(copyOfDatastorePath, datastorePath) < 0)
+        goto cleanup;
+
+    /* Expected format: '[<datastore>] <path>' where <path> is optional */
+    if (!(tmp = STRSKIP(copyOfDatastorePath, "[")) || *tmp == ']' ||
+        !(preliminaryDatastoreName = strtok_r(tmp, "]", &saveptr))) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Datastore path '%s' doesn't have expected format "
+                         "'[<datastore>] <path>'"), datastorePath);
         goto cleanup;
     }
 
-    /* Expected format: '[<datastore>] <path>' */
-    if ((tmp = STRSKIP(copyOfDatastorePath, "[")) == NULL ||
-        (preliminaryDatastoreName = strtok_r(tmp, "]", &saveptr)) == NULL ||
-        (directoryAndFileName = strtok_r(NULL, "", &saveptr)) == NULL) {
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("Datastore path '%s' doesn't have expected format "
-                    "'[<datastore>] <path>'"), datastorePath);
+    if (datastoreName &&
+        VIR_STRDUP(*datastoreName, preliminaryDatastoreName) < 0) {
         goto cleanup;
     }
 
-    if (esxVI_String_DeepCopyValue(datastoreName,
-                                   preliminaryDatastoreName) < 0) {
-        goto cleanup;
-    }
+    preliminaryDirectoryAndFileName = strtok_r(NULL, "", &saveptr);
 
-    directoryAndFileName += strspn(directoryAndFileName, " ");
-
-    /* Split <path> into <directory>/<file>, where <directory> is optional */
-    separator = strrchr(directoryAndFileName, '/');
-
-    if (separator != NULL) {
-        *separator++ = '\0';
-
-        if (*separator == '\0') {
-            ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                      _("Datastore path '%s' doesn't reference a file"),
-                      datastorePath);
-            goto cleanup;
-        }
-
-        if (esxVI_String_DeepCopyValue(directoryName,
-                                       directoryAndFileName) < 0 ||
-            esxVI_String_DeepCopyValue(fileName, separator) < 0) {
-            goto cleanup;
-        }
+    if (!preliminaryDirectoryAndFileName) {
+        preliminaryDirectoryAndFileName = (char *)"";
     } else {
-        if (esxVI_String_DeepCopyValue(fileName, directoryAndFileName) < 0) {
+        preliminaryDirectoryAndFileName +=
+          strspn(preliminaryDirectoryAndFileName, " ");
+    }
+
+    if (directoryAndFileName &&
+        VIR_STRDUP(*directoryAndFileName, preliminaryDirectoryAndFileName) < 0) {
+        goto cleanup;
+    }
+
+    if (directoryName) {
+        /* Split <path> into <directory>/<file> and remove /<file> */
+        tmp = strrchr(preliminaryDirectoryAndFileName, '/');
+
+        if (tmp)
+            *tmp = '\0';
+
+        if (VIR_STRDUP(*directoryName, preliminaryDirectoryAndFileName) < 0)
             goto cleanup;
-        }
     }
 
     result = 0;
 
-  cleanup:
+ cleanup:
     if (result < 0) {
-        VIR_FREE(*datastoreName);
-        VIR_FREE(*directoryName);
-        VIR_FREE(*fileName);
+        if (datastoreName)
+            VIR_FREE(*datastoreName);
+
+        if (directoryName)
+            VIR_FREE(*directoryName);
+
+        if (directoryAndFileName)
+            VIR_FREE(*directoryAndFileName);
     }
 
     VIR_FREE(copyOfDatastorePath);
@@ -361,7 +301,7 @@ esxUtil_ResolveHostname(const char *hostname,
     struct addrinfo *result = NULL;
     int errcode;
 
-    memset(&hints, 0, sizeof (hints));
+    memset(&hints, 0, sizeof(hints));
 
     hints.ai_flags = AI_ADDRCONFIG;
     hints.ai_family = AF_INET;
@@ -371,16 +311,16 @@ esxUtil_ResolveHostname(const char *hostname,
     errcode = getaddrinfo(hostname, NULL, &hints, &result);
 
     if (errcode != 0) {
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("IP address lookup for host '%s' failed: %s"), hostname,
-                  gai_strerror(errcode));
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("IP address lookup for host '%s' failed: %s"), hostname,
+                       gai_strerror(errcode));
         return -1;
     }
 
-    if (result == NULL) {
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("No IP address for host '%s' found: %s"), hostname,
-                  gai_strerror(errcode));
+    if (!result) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("No IP address for host '%s' found: %s"), hostname,
+                       gai_strerror(errcode));
         return -1;
     }
 
@@ -388,9 +328,9 @@ esxUtil_ResolveHostname(const char *hostname,
                           ipAddress_length, NULL, 0, NI_NUMERICHOST);
 
     if (errcode != 0) {
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("Formating IP address for host '%s' failed: %s"), hostname,
-                  gai_strerror(errcode));
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Formatting IP address for host '%s' failed: %s"), hostname,
+                       gai_strerror(errcode));
         freeaddrinfo(result);
         return -1;
     }
@@ -403,191 +343,144 @@ esxUtil_ResolveHostname(const char *hostname,
 
 
 int
-esxUtil_GetConfigString(virConfPtr conf, const char *name, char **string,
-                        bool optional)
+esxUtil_ReformatUuid(const char *input, char *output)
 {
-    virConfValuePtr value;
+    unsigned char uuid[VIR_UUID_BUFLEN];
 
-    *string = NULL;
-    value = virConfGetValue(conf, name);
-
-    if (value == NULL) {
-        if (optional) {
-            return 0;
-        }
-
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("Missing essential config entry '%s'"), name);
+    if (virUUIDParse(input, uuid) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Could not parse UUID from string '%s'"),
+                       input);
         return -1;
     }
 
-    if (value->type != VIR_CONF_STRING) {
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("Config entry '%s' must be a string"), name);
-        return -1;
-    }
-
-    if (value->str == NULL) {
-        if (optional) {
-            return 0;
-        }
-
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("Missing essential config entry '%s'"), name);
-        return -1;
-    }
-
-    *string = strdup(value->str);
-
-    if (*string == NULL) {
-        virReportOOMError();
-        return -1;
-    }
+    virUUIDFormat(uuid, output);
 
     return 0;
 }
 
 
 
-int
-esxUtil_GetConfigUUID(virConfPtr conf, const char *name, unsigned char *uuid,
-                      bool optional)
+char *
+esxUtil_EscapeBase64(const char *string)
 {
-    virConfValuePtr value;
+    /* 'normal' characters don't get base64 encoded */
+    static const char *normal =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'(),. _-";
 
-    value = virConfGetValue(conf, name);
+    /* VMware uses ',' instead of the path separator '/' in the base64 alphabet */
+    static const char *base64 =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+,";
 
-    if (value == NULL) {
-        if (optional) {
-            return 0;
+    virBuffer buffer = VIR_BUFFER_INITIALIZER;
+    const char *tmp1 = string;
+    size_t length;
+    unsigned char c1, c2, c3;
+
+    /* Escape sequences of non-'normal' characters as base64 without padding */
+    while (*tmp1 != '\0') {
+        length = strspn(tmp1, normal);
+
+        if (length > 0) {
+            virBufferAdd(&buffer, tmp1, length);
+
+            tmp1 += length;
         } else {
-            ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                      _("Missing essential config entry '%s'"), name);
-            return -1;
-        }
-    }
+            length = strcspn(tmp1, normal);
 
-    if (value->type != VIR_CONF_STRING) {
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("Config entry '%s' must be a string"), name);
-        return -1;
-    }
+            virBufferAddChar(&buffer, '+');
 
-    if (value->str == NULL) {
-        if (optional) {
-            return 0;
-        } else {
-            ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                      _("Missing essential config entry '%s'"), name);
-            return -1;
-        }
-    }
+            while (length > 0) {
+                c1 = *tmp1++;
+                c2 = length > 1 ? *tmp1++ : 0;
+                c3 = length > 2 ? *tmp1++ : 0;
 
-    if (virUUIDParse(value->str, uuid) < 0) {
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("Could not parse UUID from string '%s'"), value->str);
-        return -1;
-    }
+                virBufferAddChar(&buffer, base64[(c1 >> 2) & 0x3f]);
+                virBufferAddChar(&buffer, base64[((c1 << 4) + (c2 >> 4)) & 0x3f]);
 
-    return 0;
-}
+                if (length > 1)
+                    virBufferAddChar(&buffer, base64[((c2 << 2) + (c3 >> 6)) & 0x3f]);
 
+                if (length > 2)
+                    virBufferAddChar(&buffer, base64[c3 & 0x3f]);
 
-
-int
-esxUtil_GetConfigLong(virConfPtr conf, const char *name, long long *number,
-                      long long default_, bool optional)
-{
-    virConfValuePtr value;
-
-    *number = default_;
-    value = virConfGetValue(conf, name);
-
-    if (value == NULL) {
-        if (optional) {
-            return 0;
-        } else {
-            ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                      _("Missing essential config entry '%s'"), name);
-            return -1;
-        }
-    }
-
-    if (value->type == VIR_CONF_STRING) {
-        if (value->str == NULL) {
-            if (optional) {
-                return 0;
-            } else {
-                ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                          _("Missing essential config entry '%s'"), name);
-                return -1;
+                length -= length > 3 ? 3 : length;
             }
-        }
 
-        if (STREQ(value->str, "unlimited")) {
-            *number = -1;
-        } else if (virStrToLong_ll(value->str, NULL, 10, number) < 0) {
-            ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                      _("Config entry '%s' must represent an integer value"),
-                      name);
-            return -1;
+            if (*tmp1 != '\0')
+                virBufferAddChar(&buffer, '-');
         }
-    } else {
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("Config entry '%s' must be a string"), name);
-        return -1;
     }
 
-    return 0;
+    if (virBufferCheckError(&buffer) < 0)
+        return NULL;
+
+    return virBufferContentAndReset(&buffer);
 }
 
 
 
-int
-esxUtil_GetConfigBoolean(virConfPtr conf, const char *name, bool *boolean_,
-                         bool default_, bool optional)
+void
+esxUtil_ReplaceSpecialWindowsPathChars(char *string)
 {
-    virConfValuePtr value;
+    /* '/' and '\\' are missing on purpose */
+    static const char *specials = "\"*<>:|?";
 
-    *boolean_ = default_;
-    value = virConfGetValue(conf, name);
+    char *tmp = string;
+    size_t length;
 
-    if (value == NULL) {
-        if (optional) {
-            return 0;
-        } else {
-            ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                      _("Missing essential config entry '%s'"), name);
-            return -1;
+    while (*tmp != '\0') {
+        length = strspn(tmp, specials);
+
+        while (length > 0) {
+            *tmp++ = '_';
+            --length;
         }
+
+        if (*tmp != '\0')
+            ++tmp;
     }
+}
 
-    if (value->type == VIR_CONF_STRING) {
-        if (value->str == NULL) {
-            if (optional) {
-                return 0;
-            } else {
-                ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                          _("Missing essential config entry '%s'"), name);
-                return -1;
-            }
-        }
 
-        if (STRCASEEQ(value->str, "true")) {
-            *boolean_ = 1;
-        } else if (STRCASEEQ(value->str, "false")) {
-            *boolean_ = 0;
-        } else {
-            ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                      _("Config entry '%s' must represent a boolean value "
-                        "(true|false)"), name);
-            return -1;
-        }
-    } else {
-        ESX_ERROR(VIR_ERR_INTERNAL_ERROR,
-                  _("Config entry '%s' must be a string"), name);
-        return -1;
-    }
 
-    return 0;
+char *
+esxUtil_EscapeDatastoreItem(const char *string)
+{
+    char *replaced;
+    char *escaped1;
+    char *escaped2 = NULL;
+
+    if (VIR_STRDUP(replaced, string) < 0)
+        return NULL;
+
+    esxUtil_ReplaceSpecialWindowsPathChars(replaced);
+
+    escaped1 = virVMXEscapeHexPercent(replaced);
+
+    if (!escaped1)
+        goto cleanup;
+
+    escaped2 = esxUtil_EscapeBase64(escaped1);
+
+ cleanup:
+    VIR_FREE(replaced);
+    VIR_FREE(escaped1);
+
+    return escaped2;
+}
+
+
+
+char *
+esxUtil_EscapeForXml(const char *string)
+{
+    virBuffer buffer = VIR_BUFFER_INITIALIZER;
+
+    virBufferEscapeString(&buffer, "%s", string);
+
+    if (virBufferCheckError(&buffer) < 0)
+        return NULL;
+
+    return virBufferContentAndReset(&buffer);
 }

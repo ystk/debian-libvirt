@@ -1,9 +1,21 @@
 /*
- * xen_unified.c: Unified Xen driver.
+ * xen_driver.h: Unified Xen driver.
  *
- * Copyright (C) 2007 Red Hat, Inc.
+ * Copyright (C) 2007, 2010-2011 Red Hat, Inc.
  *
- * See COPYING.LIB for the License of this software
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Richard W.M. Jones <rjones@redhat.com>
  */
@@ -20,7 +32,7 @@
 #  include "xen_inotify.h"
 # endif
 # include "domain_event.h"
-# include "hash.h"
+# include "virhash.h"
 
 # ifndef HAVE_WINSOCK2_H
 #  include <sys/un.h>
@@ -29,84 +41,49 @@
 #  include <winsock2.h>
 # endif
 
-extern int xenRegister (void);
+# include <xen/xen.h>
+
+/* xen-unstable changeset 19788 removed MAX_VIRT_CPUS from public
+ * headers.  Its semantic was retained with XEN_LEGACY_MAX_VCPUS.
+ * Ensure MAX_VIRT_CPUS is defined accordingly.
+ */
+# if !defined(MAX_VIRT_CPUS) && defined(XEN_LEGACY_MAX_VCPUS)
+#  define MAX_VIRT_CPUS XEN_LEGACY_MAX_VCPUS
+# endif
+
+int xenRegister (void);
 
 # define XEN_UNIFIED_HYPERVISOR_OFFSET 0
-# define XEN_UNIFIED_PROXY_OFFSET 1
-# define XEN_UNIFIED_XEND_OFFSET 2
-# define XEN_UNIFIED_XS_OFFSET 3
-# define XEN_UNIFIED_XM_OFFSET 4
+# define XEN_UNIFIED_XEND_OFFSET 1
+# define XEN_UNIFIED_XS_OFFSET 2
+# define XEN_UNIFIED_XM_OFFSET 3
 
 # if WITH_XEN_INOTIFY
-#  define XEN_UNIFIED_INOTIFY_OFFSET 5
-#  define XEN_UNIFIED_NR_DRIVERS 6
-# else
+#  define XEN_UNIFIED_INOTIFY_OFFSET 4
 #  define XEN_UNIFIED_NR_DRIVERS 5
+# else
+#  define XEN_UNIFIED_NR_DRIVERS 4
 # endif
 
 # define MIN_XEN_GUEST_SIZE 64  /* 64 megabytes */
 
-# define XEN_CONFIG_FORMAT_XM    "xen-xm"
-# define XEN_CONFIG_FORMAT_SEXPR "xen-sxpr"
-
 # define XEND_DOMAINS_DIR "/var/lib/xend/domains"
 
-/* _xenUnifiedDriver:
- *
- * Entry points into the underlying Xen drivers.  This structure
- * will eventually go away and instead xen unified will make direct
- * calls to the underlying Xen drivers.
- *
- * To reiterate - the goal is to remove elements from this structure
- * until it is empty, replacing indirect calls through this
- * structure with direct calls in xen_unified.c.
- */
-struct xenUnifiedDriver {
-        virDrvOpen			open;
-        virDrvClose			close;
-        virDrvGetVersion		version;
-    virDrvGetHostname       getHostname;
-        virDrvNodeGetInfo		nodeGetInfo;
-        virDrvGetCapabilities		getCapabilities;
-        virDrvListDomains		listDomains;
-        virDrvNumOfDomains		numOfDomains;
-        virDrvDomainCreateXML		domainCreateXML;
-        virDrvDomainSuspend		domainSuspend;
-        virDrvDomainResume		domainResume;
-        virDrvDomainShutdown		domainShutdown;
-        virDrvDomainReboot		domainReboot;
-        virDrvDomainDestroy		domainDestroy;
-        virDrvDomainGetOSType		domainGetOSType;
-        virDrvDomainGetMaxMemory	domainGetMaxMemory;
-        virDrvDomainSetMaxMemory	domainSetMaxMemory;
-        virDrvDomainSetMemory		domainSetMemory;
-        virDrvDomainGetInfo		domainGetInfo;
-        virDrvDomainSave		domainSave;
-        virDrvDomainRestore		domainRestore;
-        virDrvDomainCoreDump		domainCoreDump;
-        virDrvDomainSetVcpus		domainSetVcpus;
-        virDrvDomainPinVcpu		domainPinVcpu;
-        virDrvDomainGetVcpus		domainGetVcpus;
-        virDrvDomainGetMaxVcpus		domainGetMaxVcpus;
-        virDrvListDefinedDomains	listDefinedDomains;
-        virDrvNumOfDefinedDomains	numOfDefinedDomains;
-        virDrvDomainCreate		domainCreate;
-        virDrvDomainDefineXML           domainDefineXML;
-        virDrvDomainUndefine            domainUndefine;
-        virDrvDomainAttachDeviceFlags	domainAttachDeviceFlags;
-        virDrvDomainDetachDeviceFlags	domainDetachDeviceFlags;
-        virDrvDomainUpdateDeviceFlags	domainUpdateDeviceFlags;
-        virDrvDomainGetAutostart	domainGetAutostart;
-        virDrvDomainSetAutostart	domainSetAutostart;
-        virDrvDomainGetSchedulerType	domainGetSchedulerType;
-        virDrvDomainGetSchedulerParameters domainGetSchedulerParameters;
-        virDrvDomainSetSchedulerParameters domainSetSchedulerParameters;
-};
+# define XEN_SCHED_SEDF_NPARAM   6
+# define XEN_SCHED_CRED_NPARAM   2
+
+/* The set of migration flags explicitly supported by xen.  */
+# define XEN_MIGRATION_FLAGS                    \
+    (VIR_MIGRATE_LIVE |                         \
+     VIR_MIGRATE_UNDEFINE_SOURCE |              \
+     VIR_MIGRATE_PAUSED |                       \
+     VIR_MIGRATE_PERSIST_DEST)
+
 
 typedef struct xenXMConfCache *xenXMConfCachePtr;
 typedef struct xenXMConfCache {
     time_t refreshedAt;
-    char filename[PATH_MAX];
+    char *filename;
     virDomainDefPtr def;
 } xenXMConfCache;
 
@@ -124,7 +101,7 @@ typedef struct _xenUnifiedDomainInfo xenUnifiedDomainInfo;
 typedef xenUnifiedDomainInfo *xenUnifiedDomainInfoPtr;
 
 struct _xenUnifiedDomainInfoList {
-    unsigned int count;
+    size_t count;
     xenUnifiedDomainInfoPtr *doms;
 };
 typedef struct _xenUnifiedDomainInfoList xenUnifiedDomainInfoList;
@@ -143,9 +120,8 @@ struct _xenUnifiedPrivate {
      * holding the lock
      */
     virCapsPtr caps;
+    virDomainXMLOptionPtr xmlopt;
     int handle;			/* Xen hypervisor handle */
-
-    int xendConfigVersion;      /* XenD config version */
 
     /* connection to xend */
     struct sockaddr_storage addr;
@@ -167,8 +143,6 @@ struct _xenUnifiedPrivate {
 
     struct xs_handle *xshandle; /* handle to talk to the xenstore */
 
-    int proxy;                  /* fd of proxy. */
-
 
     /* A list of xenstore watches */
     xenStoreWatchListPtr xsWatchList;
@@ -180,20 +154,20 @@ struct _xenUnifiedPrivate {
     int nbNodeCells;
     int nbNodeCpus;
 
-    /* An list of callbacks */
-    virDomainEventCallbackListPtr domainEventCallbacks;
-    int domainEventDispatching;
+    virObjectEventStatePtr domainEvents;
 
     /* Location of config files, either /etc
      * or /var/lib/xen */
     const char *configDir;
+    /* Location of managed save dir, default /var/lib/libvirt/xen/save */
+    char *saveDir;
 
 # if WITH_XEN_INOTIFY
     /* The inotify fd */
     int inotifyFD;
     int inotifyWatch;
 
-    int  useXenConfigCache ;
+    int  useXenConfigCache;
     xenUnifiedDomainInfoListPtr configInfoList;
 # endif
 
@@ -208,7 +182,9 @@ struct _xenUnifiedPrivate {
 
 typedef struct _xenUnifiedPrivate *xenUnifiedPrivatePtr;
 
-char *xenDomainUsedCpus(virDomainPtr dom);
+char *xenDomainUsedCpus(virDomainPtr dom, virDomainDefPtr def);
+
+virDomainXMLOptionPtr xenDomainXMLConfInit(void);
 
 void xenUnifiedDomainInfoListFree(xenUnifiedDomainInfoListPtr info);
 int  xenUnifiedAddDomainInfo(xenUnifiedDomainInfoListPtr info,
@@ -218,15 +194,11 @@ int  xenUnifiedRemoveDomainInfo(xenUnifiedDomainInfoListPtr info,
                                 int id, char *name,
                                 unsigned char *uuid);
 void xenUnifiedDomainEventDispatch (xenUnifiedPrivatePtr priv,
-                                    virDomainEventPtr event);
+                                    virObjectEventPtr event);
 unsigned long xenUnifiedVersion(void);
+int xenUnifiedConnectGetMaxVcpus(virConnectPtr conn, const char *type);
 
-# ifndef PROXY
 void xenUnifiedLock(xenUnifiedPrivatePtr priv);
 void xenUnifiedUnlock(xenUnifiedPrivatePtr priv);
-# else
-#  define xenUnifiedLock(p) do {} while(0)
-#  define xenUnifiedUnlock(p) do {} while(0)
-# endif
 
 #endif /* __VIR_XEN_UNIFIED_H__ */
