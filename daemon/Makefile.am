@@ -1,51 +1,161 @@
 ## Process this file with automake to produce Makefile.in
 
+## Copyright (C) 2005-2015 Red Hat, Inc.
+##
+## This library is free software; you can redistribute it and/or
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+##
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+##
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library.  If not, see
+## <http://www.gnu.org/licenses/>.
+
+INCLUDES = \
+	-I$(top_builddir)/gnulib/lib -I$(top_srcdir)/gnulib/lib \
+	-I$(top_srcdir) \
+	-I$(top_builddir)/include -I$(top_srcdir)/include \
+	-I$(top_builddir)/src -I$(top_srcdir)/src \
+	-I$(top_srcdir)/src/util \
+	-I$(top_srcdir)/src/conf \
+	-I$(top_srcdir)/src/rpc \
+	-I$(top_srcdir)/src/remote \
+	-I$(top_srcdir)/src/admin \
+	-I$(top_srcdir)/src/access \
+	$(GETTEXT_CPPFLAGS)
+
+CLEANFILES =
+
+DAEMON_GENERATED =			\
+		remote_dispatch.h	\
+		lxc_dispatch.h		\
+		qemu_dispatch.h		\
+		admin_dispatch.h	\
+		$(NULL)
+
 DAEMON_SOURCES =					\
-		event.c event.h				\
 		libvirtd.c libvirtd.h			\
 		remote.c remote.h			\
-		dispatch.c dispatch.h			\
 		stream.c stream.h			\
-		remote_dispatch_prototypes.h		\
-		remote_dispatch_table.h			\
-		remote_dispatch_args.h			\
-		remote_dispatch_ret.h			\
-		qemu_dispatch_prototypes.h		\
-		qemu_dispatch_table.h			\
-		qemu_dispatch_args.h			\
-		qemu_dispatch_ret.h			\
-		../src/remote/remote_protocol.c		\
-		../src/remote/qemu_protocol.c
+		$(DAEMON_GENERATED)
 
-AVAHI_SOURCES =						\
-		mdns.c mdns.h
+LIBVIRTD_CONF_SOURCES = libvirtd-config.c libvirtd-config.h
+
+PODFILES = \
+	libvirtd.pod \
+	$(NULL)
+
+MANINFILES = \
+	libvirtd.8.in \
+	$(NULL)
 
 DISTCLEANFILES =
 EXTRA_DIST =						\
-	remote_generate_stubs.pl			\
+	remote_dispatch.h				\
+	lxc_dispatch.h					\
+	qemu_dispatch.h					\
+	admin_dispatch.h				\
 	libvirtd.conf					\
 	libvirtd.init.in				\
-	libvirtd.policy-0				\
-	libvirtd.policy-1				\
+	libvirtd.upstart				\
+	libvirtd.policy.in				\
+	libvirt.rules					\
 	libvirtd.sasl					\
+	libvirtd.service.in				\
+	virt-guest-shutdown.target		\
 	libvirtd.sysconf				\
+	libvirtd.sysctl					\
 	libvirtd.aug                                    \
+	libvirtd.logrotate.in                           \
 	libvirtd.qemu.logrotate.in                      \
 	libvirtd.lxc.logrotate.in                       \
+	libvirtd.libxl.logrotate.in                     \
 	libvirtd.uml.logrotate.in                       \
-	test_libvirtd.aug                               \
-	THREADING.txt					\
-	libvirt-guests.init.in				\
-	libvirt-guests.sysconf				\
-	libvirtd.pod.in					\
-	$(AVAHI_SOURCES)				\
-	$(DAEMON_SOURCES)
-
-man_MANS = libvirtd.8
+	test_libvirtd.aug.in                             \
+	THREADS.txt					\
+	$(PODFILES)					\
+	$(MANINFILES)					\
+	$(DAEMON_SOURCES)				\
+	$(LIBVIRTD_CONF_SOURCES)			\
+	$(NULL)
 
 BUILT_SOURCES =
 
+REMOTE_PROTOCOL = $(top_srcdir)/src/remote/remote_protocol.x
+LXC_PROTOCOL = $(top_srcdir)/src/remote/lxc_protocol.x
+QEMU_PROTOCOL = $(top_srcdir)/src/remote/qemu_protocol.x
+ADMIN_PROTOCOL = $(top_srcdir)/src/admin/admin_protocol.x
+
+remote_dispatch.h: $(top_srcdir)/src/rpc/gendispatch.pl \
+		$(REMOTE_PROTOCOL)
+	$(AM_V_GEN)$(PERL) -w $(top_srcdir)/src/rpc/gendispatch.pl \
+	  --mode=server remote REMOTE $(REMOTE_PROTOCOL) \
+	  > $(srcdir)/remote_dispatch.h
+
+lxc_dispatch.h: $(top_srcdir)/src/rpc/gendispatch.pl \
+		$(LXC_PROTOCOL)
+	$(AM_V_GEN)$(PERL) -w $(top_srcdir)/src/rpc/gendispatch.pl \
+	  --mode=server lxc LXC $(LXC_PROTOCOL) \
+	  > $(srcdir)/lxc_dispatch.h
+
+qemu_dispatch.h: $(top_srcdir)/src/rpc/gendispatch.pl \
+		$(QEMU_PROTOCOL)
+	$(AM_V_GEN)$(PERL) -w $(top_srcdir)/src/rpc/gendispatch.pl \
+	  --mode=server qemu QEMU $(QEMU_PROTOCOL) \
+	  > $(srcdir)/qemu_dispatch.h
+
+admin_dispatch.h: $(top_srcdir)/src/rpc/gendispatch.pl \
+		$(ADMIN_PROTOCOL)
+	$(AM_V_GEN)$(PERL) -w $(top_srcdir)/src/rpc/gendispatch.pl \
+	  --mode=server admin ADMIN $(ADMIN_PROTOCOL) \
+	  > $(srcdir)/admin_dispatch.h
+
 if WITH_LIBVIRTD
+
+# Build a convenience library, for reuse in tests/libvirtdconftest
+noinst_LTLIBRARIES = libvirtd_conf.la
+libvirtd_conf_la_SOURCES = $(LIBVIRTD_CONF_SOURCES)
+libvirtd_conf_la_CFLAGS = \
+	$(LIBXML_CFLAGS) \
+	$(XDR_CFLAGS) \
+	$(WARN_CFLAGS) $(PIE_CFLAGS) \
+	$(COVERAGE_CFLAGS) \
+	$(NULL)
+libvirtd_conf_la_LDFLAGS =				\
+	$(RELRO_LDFLAGS)				\
+	$(PIE_LDFLAGS)					\
+	$(COVERAGE_LDFLAGS)				\
+	$(NO_INDIRECT_LDFLAGS)				\
+	$(NULL)
+libvirtd_conf_la_LIBADD = $(LIBXML_LIBS)
+
+noinst_LTLIBRARIES += libvirtd_admin.la
+libvirtd_admin_la_SOURCES = \
+		admin.c admin.h admin_server.c admin_server.h
+
+libvirtd_admin_la_CFLAGS = \
+		$(AM_CFLAGS)		\
+		$(XDR_CFLAGS)		\
+		$(PIE_CFLAGS)		\
+		$(WARN_CFLAGS)		\
+		$(LIBXML_CFLAGS)	\
+		$(COVERAGE_CFLAGS)	\
+		$(NULL)
+libvirtd_admin_la_LDFLAGS = \
+		$(PIE_LDFLAGS)		\
+		$(RELRO_LDFLAGS)	\
+		$(COVERAGE_LDFLAGS)	\
+		$(NO_INDIRECT_LDFLAGS)  \
+		$(NULL)
+libvirtd_admin_la_LIBADD =	\
+		../src/libvirt-admin.la
+
+man8_MANS = libvirtd.8
 
 sbin_PROGRAMS = libvirtd
 
@@ -58,271 +168,383 @@ augeas_DATA = libvirtd.aug
 augeastestsdir = $(datadir)/augeas/lenses/tests
 augeastests_DATA = test_libvirtd.aug
 
-POD2MAN = pod2man -c "Virtualization Support" \
-			-r "$(PACKAGE)-$(VERSION)" -s 8
-
-libvirtd.pod: libvirtd.pod.in
-	sed \
-	    -e 's![@]sysconfdir[@]!$(sysconfdir)!g' \
-	    -e 's![@]localstatedir[@]!$(localstatedir)!g' \
-	    -e 's![@]remote_pid_file[@]!$(REMOTE_PID_FILE)!g' \
-	    < $< > $@-t
-	mv $@-t $@
-
-libvirtd.8: libvirtd.pod
-	$(AM_V_GEN)$(POD2MAN) $< $@
+CLEANFILES += test_libvirtd.aug
 
 libvirtd_SOURCES = $(DAEMON_SOURCES)
 
 #-D_XOPEN_SOURCE=600 -D_XOPEN_SOURCE_EXTENDED=1 -D_POSIX_C_SOURCE=199506L
 libvirtd_CFLAGS = \
-	-I$(top_srcdir)/gnulib/lib -I../gnulib/lib \
-	-I$(top_srcdir)/include -I$(top_builddir)/include \
-	-I$(top_srcdir)/src \
-	-I$(top_srcdir)/src/util \
-	-I$(top_srcdir)/src/conf \
-	-I$(top_srcdir)/src/remote \
 	$(LIBXML_CFLAGS) $(GNUTLS_CFLAGS) $(SASL_CFLAGS) \
-	$(POLKIT_CFLAGS) \
-	$(WARN_CFLAGS) -DLOCAL_STATE_DIR="\"$(localstatedir)\"" \
+	$(XDR_CFLAGS) $(DBUS_CFLAGS) $(LIBNL_CFLAGS) \
+	$(WARN_CFLAGS) $(PIE_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
-	-DSYSCONF_DIR="\"$(sysconfdir)\"" \
-	-DQEMUD_PID_FILE="\"$(QEMUD_PID_FILE)\"" \
-	-DREMOTE_PID_FILE="\"$(REMOTE_PID_FILE)\"" \
-	-DGETTEXT_PACKAGE=\"$(PACKAGE)\"
+	-DQEMUD_PID_FILE="\"$(QEMUD_PID_FILE)\""
 
-libvirtd_LDFLAGS = 					\
-	$(WARN_CFLAGS) 					\
-	$(COVERAGE_LDFLAGS)
+libvirtd_LDFLAGS =					\
+	$(RELRO_LDFLAGS)				\
+	$(PIE_LDFLAGS)					\
+	$(COVERAGE_LDFLAGS)				\
+	$(NO_INDIRECT_LDFLAGS)				\
+	$(NULL)
 
 libvirtd_LDADD =					\
 	$(LIBXML_LIBS)					\
 	$(GNUTLS_LIBS)					\
 	$(SASL_LIBS)					\
-	$(POLKIT_LIBS)
+	$(DBUS_LIBS)					\
+	$(LIBNL_LIBS)
 
-libvirtd_LDADD += ../src/libvirt_util.la ../src/libvirt-qemu.la
+if WITH_DTRACE_PROBES
+libvirtd_LDADD += ../src/libvirt_probes.lo
+endif WITH_DTRACE_PROBES
 
-if WITH_DRIVER_MODULES
-  libvirtd_LDADD += ../src/libvirt_driver.la
-else
+libvirtd_LDADD += \
+	libvirtd_conf.la \
+	libvirtd_admin.la \
+	../src/libvirt-lxc.la \
+	../src/libvirt-qemu.la \
+	../src/libvirt_driver_remote.la \
+	$(NULL)
+
+if ! WITH_DRIVER_MODULES
 if WITH_QEMU
     libvirtd_LDADD += ../src/libvirt_driver_qemu.la
-endif
+if WITH_DTRACE_PROBES
+    libvirtd_LDADD += ../src/libvirt_qemu_probes.lo
+endif WITH_DTRACE_PROBES
+endif WITH_QEMU
 
 if WITH_LXC
     libvirtd_LDADD += ../src/libvirt_driver_lxc.la
-endif
+endif WITH_LXC
+
+if WITH_XEN
+    libvirtd_LDADD += ../src/libvirt_driver_xen.la
+endif WITH_XEN
+
+if WITH_LIBXL
+    libvirtd_LDADD += ../src/libvirt_driver_libxl.la
+endif WITH_LIBXL
 
 if WITH_UML
     libvirtd_LDADD += ../src/libvirt_driver_uml.la
-endif
+endif WITH_UML
 
-if WITH_ONE
-    libvirtd_LDADD += ../src/libvirt_driver_one.la
-endif
+if WITH_VBOX
+    libvirtd_LDADD += ../src/libvirt_driver_vbox.la
+endif WITH_VBOX
 
-if WITH_STORAGE_DIR
+if WITH_VZ
+    libvirtd_LDADD += ../src/libvirt_driver_vz.la
+endif WITH_VZ
+
+if WITH_STORAGE
     libvirtd_LDADD += ../src/libvirt_driver_storage.la
-endif
+endif WITH_STORAGE
 
 if WITH_NETWORK
     libvirtd_LDADD += ../src/libvirt_driver_network.la
-endif
+endif WITH_NETWORK
 
-if WITH_NETCF
+if WITH_INTERFACE
     libvirtd_LDADD += ../src/libvirt_driver_interface.la
-endif
+endif WITH_INTERFACE
 
 if WITH_NODE_DEVICES
     libvirtd_LDADD += ../src/libvirt_driver_nodedev.la
-endif
+endif WITH_NODE_DEVICES
 
 if WITH_SECRETS
     libvirtd_LDADD += ../src/libvirt_driver_secret.la
-endif
+endif WITH_SECRETS
 
 if WITH_NWFILTER
     libvirtd_LDADD += ../src/libvirt_driver_nwfilter.la
-endif
-endif
+endif WITH_NWFILTER
+endif ! WITH_DRIVER_MODULES
 
 libvirtd_LDADD += ../src/libvirt.la
 
-if HAVE_POLKIT
-if HAVE_POLKIT0
+if WITH_POLKIT
+if WITH_POLKIT0
 policydir = $(datadir)/PolicyKit/policy
-policyfile = libvirtd.policy-0
-else
+policyauth = auth_admin_keep_session
+else ! WITH_POLKIT0
 policydir = $(datadir)/polkit-1/actions
-policyfile = libvirtd.policy-1
-endif
-endif
+policyauth = auth_admin_keep
+rulesdir = $(datadir)/polkit-1/rules.d
+rulesfile = libvirt.rules
+endif ! WITH_POLKIT0
+endif WITH_POLKIT
 
-if HAVE_AVAHI
-libvirtd_SOURCES += $(AVAHI_SOURCES)
-libvirtd_CFLAGS += $(AVAHI_CFLAGS)
-libvirtd_LDADD += $(AVAHI_LIBS)
-endif
+libvirtd.policy: libvirtd.policy.in $(top_builddir)/config.status
+	$(AM_V_GEN) sed \
+	    -e 's|[@]authaction[@]|$(policyauth)|g' \
+	    < $< > $@-t && \
+	mv $@-t $@
+BUILT_SOURCES += libvirtd.policy
 
+install-data-local: install-init-redhat install-init-systemd \
+		install-init-upstart \
+		install-data-sasl install-data-polkit \
+		install-logrotate install-sysctl
+	$(MKDIR_P) $(DESTDIR)$(localstatedir)/log/libvirt \
+		   $(DESTDIR)$(localstatedir)/run/libvirt \
+		   $(DESTDIR)$(localstatedir)/lib/libvirt
 
-install-data-local: install-init install-data-sasl install-data-polkit \
-                    install-logrotate
-	mkdir -p $(DESTDIR)$(localstatedir)/log/libvirt
-	mkdir -p $(DESTDIR)$(localstatedir)/run/libvirt
-	mkdir -p $(DESTDIR)$(localstatedir)/lib/libvirt
-
-uninstall-local:: uninstall-init uninstall-data-sasl uninstall-data-polkit
+uninstall-local:: uninstall-init-redhat uninstall-init-systemd \
+		uninstall-init-upstart \
+		uninstall-data-sasl uninstall-data-polkit \
+		uninstall-logrotate uninstall-sysctl
 	rmdir $(DESTDIR)$(localstatedir)/log/libvirt || :
 	rmdir $(DESTDIR)$(localstatedir)/run/libvirt || :
 	rmdir $(DESTDIR)$(localstatedir)/lib/libvirt || :
 
-if HAVE_POLKIT
-install-data-polkit:: install-init
-	mkdir -p $(DESTDIR)$(policydir)
-	$(INSTALL_DATA) $(srcdir)/$(policyfile) $(DESTDIR)$(policydir)/org.libvirt.unix.policy
-uninstall-data-polkit:: install-init
+if WITH_POLKIT
+install-data-polkit::
+	$(MKDIR_P) $(DESTDIR)$(policydir)
+	$(INSTALL_DATA) libvirtd.policy $(DESTDIR)$(policydir)/org.libvirt.unix.policy
+if ! WITH_POLKIT0
+	$(MKDIR_P) $(DESTDIR)$(rulesdir)
+	$(INSTALL_DATA) $(srcdir)/$(rulesfile) $(DESTDIR)$(rulesdir)/50-libvirt.rules
+endif ! WITH_POLKIT0
+
+uninstall-data-polkit::
 	rm -f $(DESTDIR)$(policydir)/org.libvirt.unix.policy
-else
+	rmdir $(DESTDIR)$(policydir) || :
+if ! WITH_POLKIT0
+	rm -f $(DESTDIR)$(rulesdir)/50-libvirt.rules
+	rmdir $(DESTDIR)$(rulesdir) || :
+endif ! WITH_POLKIT0
+
+else ! WITH_POLKIT
 install-data-polkit::
 uninstall-data-polkit::
-endif
+endif ! WITH_POLKIT
 
-
-remote.c: remote_dispatch_prototypes.h \
-	  remote_dispatch_table.h \
-	  remote_dispatch_args.h \
-	  remote_dispatch_ret.h \
-	  qemu_dispatch_prototypes.h \
-	  qemu_dispatch_table.h \
-	  qemu_dispatch_args.h \
-	  qemu_dispatch_ret.h
-
-REMOTE_PROTOCOL = $(top_srcdir)/src/remote/remote_protocol.x
-QEMU_PROTOCOL = $(top_srcdir)/src/remote/qemu_protocol.x
-
-remote_dispatch_prototypes.h: $(srcdir)/remote_generate_stubs.pl $(REMOTE_PROTOCOL)
-	$(AM_V_GEN)perl -w $(srcdir)/remote_generate_stubs.pl -c -p remote $(REMOTE_PROTOCOL) > $@
-
-remote_dispatch_table.h: $(srcdir)/remote_generate_stubs.pl $(REMOTE_PROTOCOL)
-	$(AM_V_GEN)perl -w $(srcdir)/remote_generate_stubs.pl -c -t remote $(REMOTE_PROTOCOL) > $@
-
-remote_dispatch_args.h: $(srcdir)/remote_generate_stubs.pl $(REMOTE_PROTOCOL)
-	$(AM_V_GEN)perl -w $(srcdir)/remote_generate_stubs.pl -c -a remote $(REMOTE_PROTOCOL) > $@
-
-remote_dispatch_ret.h: $(srcdir)/remote_generate_stubs.pl $(REMOTE_PROTOCOL)
-	$(AM_V_GEN)perl -w $(srcdir)/remote_generate_stubs.pl -c -r remote $(REMOTE_PROTOCOL) > $@
-
-qemu_dispatch_prototypes.h: $(srcdir)/remote_generate_stubs.pl $(QEMU_PROTOCOL)
-	$(AM_V_GEN)perl -w $(srcdir)/remote_generate_stubs.pl -p qemu $(QEMU_PROTOCOL) > $@
-
-qemu_dispatch_table.h: $(srcdir)/remote_generate_stubs.pl $(QEMU_PROTOCOL)
-	$(AM_V_GEN)perl -w $(srcdir)/remote_generate_stubs.pl -t qemu $(QEMU_PROTOCOL) > $@
-
-qemu_dispatch_args.h: $(srcdir)/remote_generate_stubs.pl $(QEMU_PROTOCOL)
-	$(AM_V_GEN)perl -w $(srcdir)/remote_generate_stubs.pl -a qemu $(QEMU_PROTOCOL) > $@
-
-qemu_dispatch_ret.h: $(srcdir)/remote_generate_stubs.pl $(QEMU_PROTOCOL)
-	$(AM_V_GEN)perl -w $(srcdir)/remote_generate_stubs.pl -r qemu $(QEMU_PROTOCOL) > $@
+remote.c: $(DAEMON_GENERATED)
+remote.h: $(DAEMON_GENERATED)
+admin.c: $(DAEMON_GENERATED)
+admin.h: $(DAEMON_GENERATED)
 
 LOGROTATE_CONFS = libvirtd.qemu.logrotate libvirtd.lxc.logrotate \
-                  libvirtd.uml.logrotate
+		  libvirtd.libxl.logrotate libvirtd.uml.logrotate \
+		  libvirtd.logrotate
 
 BUILT_SOURCES += $(LOGROTATE_CONFS)
 
+libvirtd.logrotate: libvirtd.logrotate.in
+	$(AM_V_GEN)sed						\
+	    -e 's|[@]localstatedir[@]|$(localstatedir)|g'	\
+	    < $< > $@-t && \
+	mv $@-t $@
+
 libvirtd.qemu.logrotate: libvirtd.qemu.logrotate.in
-	sed							\
-	    -e 's![@]localstatedir[@]!$(localstatedir)!g'	\
-	    < $< > $@-t
+	$(AM_V_GEN)sed						\
+	    -e 's|[@]localstatedir[@]|$(localstatedir)|g'	\
+	    < $< > $@-t && \
 	mv $@-t $@
 
 libvirtd.lxc.logrotate: libvirtd.lxc.logrotate.in
 	$(AM_V_GEN)sed						\
-	    -e 's![@]localstatedir[@]!$(localstatedir)!g'	\
+	    -e 's|[@]localstatedir[@]|$(localstatedir)|g'	\
+	    < $< > $@-t &&					\
+	    mv $@-t $@
+
+libvirtd.libxl.logrotate: libvirtd.libxl.logrotate.in
+	$(AM_V_GEN)sed						\
+	    -e 's|[@]localstatedir[@]|$(localstatedir)|g'	\
 	    < $< > $@-t &&					\
 	    mv $@-t $@
 
 libvirtd.uml.logrotate: libvirtd.uml.logrotate.in
 	$(AM_V_GEN)sed						\
-	    -e 's![@]localstatedir[@]!$(localstatedir)!g'	\
+	    -e 's|[@]localstatedir[@]|$(localstatedir)|g'	\
 	    < $< > $@-t &&					\
 	    mv $@-t $@
 
 install-logrotate: $(LOGROTATE_CONFS)
-	mkdir -p $(DESTDIR)$(localstatedir)/log/libvirt/qemu/
-	mkdir -p $(DESTDIR)$(localstatedir)/log/libvirt/lxc/
-	mkdir -p $(DESTDIR)$(localstatedir)/log/libvirt/uml/
-	mkdir -p $(DESTDIR)$(sysconfdir)/logrotate.d/
-	$(INSTALL_DATA) libvirtd.qemu.logrotate $(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.qemu
-	$(INSTALL_DATA) libvirtd.lxc.logrotate $(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.lxc
-	$(INSTALL_DATA) libvirtd.uml.logrotate $(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.uml
+	$(MKDIR_P) $(DESTDIR)$(localstatedir)/log/libvirt/qemu/ \
+		   $(DESTDIR)$(localstatedir)/log/libvirt/lxc/ \
+		   $(DESTDIR)$(localstatedir)/log/libvirt/uml/ \
+		   $(DESTDIR)$(sysconfdir)/logrotate.d/
+	$(INSTALL_DATA) libvirtd.logrotate \
+		$(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd
+	$(INSTALL_DATA) libvirtd.qemu.logrotate \
+		$(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.qemu
+	$(INSTALL_DATA) libvirtd.lxc.logrotate \
+		$(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.lxc
+	$(INSTALL_DATA) libvirtd.libxl.logrotate \
+		$(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.libxl
+	$(INSTALL_DATA) libvirtd.uml.logrotate \
+		$(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.uml
+
+uninstall-logrotate:
+	rm -f $(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd \
+	      $(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.qemu \
+	      $(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.lxc \
+	      $(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.libxl \
+	      $(DESTDIR)$(sysconfdir)/logrotate.d/libvirtd.uml
+	rmdir $(DESTDIR)$(localstatedir)/log/libvirt/qemu || :
+	rmdir $(DESTDIR)$(localstatedir)/log/libvirt/lxc || :
+	rmdir $(DESTDIR)$(localstatedir)/log/libvirt/uml || :
+	rmdir $(DESTDIR)$(sysconfdir)/logrotate.d || :
+
+install-sysconfig:
+	$(MKDIR_P) $(DESTDIR)$(sysconfdir)/sysconfig
+	$(INSTALL_DATA) $(srcdir)/libvirtd.sysconf \
+	  $(DESTDIR)$(sysconfdir)/sysconfig/libvirtd
+uninstall-sysconfig:
+	rm -f $(DESTDIR)$(sysconfdir)/sysconfig/libvirtd
+	rmdir $(DESTDIR)$(sysconfdir)/sysconfig || :
+
+if WITH_SYSCTL
+# Use $(prefix)/lib rather than $(libdir), since man sysctl.d insists on
+# /usr/lib/sysctl.d/ even when libdir is /usr/lib64
+install-sysctl:
+	$(MKDIR_P) $(DESTDIR)$(prefix)/lib/sysctl.d
+	$(INSTALL_DATA) $(srcdir)/libvirtd.sysctl \
+	  $(DESTDIR)$(prefix)/lib/sysctl.d/60-libvirtd.conf
+
+uninstall-sysctl:
+	rm -f $(DESTDIR)$(prefix)/lib/sysctl.d/60-libvirtd.conf
+	rmdir $(DESTDIR)$(prefix)/lib/sysctl.d || :
+else ! WITH_SYSCTL
+install-sysctl:
+uninstall-sysctl:
+endif ! WITH_SYSCTL
 
 if LIBVIRT_INIT_SCRIPT_RED_HAT
-install-init: libvirtd.init libvirt-guests.init
-	mkdir -p $(DESTDIR)$(sysconfdir)/rc.d/init.d
+
+BUILT_SOURCES += libvirtd.init
+
+install-init-redhat: install-sysconfig libvirtd.init
+	$(MKDIR_P) $(DESTDIR)$(sysconfdir)/rc.d/init.d
 	$(INSTALL_SCRIPT) libvirtd.init \
 	  $(DESTDIR)$(sysconfdir)/rc.d/init.d/libvirtd
-	$(INSTALL_SCRIPT) libvirt-guests.init \
-	  $(DESTDIR)$(sysconfdir)/rc.d/init.d/libvirt-guests
-	mkdir -p $(DESTDIR)$(sysconfdir)/sysconfig
-	$(INSTALL_SCRIPT) $(srcdir)/libvirtd.sysconf \
-	  $(DESTDIR)$(sysconfdir)/sysconfig/libvirtd
-	$(INSTALL_SCRIPT) $(srcdir)/libvirt-guests.sysconf \
-	  $(DESTDIR)$(sysconfdir)/sysconfig/libvirt-guests
 
-uninstall-init:
-	rm -f $(DESTDIR)$(sysconfdir)/rc.d/init.d/libvirtd \
-		$(DESTDIR)$(sysconfdir)/sysconfig/libvirtd \
-		$(DESTDIR)$(sysconfdir)/rc.d/init.d/libvirt-guests \
-		$(DESTDIR)$(sysconfdir)/sysconfig/libvirt-guests
+uninstall-init-redhat: uninstall-sysconfig
+	rm -f $(DESTDIR)$(sysconfdir)/rc.d/init.d/libvirtd
+	rmdir $(DESTDIR)$(sysconfdir)/rc.d/init.d || :
+else ! LIBVIRT_INIT_SCRIPT_RED_HAT
+install-init-redhat:
+uninstall-init-redhat:
+endif ! LIBVIRT_INIT_SCRIPT_RED_HAT
 
-BUILT_SOURCES += libvirtd.init libvirt-guests.init
 
-%.init: %.init.in $(top_builddir)/config.status
-	$(AM_V_GEN)sed					\
-	    -e s!\@localstatedir\@!@localstatedir@!g	\
-	    -e s!\@sbindir\@!@sbindir@!g		\
-	    -e s!\@sysconfdir\@!@sysconfdir@!g		\
-	    < $< > $@-t &&				\
-	    chmod a+x $@-t &&				\
+if LIBVIRT_INIT_SCRIPT_UPSTART
+
+install-init-upstart: install-sysconfig
+	$(MKDIR_P) $(DESTDIR)$(sysconfdir)/event.d
+	$(INSTALL_SCRIPT) libvirtd.upstart \
+	  $(DESTDIR)$(sysconfdir)/event.d/libvirtd
+
+uninstall-init-upstart: uninstall-sysconfig
+	rm -f $(DESTDIR)$(sysconfdir)/event.d/libvirtd
+	rmdir $(DESTDIR)$(sysconfdir)/event.d || :
+else ! LIBVIRT_INIT_SCRIPT_UPSTART
+install-init-upstart:
+uninstall-init-upstart:
+endif ! LIBVIRT_INIT_SCRIPT_UPSTART
+
+
+if LIBVIRT_INIT_SCRIPT_SYSTEMD
+
+SYSTEMD_UNIT_DIR = $(prefix)/lib/systemd/system
+BUILT_SOURCES += libvirtd.service
+
+install-init-systemd: install-sysconfig libvirtd.service
+	$(MKDIR_P) $(DESTDIR)$(SYSTEMD_UNIT_DIR)
+	$(INSTALL_DATA) libvirtd.service \
+	  $(DESTDIR)$(SYSTEMD_UNIT_DIR)/libvirtd.service
+	$(INSTALL_DATA) $(srcdir)/virt-guest-shutdown.target \
+	  $(DESTDIR)$(SYSTEMD_UNIT_DIR)/virt-guest-shutdown.target
+
+uninstall-init-systemd: uninstall-sysconfig
+	rm -f $(DESTDIR)$(SYSTEMD_UNIT_DIR)/virt-guest-shutdown.target
+	rm -f $(DESTDIR)$(SYSTEMD_UNIT_DIR)/libvirtd.service
+	rmdir $(DESTDIR)$(SYSTEMD_UNIT_DIR) || :
+else ! LIBVIRT_INIT_SCRIPT_SYSTEMD
+install-init-systemd:
+uninstall-init-systemd:
+endif ! LIBVIRT_INIT_SCRIPT_SYSTEMD
+
+libvirtd.init: libvirtd.init.in $(top_builddir)/config.status
+	$(AM_V_GEN)sed						\
+	    -e 's|[@]localstatedir[@]|$(localstatedir)|g'	\
+	    -e 's|[@]sbindir[@]|$(sbindir)|g'			\
+	    -e 's|[@]sysconfdir[@]|$(sysconfdir)|g'		\
+	    < $< > $@-t &&					\
+	    chmod a+x $@-t &&					\
 	    mv $@-t $@
 
-check-local:
-	test -x '$(AUGPARSE)' \
-	  && '$(AUGPARSE)' -I $(srcdir) $(srcdir)/test_libvirtd.aug || :
+libvirtd.service: libvirtd.service.in $(top_builddir)/config.status
+	$(AM_V_GEN)sed						\
+	    -e 's|[@]localstatedir[@]|$(localstatedir)|g'	\
+	    -e 's|[@]sbindir[@]|$(sbindir)|g'			\
+	    -e 's|[@]sysconfdir[@]|$(sysconfdir)|g'		\
+	    < $< > $@-t &&					\
+	    mv $@-t $@
 
-else
 
-install-init:
-uninstall-init:
-libvirtd.init:
+check-local: check-augeas
 
-endif # LIBVIRT_INIT_SCRIPT_RED_HAT
+AUG_GENTEST = $(PERL) $(top_srcdir)/build-aux/augeas-gentest.pl
+
+test_libvirtd.aug: test_libvirtd.aug.in $(srcdir)/libvirtd.conf
+	$(AM_V_GEN)$(AUG_GENTEST) $(srcdir)/libvirtd.conf $< $@
+
+check-augeas: test_libvirtd.aug
+	$(AM_V_GEN)if test -x '$(AUGPARSE)'; then \
+	  '$(AUGPARSE)' -I $(srcdir) test_libvirtd.aug; \
+	fi
+
 
 # This must be added last, since functions it provides/replaces
 # are used by nearly every other library.
 libvirtd_LDADD += ../gnulib/lib/libgnu.la $(LIBSOCKET)
 
-else # WITH_LIBVIRTD
+else ! WITH_LIBVIRTD
 install-data-local: install-data-sasl
 uninstall-local:: uninstall-data-sasl
-endif # WITH_LIBVIRTD
+endif ! WITH_LIBVIRTD
+
+POD2MAN = pod2man -c "Virtualization Support" -r "$(PACKAGE)-$(VERSION)"
+
+%.8.in: %.pod
+	$(AM_V_GEN)$(POD2MAN) --section=8 $< $@-t1 && \
+	if grep 'POD ERROR' $@-t1; then rm $@-t1; exit 1; fi && \
+	sed \
+		-e 's|SYSCONFDIR|\@sysconfdir\@|g' \
+		-e 's|LOCALSTATEDIR|\@localstatedir\@|g' \
+		< $@-t1 > $@-t2 && \
+	rm -f $@-t1 && \
+	mv $@-t2 $@
+
+%.8: %.8.in $(top_srcdir)/configure.ac
+	$(AM_V_GEN)sed \
+		-e 's|[@]sysconfdir[@]|$(sysconfdir)|g' \
+		-e 's|[@]localstatedir[@]|$(localstatedir)|g' \
+		< $< > $@-t && \
+	mv $@-t $@
 
 # This is needed for clients too, so can't wrap in
 # the WITH_LIBVIRTD conditional
-if HAVE_SASL
+if WITH_SASL
 install-data-sasl:
-	mkdir -p $(DESTDIR)$(sysconfdir)/sasl2/
-	$(INSTALL_DATA) $(srcdir)/libvirtd.sasl $(DESTDIR)$(sysconfdir)/sasl2/libvirt.conf
+	$(MKDIR_P) $(DESTDIR)$(sysconfdir)/sasl2/
+	$(INSTALL_DATA) $(srcdir)/libvirtd.sasl \
+		$(DESTDIR)$(sysconfdir)/sasl2/libvirt.conf
 
 uninstall-data-sasl:
 	rm -f $(DESTDIR)$(sysconfdir)/sasl2/libvirt.conf
-	rmdir $(DESTDIR)$(sysconfdir)/sasl2/
-else
+	rmdir $(DESTDIR)$(sysconfdir)/sasl2/ || :
+else ! WITH_SASL
 install-data-sasl:
 uninstall-data-sasl:
-endif
+endif ! WITH_SASL
 
 
-CLEANFILES = $(BUILT_SOURCES) $(man_MANS) libvirtd.pod
+CLEANFILES += $(BUILT_SOURCES) $(man8_MANS)
 CLEANFILES += *.cov *.gcov .libs/*.gcda .libs/*.gcno *.gcno *.gcda
+MAINTAINERCLEANFILES = $(MANINFILES) $(DAEMON_GENERATED)

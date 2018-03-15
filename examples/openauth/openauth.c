@@ -40,7 +40,7 @@ showError(virConnectPtr conn)
     virResetError(err);
     free(err);
 
-out:
+ out:
     return;
 }
 
@@ -82,7 +82,7 @@ showHypervisorInfo(virConnectPtr conn)
            minor,
            release);
 
-out:
+ out:
     return ret;
 }
 
@@ -90,7 +90,8 @@ out:
 static int
 showDomains(virConnectPtr conn)
 {
-    int ret = 0, i, numNames, numInactiveDomains, numActiveDomains;
+    int ret = 0, numNames, numInactiveDomains, numActiveDomains;
+    ssize_t i;
     char **nameList = NULL;
 
     numActiveDomains = virConnectNumOfDomains(conn);
@@ -131,11 +132,10 @@ showDomains(virConnectPtr conn)
         goto out;
     }
 
-    if (numNames > 0) {
+    if (numNames > 0)
         printf("Inactive domains:\n");
-    }
 
-    for (i = 0 ; i < numNames ; i++) {
+    for (i = 0; i < numNames; i++) {
         printf("  %s\n", *(nameList + i));
         /* The API documentation doesn't say so, but the names
          * returned by virConnectListDefinedDomains are strdup'd and
@@ -143,7 +143,7 @@ showDomains(virConnectPtr conn)
         free(*(nameList + i));
     }
 
-out:
+ out:
     free(nameList);
     return ret;
 }
@@ -161,7 +161,7 @@ typedef struct _AuthData AuthData;
 static int
 authCallback(virConnectCredentialPtr cred, unsigned int ncred, void *cbdata)
 {
-    int i;
+    size_t i;
     AuthData *authData = cbdata;
 
     /* libvirt might request multiple credentials in a single call.
@@ -175,14 +175,13 @@ authCallback(virConnectCredentialPtr cred, unsigned int ncred, void *cbdata)
      * For example the ESX driver passes the hostname of the ESX or vCenter
      * server as challenge. This allows a auth callback to return the
      * proper credentials. */
-    for (i = 0; i < ncred ; ++i) {
+    for (i = 0; i < ncred; ++i) {
         switch (cred[i].type) {
         case VIR_CRED_AUTHNAME:
             cred[i].result = strdup(authData->username);
 
-            if (cred[i].result == NULL) {
+            if (cred[i].result == NULL)
                 return -1;
-            }
 
             cred[i].resultlen = strlen(cred[i].result);
             break;
@@ -190,9 +189,8 @@ authCallback(virConnectCredentialPtr cred, unsigned int ncred, void *cbdata)
         case VIR_CRED_PASSPHRASE:
             cred[i].result = strdup(authData->password);
 
-            if (cred[i].result == NULL) {
+            if (cred[i].result == NULL)
                 return -1;
-            }
 
             cred[i].resultlen = strlen(cred[i].result);
             break;
@@ -273,7 +271,7 @@ main(int argc, char *argv[])
         goto disconnect;
     }
 
-  disconnect:
+ disconnect:
     if (virConnectClose(conn) != 0) {
         printf("Failed to disconnect from hypervisor\n");
         showError(conn);
@@ -282,6 +280,6 @@ main(int argc, char *argv[])
         printf("Disconnected from hypervisor\n");
     }
 
-  out:
+ out:
     return ret;
 }

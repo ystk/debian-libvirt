@@ -1,6 +1,8 @@
+<?xml version="1.0"?>
 <!-- A Relax NG schema for the libvirt node device XML format -->
 <grammar xmlns="http://relaxng.org/ns/structure/1.0"
     datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
+  <include href='basictypes.rng'/>
   <start>
     <ref name='device'/>
   </start>
@@ -11,12 +13,44 @@
          and in virsh -->
       <element name="name"><text/></element>
       <optional>
-        <element name="parent"><text/></element>
+        <element name="path"><text/></element>
+      </optional>
+      <optional>
+        <ref name="parent"/>
+      </optional>
+
+      <optional>
+        <element name="driver">
+          <element name="name"><text/></element>
+        </element>
       </optional>
 
       <zeroOrMore>
         <ref name="capability"/>
       </zeroOrMore>
+    </element>
+  </define>
+
+  <define name='parent'>
+    <element name='parent'>
+      <choice>
+        <group>
+          <attribute name='wwnn'>
+            <ref name='wwn'/>
+          </attribute>
+          <attribute name='wwpn'>
+            <ref name='wwn'/>
+          </attribute>
+          <empty/>
+        </group>
+        <group>
+          <attribute name='fabric_wwn'>
+            <ref name='wwn'/>
+          </attribute>
+          <empty/>
+        </group>
+        <text/>
+      </choice>
     </element>
   </define>
 
@@ -29,6 +63,7 @@
         <ref name="capusbinterface"/>
         <ref name="capnet"/>
         <ref name="capscsihost"/>
+        <ref name="capscsitarget"/>
         <ref name="capscsi"/>
         <ref name="capstorage"/>
       </choice>
@@ -56,7 +91,7 @@
       </optional>
 
       <element name='uuid'>
-        <ref name='uuid'/>
+        <ref name='UUID'/>
       </element>
     </element>
 
@@ -80,16 +115,16 @@
     </attribute>
 
     <element name='domain'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
     <element name='bus'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
     <element name='slot'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
     <element name='function'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
 
     <element name='product'>
@@ -114,6 +149,94 @@
       </choice>
     </element>
 
+    <optional>
+      <element name='capability'>
+        <attribute name='type'>
+          <value>phys_function</value>
+        </attribute>
+        <optional>
+          <ref name='address'/>
+        </optional>
+      </element>
+    </optional>
+
+    <optional>
+      <element name='capability'>
+        <attribute name='type'>
+          <value>virt_functions</value>
+        </attribute>
+        <optional>
+          <attribute name='maxCount'>
+            <ref name='unsignedInt'/>
+          </attribute>
+        </optional>
+        <zeroOrMore>
+          <ref name='address'/>
+        </zeroOrMore>
+      </element>
+    </optional>
+
+    <optional>
+      <element name='capability'>
+        <attribute name='type'>
+          <choice>
+            <value>pci-bridge</value>
+            <value>cardbus-bridge</value>
+          </choice>
+        </attribute>
+      </element>
+    </optional>
+
+    <optional>
+      <element name='iommuGroup'>
+        <attribute name='number'>
+          <ref name='unsignedInt'/>
+        </attribute>
+        <oneOrMore>
+          <ref name='address'/>
+        </oneOrMore>
+      </element>
+    </optional>
+
+    <optional>
+      <element name='numa'>
+        <optional>
+          <attribute name='node'>
+            <data type='int'/>
+          </attribute>
+        </optional>
+      </element>
+    </optional>
+
+    <optional>
+      <element name='pci-express'>
+        <zeroOrMore>
+          <element name='link'>
+            <attribute name='validity'>
+              <choice>
+                <value>cap</value>
+                <value>sta</value>
+              </choice>
+            </attribute>
+            <optional>
+              <attribute name='port'>
+                <ref name='unsignedInt'/>
+              </attribute>
+            </optional>
+            <optional>
+              <attribute name='speed'>
+                <data type="string">
+                  <param name="pattern">[0-9]+(.[0-9]+)?</param>
+                </data>
+              </attribute>
+            </optional>
+            <attribute name='width'>
+              <ref name='unsignedInt'/>
+            </attribute>
+          </element>
+        </zeroOrMore>
+      </element>
+    </optional>
   </define>
 
   <define name='capusbdev'>
@@ -122,10 +245,10 @@
     </attribute>
 
     <element name='bus'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
     <element name='device'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
 
     <element name='product'>
@@ -157,16 +280,16 @@
     </attribute>
 
     <element name='number'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
     <element name='class'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
     <element name='subclass'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
     <element name='protocol'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
 
     <optional>
@@ -189,10 +312,25 @@
         <ref name='mac'/>
       </element>
     </optional>
+    <ref name="link-speed-state"/>
+
+    <zeroOrMore>
+      <element name='feature'>
+        <attribute name='name'>
+          <ref name='netfeaturename'/>
+        </attribute>
+      </element>
+    </zeroOrMore>
 
     <zeroOrMore>
       <ref name='subcapnet'/>
     </zeroOrMore>
+  </define>
+
+  <define name='netfeaturename'>
+    <data type='string'>
+      <param name='pattern'>[a-zA-Z\-_]+</param>
+    </data>
   </define>
 
   <define name='subcapnet'>
@@ -216,6 +354,35 @@
     </attribute>
   </define>
 
+  <define name='capsfchost'>
+    <attribute name='type'>
+      <value>fc_host</value>
+    </attribute>
+
+    <element name='wwnn'>
+      <ref name='wwn'/>
+    </element>
+
+    <element name='wwpn'>
+      <ref name='wwn'/>
+    </element>
+
+    <element name='fabric_wwn'>
+      <ref name='wwn'/>
+    </element>
+  </define>
+
+  <define name='capsvports'>
+    <attribute name='type'>
+      <value>vports_ops</value>
+    </attribute>
+    <element name='max_vports'>
+      <ref name='unsignedInt'/>
+    </element>
+    <element name='vports'>
+      <ref name='unsignedInt'/>
+    </element>
+  </define>
 
   <define name='capscsihost'>
     <attribute name='type'>
@@ -223,7 +390,34 @@
     </attribute>
 
     <element name='host'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
+    </element>
+
+    <optional>
+      <element name='unique_id'>
+        <ref name='positiveInteger'/>
+      </element>
+    </optional>
+
+    <optional>
+      <zeroOrMore>
+        <element name='capability'>
+          <choice>
+            <ref name='capsfchost'/>
+            <ref name='capsvports'/>
+          </choice>
+        </element>
+      </zeroOrMore>
+    </optional>
+  </define>
+
+  <define name='capscsitarget'>
+    <attribute name='type'>
+      <value>scsi_target</value>
+    </attribute>
+
+    <element name='target'>
+      <text/>
     </element>
   </define>
 
@@ -233,16 +427,16 @@
     </attribute>
 
     <element name='host'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
     <element name='bus'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
     <element name='target'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
     <element name='lun'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
 
     <element name='type'>
@@ -312,7 +506,7 @@
       </element>
 
       <element name='media_size'>
-        <ref name='uint'/>
+        <ref name='unsignedLong'/>
       </element>
       <optional>
         <element name='media_label'>
@@ -324,31 +518,17 @@
 
   <define name='capstoragefixed'>
     <element name='size'>
-      <ref name='uint'/>
+      <ref name='unsignedLong'/>
     </element>
   </define>
 
-  <define name='uuid'>
-    <choice>
-      <data type='string'>
-        <param name="pattern">[a-fA-F0-9]{32}</param>
-      </data>
-      <data type='string'>
-        <param name="pattern">[a-fA-F0-9]{8}\-([a-fA-F0-9]{4}\-){3}[a-fA-F0-9]{12}</param>
-      </data>
-    </choice>
-  </define>
-
-  <define name='uint'>
-    <data type='string'>
-      <param name="pattern">[0-9]+</param>
-    </data>
-  </define>
-
-  <define name='hexuint'>
-    <data type='string'>
-      <param name="pattern">(0x)?[0-9a-f]+</param>
-    </data>
+  <define name='address'>
+    <element name='address'>
+      <attribute name='domain'><ref name='hexuint'/></attribute>
+      <attribute name='bus'><ref name='hexuint'/></attribute>
+      <attribute name='slot'><ref name='hexuint'/></attribute>
+      <attribute name='function'><ref name='hexuint'/></attribute>
+    </element>
   </define>
 
   <define name='mac'>

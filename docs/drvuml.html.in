@@ -1,4 +1,6 @@
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <h1>User Mode Linux driver</h1>
 
@@ -7,9 +9,18 @@
     guests built for User Mode Linux. UML requires no special support in
     the host kernel, so can be used by any user of any linux system, provided
     they have enough free RAM for their guest's needs, though there are
-    certain restrictions on network connectivity unless the adminstrator
+    certain restrictions on network connectivity unless the administrator
     has pre-created TAP devices.
     </p>
+
+    <h2><a name="project">Project Links</a></h2>
+
+    <ul>
+      <li>
+        The <a href="http://user-mode-linux.sourceforge.net/">User
+        Mode Linux</a> paravirtualized kernel
+      </li>
+    </ul>
 
     <h2>Connections to UML driver</h2>
 
@@ -54,7 +65,7 @@ uml+ssh://root@example.com/system    (remote access, SSH tunnelled)
     </p>
 
     <p>
-      Once booted the primary console is connected toa PTY, and
+      Once booted the primary console is connected to a PTY, and
       thus accessible with "virsh console" or equivalent tools
     </p>
 

@@ -1,4 +1,3 @@
-
 #include <config.h>
 
 #include <stdio.h>
@@ -10,48 +9,44 @@
 
 #include "internal.h"
 #include "xen/xend_internal.h"
+#include "xen/xen_driver.h"
+#include "xenconfig/xen_sxpr.h"
 #include "testutils.h"
 #include "testutilsxen.h"
+#include "virstring.h"
 
-static char *progname;
-static char *abs_srcdir;
+#define VIR_FROM_THIS VIR_FROM_NONE
+
 static virCapsPtr caps;
+static virDomainXMLOptionPtr xmlopt;
 
-#define MAX_FILE 4096
-
-static int testCompareFiles(const char *xml, const char *sexpr,
-                            int xendConfigVersion) {
-  char xmlData[MAX_FILE];
-  char sexprData[MAX_FILE];
+static int
+testCompareFiles(const char *xml, const char *sexpr)
+{
   char *gotsexpr = NULL;
-  char *xmlPtr = &(xmlData[0]);
-  char *sexprPtr = &(sexprData[0]);
   int ret = -1;
   virDomainDefPtr def = NULL;
 
-  if (virtTestLoadFile(xml, &xmlPtr, MAX_FILE) < 0)
+  if (!(def = virDomainDefParseFile(xml, caps, xmlopt, NULL,
+                                    VIR_DOMAIN_DEF_PARSE_INACTIVE)))
       goto fail;
 
-  if (virtTestLoadFile(sexpr, &sexprPtr, MAX_FILE) < 0)
-      goto fail;
-
-  if (!(def = virDomainDefParseString(caps, xmlData,
-                                      VIR_DOMAIN_XML_INACTIVE)))
-      goto fail;
-
-  if (!(gotsexpr = xenDaemonFormatSxpr(NULL, def, xendConfigVersion)))
-      goto fail;
-
-  if (STRNEQ(sexprData, gotsexpr)) {
-      virtTestDifference(stderr, sexprData, gotsexpr);
+  if (!virDomainDefCheckABIStability(def, def)) {
+      fprintf(stderr, "ABI stability check failed on %s", xml);
       goto fail;
   }
+
+  if (!(gotsexpr = xenFormatSxpr(NULL, def)))
+      goto fail;
+
+  if (virTestCompareToFile(gotsexpr, sexpr) < 0)
+      goto fail;
 
   ret = 0;
 
  fail:
+  VIR_FREE(gotsexpr);
   virDomainDefFree(def);
-  free(gotsexpr);
 
   return ret;
 }
@@ -60,103 +55,116 @@ struct testInfo {
     const char *input;
     const char *output;
     const char *name;
-    int version;
 };
 
-static int testCompareHelper(const void *data) {
-    const struct testInfo *info = data;
-    char xml[PATH_MAX];
-    char args[PATH_MAX];
-    snprintf(xml, PATH_MAX, "%s/xml2sexprdata/xml2sexpr-%s.xml",
-             abs_srcdir, info->input);
-    snprintf(args, PATH_MAX, "%s/xml2sexprdata/xml2sexpr-%s.sexpr",
-             abs_srcdir, info->output);
-    return testCompareFiles(xml, args, info->version);
-}
-
-
 static int
-mymain(int argc, char **argv)
+testCompareHelper(const void *data)
 {
-    int ret = 0;
-    char cwd[PATH_MAX];
+    int result = -1;
+    const struct testInfo *info = data;
+    char *xml = NULL;
+    char *args = NULL;
 
-    progname = argv[0];
-
-    abs_srcdir = getenv("abs_srcdir");
-    if (!abs_srcdir)
-        abs_srcdir = getcwd(cwd, sizeof(cwd));
-
-    if (argc > 1) {
-        fprintf(stderr, "Usage: %s\n", progname);
-        return(EXIT_FAILURE);
+    if (virAsprintf(&xml, "%s/xml2sexprdata/xml2sexpr-%s.xml",
+                    abs_srcdir, info->input) < 0 ||
+        virAsprintf(&args, "%s/xml2sexprdata/xml2sexpr-%s.sexpr",
+                    abs_srcdir, info->output) < 0) {
+        goto cleanup;
     }
 
-#define DO_TEST(in, out, name, version)                                \
+    result = testCompareFiles(xml, args);
+
+ cleanup:
+    VIR_FREE(xml);
+    VIR_FREE(args);
+
+    return result;
+}
+
+static int
+mymain(void)
+{
+    int ret = 0;
+
+#define DO_TEST(in, out, name)                                         \
     do {                                                               \
-        struct testInfo info = { in, out, name, version };             \
+        struct testInfo info = { in, out, name };                      \
         virResetLastError();                                           \
-        if (virtTestRun("Xen XML-2-SEXPR " in " -> " out,              \
-                        1, testCompareHelper, &info) < 0)     \
+        if (virTestRun("Xen XML-2-SEXPR " in " -> " out,               \
+                       testCompareHelper, &info) < 0)                  \
             ret = -1;                                                  \
     } while (0)
 
     if (!(caps = testXenCapsInit()))
-        return(EXIT_FAILURE);
+        return EXIT_FAILURE;
 
-    DO_TEST("pv", "pv", "pvtest", 1);
-    DO_TEST("fv", "fv", "fvtest", 1);
-    DO_TEST("pv", "pv", "pvtest", 2);
-    DO_TEST("fv", "fv-v2", "fvtest", 2);
-    DO_TEST("fv-vncunused", "fv-vncunused", "fvtest", 2);
-    DO_TEST("pv-vfb-orig", "pv-vfb-orig", "pvtest", 2);
-    DO_TEST("pv-vfb-new", "pv-vfb-new", "pvtest", 3);
-    DO_TEST("pv-vfb-new-auto", "pv-vfb-new-auto", "pvtest", 3);
-    DO_TEST("pv-bootloader", "pv-bootloader", "pvtest", 1);
+    if (!(xmlopt = xenDomainXMLConfInit()))
+        return EXIT_FAILURE;
 
-    DO_TEST("disk-file", "disk-file", "pvtest", 2);
-    DO_TEST("disk-block", "disk-block", "pvtest", 2);
-    DO_TEST("disk-block-shareable", "disk-block-shareable", "pvtest", 2);
-    DO_TEST("disk-drv-loop", "disk-drv-loop", "pvtest", 2);
-    DO_TEST("disk-drv-blkback", "disk-drv-blkback", "pvtest", 2);
-    DO_TEST("disk-drv-blktap", "disk-drv-blktap", "pvtest", 2);
-    DO_TEST("disk-drv-blktap-raw", "disk-drv-blktap-raw", "pvtest", 2);
-    DO_TEST("disk-drv-blktap-qcow", "disk-drv-blktap-qcow", "pvtest", 2);
+    DO_TEST("pv", "pv", "pvtest");
+    DO_TEST("fv", "fv", "fvtest");
+    DO_TEST("pv", "pv", "pvtest");
+    DO_TEST("fv", "fv-v2", "fvtest");
+    DO_TEST("fv-vncunused", "fv-vncunused", "fvtest");
+    DO_TEST("pv-vfb-new", "pv-vfb-new", "pvtest");
+    DO_TEST("pv-vfb-new-auto", "pv-vfb-new-auto", "pvtest");
+    DO_TEST("pv-bootloader", "pv-bootloader", "pvtest");
+    DO_TEST("pv-bootloader-cmdline", "pv-bootloader-cmdline", "pvtest");
+    DO_TEST("pv-vcpus", "pv-vcpus", "pvtest");
 
-    DO_TEST("curmem", "curmem", "rhel5", 2);
-    DO_TEST("net-routed", "net-routed", "pvtest", 2);
-    DO_TEST("net-bridged", "net-bridged", "pvtest", 2);
-    DO_TEST("net-e1000", "net-e1000", "pvtest", 2);
-    DO_TEST("bridge-ipaddr", "bridge-ipaddr", "pvtest", 2);
-    DO_TEST("no-source-cdrom", "no-source-cdrom", "test", 2);
-    DO_TEST("pv-localtime", "pv-localtime", "pvtest", 1);
-    DO_TEST("pci-devs", "pci-devs", "pvtest", 2);
+    DO_TEST("disk-file", "disk-file", "pvtest");
+    DO_TEST("disk-block", "disk-block", "pvtest");
+    DO_TEST("disk-block-shareable", "disk-block-shareable", "pvtest");
+    DO_TEST("disk-drv-loop", "disk-drv-loop", "pvtest");
+    DO_TEST("disk-drv-blkback", "disk-drv-blkback", "pvtest");
+    DO_TEST("disk-drv-blktap", "disk-drv-blktap", "pvtest");
+    DO_TEST("disk-drv-blktap-raw", "disk-drv-blktap-raw", "pvtest");
+    DO_TEST("disk-drv-blktap-qcow", "disk-drv-blktap-qcow", "pvtest");
+    DO_TEST("disk-drv-blktap2", "disk-drv-blktap2", "pvtest");
+    DO_TEST("disk-drv-blktap2-raw", "disk-drv-blktap2-raw", "pvtest");
 
-    DO_TEST("fv-utc", "fv-utc", "fvtest", 1);
-    DO_TEST("fv-localtime", "fv-localtime", "fvtest", 1);
-    DO_TEST("fv-usbmouse", "fv-usbmouse", "fvtest", 1);
-    DO_TEST("fv-usbmouse", "fv-usbmouse", "fvtest", 1);
-    DO_TEST("fv-kernel", "fv-kernel", "fvtest", 1);
+    DO_TEST("curmem", "curmem", "rhel5");
+    DO_TEST("net-routed", "net-routed", "pvtest");
+    DO_TEST("net-bridged", "net-bridged", "pvtest");
+    DO_TEST("net-e1000", "net-e1000", "pvtest");
+    DO_TEST("bridge-ipaddr", "bridge-ipaddr", "pvtest");
+    DO_TEST("no-source-cdrom", "no-source-cdrom", "test");
+    DO_TEST("pv-localtime", "pv-localtime", "pvtest");
+    DO_TEST("pci-devs", "pci-devs", "pvtest");
 
-    DO_TEST("fv-serial-null", "fv-serial-null", "fvtest", 1);
-    DO_TEST("fv-serial-file", "fv-serial-file", "fvtest", 1);
-    DO_TEST("fv-serial-stdio", "fv-serial-stdio", "fvtest", 1);
-    DO_TEST("fv-serial-pty", "fv-serial-pty", "fvtest", 1);
-    DO_TEST("fv-serial-pipe", "fv-serial-pipe", "fvtest", 1);
-    DO_TEST("fv-serial-tcp", "fv-serial-tcp", "fvtest", 1);
-    DO_TEST("fv-serial-udp", "fv-serial-udp", "fvtest", 1);
-    DO_TEST("fv-serial-tcp-telnet", "fv-serial-tcp-telnet", "fvtest", 1);
-    DO_TEST("fv-serial-unix", "fv-serial-unix", "fvtest", 1);
-    DO_TEST("fv-parallel-tcp", "fv-parallel-tcp", "fvtest", 1);
+    DO_TEST("fv-utc", "fv-utc", "fvtest");
+    DO_TEST("fv-localtime", "fv-localtime", "fvtest");
+    DO_TEST("fv-usbmouse", "fv-usbmouse", "fvtest");
+    DO_TEST("fv-usbmouse", "fv-usbmouse", "fvtest");
+    DO_TEST("fv-kernel", "fv-kernel", "fvtest");
+    DO_TEST("fv-force-hpet", "fv-force-hpet", "fvtest");
+    DO_TEST("fv-force-nohpet", "fv-force-nohpet", "fvtest");
 
-    DO_TEST("fv-sound", "fv-sound", "fvtest", 1);
+    DO_TEST("fv-serial-null", "fv-serial-null", "fvtest");
+    DO_TEST("fv-serial-file", "fv-serial-file", "fvtest");
+    DO_TEST("fv-serial-dev-2-ports", "fv-serial-dev-2-ports", "fvtest");
+    DO_TEST("fv-serial-dev-2nd-port", "fv-serial-dev-2nd-port", "fvtest");
+    DO_TEST("fv-serial-stdio", "fv-serial-stdio", "fvtest");
+    DO_TEST("fv-serial-pty", "fv-serial-pty", "fvtest");
+    DO_TEST("fv-serial-pipe", "fv-serial-pipe", "fvtest");
+    DO_TEST("fv-serial-tcp", "fv-serial-tcp", "fvtest");
+    DO_TEST("fv-serial-udp", "fv-serial-udp", "fvtest");
+    DO_TEST("fv-serial-tcp-telnet", "fv-serial-tcp-telnet", "fvtest");
+    DO_TEST("fv-serial-unix", "fv-serial-unix", "fvtest");
+    DO_TEST("fv-parallel-tcp", "fv-parallel-tcp", "fvtest");
 
-    DO_TEST("fv-net-ioemu", "fv-net-ioemu", "fvtest", 1);
-    DO_TEST("fv-net-netfront", "fv-net-netfront", "fvtest", 1);
+    DO_TEST("fv-sound", "fv-sound", "fvtest");
 
-    virCapabilitiesFree(caps);
+    DO_TEST("fv-net-netfront", "fv-net-netfront", "fvtest");
+    DO_TEST("fv-net-rate", "fv-net-rate", "fvtest");
 
-    return(ret==0 ? EXIT_SUCCESS : EXIT_FAILURE);
+    DO_TEST("boot-grub", "boot-grub", "fvtest");
+    DO_TEST("escape", "escape", "fvtest");
+
+    virObjectUnref(caps);
+    virObjectUnref(xmlopt);
+
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

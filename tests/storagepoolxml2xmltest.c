@@ -12,92 +12,100 @@
 #include "testutils.h"
 #include "storage_conf.h"
 #include "testutilsqemu.h"
+#include "virstring.h"
 
-static char *progname;
-static char *abs_srcdir;
+#define VIR_FROM_THIS VIR_FROM_NONE
 
-#define MAX_FILE 4096
-
-
-static int testCompareXMLToXMLFiles(const char *inxml, const char *outxml) {
-    char inXmlData[MAX_FILE];
-    char *inXmlPtr = &(inXmlData[0]);
-    char outXmlData[MAX_FILE];
-    char *outXmlPtr = &(outXmlData[0]);
+static int
+testCompareXMLToXMLFiles(const char *inxml, const char *outxml)
+{
     char *actual = NULL;
     int ret = -1;
     virStoragePoolDefPtr dev = NULL;
 
-    if (virtTestLoadFile(inxml, &inXmlPtr, MAX_FILE) < 0)
-        goto fail;
-    if (virtTestLoadFile(outxml, &outXmlPtr, MAX_FILE) < 0)
-        goto fail;
-
-    if (!(dev = virStoragePoolDefParseString(inXmlData)))
+    if (!(dev = virStoragePoolDefParseFile(inxml)))
         goto fail;
 
     if (!(actual = virStoragePoolDefFormat(dev)))
         goto fail;
 
-    if (STRNEQ(outXmlData, actual)) {
-        virtTestDifference(stderr, outXmlData, actual);
+    if (virTestCompareToFile(actual, outxml) < 0)
         goto fail;
-    }
 
     ret = 0;
 
  fail:
-    free(actual);
+    VIR_FREE(actual);
     virStoragePoolDefFree(dev);
     return ret;
 }
 
-static int testCompareXMLToXMLHelper(const void *data) {
-    char inxml[PATH_MAX];
-    char outxml[PATH_MAX];
-    snprintf(inxml, PATH_MAX, "%s/storagepoolxml2xmlin/%s.xml",
-             abs_srcdir, (const char*)data);
-    snprintf(outxml, PATH_MAX, "%s/storagepoolxml2xmlout/%s.xml",
-             abs_srcdir, (const char*)data);
-    return testCompareXMLToXMLFiles(inxml, outxml);
-}
-
-
 static int
-mymain(int argc, char **argv)
+testCompareXMLToXMLHelper(const void *data)
 {
-    int ret = 0;
-    char cwd[PATH_MAX];
+    int result = -1;
+    char *inxml = NULL;
+    char *outxml = NULL;
 
-    progname = argv[0];
-
-    if (argc > 1) {
-        fprintf(stderr, "Usage: %s\n", progname);
-        return (EXIT_FAILURE);
+    if (virAsprintf(&inxml, "%s/storagepoolxml2xmlin/%s.xml",
+                    abs_srcdir, (const char*)data) < 0 ||
+        virAsprintf(&outxml, "%s/storagepoolxml2xmlout/%s.xml",
+                    abs_srcdir, (const char*)data) < 0) {
+        goto cleanup;
     }
 
-    abs_srcdir = getenv("abs_srcdir");
-    if (!abs_srcdir)
-        abs_srcdir = getcwd(cwd, sizeof(cwd));
+    result = testCompareXMLToXMLFiles(inxml, outxml);
 
-#define DO_TEST(name) \
-    if (virtTestRun("Storage Pool XML-2-XML " name, \
-                    1, testCompareXMLToXMLHelper, (name)) < 0) \
+ cleanup:
+    VIR_FREE(inxml);
+    VIR_FREE(outxml);
+
+    return result;
+}
+
+static int
+mymain(void)
+{
+    int ret = 0;
+
+#define DO_TEST(name)                                           \
+    if (virTestRun("Storage Pool XML-2-XML " name,              \
+                   testCompareXMLToXMLHelper, (name)) < 0)      \
         ret = -1
 
     DO_TEST("pool-dir");
+    DO_TEST("pool-dir-naming");
     DO_TEST("pool-fs");
     DO_TEST("pool-logical");
+    DO_TEST("pool-logical-nopath");
     DO_TEST("pool-logical-create");
     DO_TEST("pool-disk");
+    DO_TEST("pool-disk-device-nopartsep");
     DO_TEST("pool-iscsi");
     DO_TEST("pool-iscsi-auth");
     DO_TEST("pool-netfs");
+    DO_TEST("pool-netfs-gluster");
+    DO_TEST("pool-netfs-cifs");
     DO_TEST("pool-scsi");
+    DO_TEST("pool-scsi-type-scsi-host");
+    DO_TEST("pool-scsi-type-fc-host");
+    DO_TEST("pool-scsi-type-fc-host-managed");
     DO_TEST("pool-mpath");
     DO_TEST("pool-iscsi-multiiqn");
+    DO_TEST("pool-iscsi-vendor-product");
+    DO_TEST("pool-sheepdog");
+    DO_TEST("pool-gluster");
+    DO_TEST("pool-gluster-sub");
+    DO_TEST("pool-scsi-type-scsi-host-stable");
+#ifdef WITH_STORAGE_ZFS
+    DO_TEST("pool-zfs");
+    DO_TEST("pool-zfs-sourcedev");
+#endif
+#ifdef WITH_STORAGE_RBD
+    DO_TEST("pool-rbd");
+#endif
 
-    return (ret==0 ? EXIT_SUCCESS : EXIT_FAILURE);
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

@@ -6,40 +6,41 @@
 #include <string.h>
 #include <errno.h>
 #include "security/security_driver.h"
+#include "virrandom.h"
+#include "testutils.h"
 
-int
-main (int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+static int
+mymain(void)
 {
-    int ret;
-
+    virSecurityManagerPtr mgr;
     const char *doi, *model;
-    virSecurityDriverPtr security_drv;
 
-    ret = virSecurityDriverStartup (&security_drv, "selinux", false);
-    if (ret == -1)
-    {
-        fprintf (stderr, "Failed to start security driver");
-        exit (-1);
-    }
-    /* No security driver wanted to be enabled: just return */
-    if (ret == -2)
-        return 0;
+    if (virThreadInitialize() < 0)
+        return EXIT_FAILURE;
 
-    model = virSecurityDriverGetModel (security_drv);
-    if (!model)
-    {
-        fprintf (stderr, "Failed to copy secModel model: %s",
-                 strerror (errno));
-        exit (-1);
+    mgr = virSecurityManagerNew(NULL, "QEMU", VIR_SECURITY_MANAGER_DEFAULT_CONFINED);
+    if (mgr == NULL) {
+        fprintf(stderr, "Failed to start security driver");
+        return EXIT_FAILURE;
     }
 
-    doi = virSecurityDriverGetDOI (security_drv);
-    if (!doi)
-    {
-        fprintf (stderr, "Failed to copy secModel DOI: %s",
-                 strerror (errno));
-        exit (-1);
+    model = virSecurityManagerGetModel(mgr);
+    if (!model) {
+        fprintf(stderr, "Failed to copy secModel model: %s",
+                strerror(errno));
+        return EXIT_FAILURE;
     }
+
+    doi = virSecurityManagerGetDOI(mgr);
+    if (!doi) {
+        fprintf(stderr, "Failed to copy secModel DOI: %s",
+                strerror(errno));
+        return EXIT_FAILURE;
+    }
+
+    virObjectUnref(mgr);
 
     return 0;
 }
+
+VIRT_TEST_MAIN(mymain)

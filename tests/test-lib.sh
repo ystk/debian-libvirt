@@ -1,9 +1,28 @@
-# source this file; set up for tests
+# test-lib.sh: source this file; set up for tests
 
-test -z "$abs_srcdir" && abs_srcdir=$(pwd)
-test -z "$abs_builddir" && abs_builddir=$(pwd)
-test -z "$abs_top_srcdir" && abs_top_srcdir=$(pwd)/..
-test -z "$abs_top_builddir" && abs_top_builddir=$(pwd)/..
+# Copyright (C) 2008-2013, 2016 Red Hat, Inc.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library.  If not, see
+# <http://www.gnu.org/licenses/>.
+#
+# Based on an idea from GNU coreutils
+
+_scriptdir="$(unset CDPATH; cd $(dirname $0) && pwd)"
+test -z "$abs_srcdir" && abs_srcdir=$_scriptdir
+test -z "$abs_builddir" && abs_builddir=$_scriptdir
+test -z "$abs_top_srcdir" && abs_top_srcdir=$_scriptdir/..
+test -z "$abs_top_builddir" && abs_top_builddir=$_scriptdir/..
 test -z "$LC_ALL" && LC_ALL=C
 
 # Skip this test if the shell lacks support for functions.
@@ -20,6 +39,24 @@ test_intro()
   if test "$verbose" = "0" ; then
     echo "TEST: $name"
     printf "      "
+  fi
+}
+
+test_skip_case()
+{
+  counter=$1
+  name=$2
+  reason=$3
+  if test "$verbose" = "0" ; then
+    mod=`expr \( $counter + 40 - 1 \) % 40`
+    if test "$counter" != 1 && test "$mod" = 0 ; then
+        printf " %-3d\n" `expr $counter - 1`
+        printf "      "
+    fi
+    printf "_"
+  else
+    printf "%3d) %-60s ... SKIP\n" "$counter" "$name"
+    printf "     case skipped: %s\n" "$reason"
   fi
 }
 
@@ -54,13 +91,8 @@ test_final()
   status=$2
 
   if test "$verbose" = "0" ; then
-    mod=`expr \( $counter + 1 \) % 40`
-    if test "$mod" != "0" && test "$mod" != "1" ; then
-      for i in `seq $mod 40`
-      do
-        printf " "
-      done
-    fi
+    len=`expr 39 - \( \( $counter - 1 \) % 40 \)`
+    printf "%${len}s" ""
     if test "$status" = "0" ; then
       printf " %-3d OK\n" $counter
     else
@@ -163,15 +195,12 @@ require_selinux_()
   esac
 }
 
-very_expensive_()
+test_expensive()
 {
-  if test "$RUN_VERY_EXPENSIVE_TESTS" != yes; then
+  if test "$VIR_TEST_EXPENSIVE" != 1; then
     skip_test_ '
 This test is very expensive, so it is disabled by default.
-To run it anyway, rerun make check with the RUN_VERY_EXPENSIVE_TESTS
-environment variable set to yes.  E.g.,
-
-  env RUN_VERY_EXPENSIVE_TESTS=yes make check
+To run it anyway, rerun: make check VIR_TEST_EXPENSIVE=1
 '
   fi
 }
@@ -203,6 +232,12 @@ if test -n "$VIR_TEST_DEBUG" || test -n "$VIR_TEST_VERBOSE" ; then
   verbose=1
 fi
 
+debug() { :; }
+
+if test "$VIR_TEST_DEBUG" = "2"; then
+  debug() { echo "$@"; }
+fi
+
 # This is a stub function that is run upon trap (upon regular exit and
 # interrupt).  Override it with a per-test function, e.g., to unmount
 # a partition, or to undo any other global state changes.
@@ -220,9 +255,9 @@ trap '(exit $?); exit $?' 1 2 13 15
 
 cd "$t_" || error_ "failed to cd to $t_"
 
-if ( diff --version < /dev/null 2>&1 | grep GNU ) 2>&1 > /dev/null; then
+if ( diff --version < /dev/null 2>&1 | grep GNU ) > /dev/null 2>&1; then
   compare() { diff -u "$@"; }
-elif ( cmp --version < /dev/null 2>&1 | grep GNU ) 2>&1 > /dev/null; then
+elif ( cmp --version < /dev/null 2>&1 | grep GNU ) > /dev/null 2>&1; then
   compare() { cmp -s "$@"; }
 else
   compare() { cmp "$@"; }

@@ -12,21 +12,19 @@
 #include "testutils.h"
 #include "interface_conf.h"
 #include "testutilsqemu.h"
+#include "virstring.h"
 
-static char *progname;
-static char *abs_srcdir;
+#define VIR_FROM_THIS VIR_FROM_NONE
 
-#define MAX_FILE 4096
-
-
-static int testCompareXMLToXMLFiles(const char *xml) {
-    char xmlData[MAX_FILE];
-    char *xmlPtr = &(xmlData[0]);
+static int
+testCompareXMLToXMLFiles(const char *xml)
+{
+    char *xmlData = NULL;
     char *actual = NULL;
     int ret = -1;
     virInterfaceDefPtr dev = NULL;
 
-    if (virtTestLoadFile(xml, &xmlPtr, MAX_FILE) < 0)
+    if (virTestLoadFile(xml, &xmlData) < 0)
         goto fail;
 
     if (!(dev = virInterfaceDefParseString(xmlData)))
@@ -36,49 +34,48 @@ static int testCompareXMLToXMLFiles(const char *xml) {
         goto fail;
 
     if (STRNEQ(xmlData, actual)) {
-        virtTestDifference(stderr, xmlData, actual);
+        virTestDifferenceFull(stderr, xmlData, xml, actual, NULL);
         goto fail;
     }
 
     ret = 0;
 
  fail:
-    free(actual);
+    VIR_FREE(xmlData);
+    VIR_FREE(actual);
     virInterfaceDefFree(dev);
     return ret;
 }
 
-static int testCompareXMLToXMLHelper(const void *data) {
-    char xml[PATH_MAX];
-    snprintf(xml, PATH_MAX, "%s/interfaceschemadata/%s.xml",
-             abs_srcdir, (const char*)data);
-    return testCompareXMLToXMLFiles(xml);
+static int
+testCompareXMLToXMLHelper(const void *data)
+{
+    int result = -1;
+    char *xml = NULL;
+
+    if (virAsprintf(&xml, "%s/interfaceschemadata/%s.xml",
+                    abs_srcdir, (const char*)data) < 0)
+        return -1;
+
+    result = testCompareXMLToXMLFiles(xml);
+
+    VIR_FREE(xml);
+    return result;
 }
 
 
 static int
-mymain(int argc, char **argv)
+mymain(void)
 {
     int ret = 0;
-    char cwd[PATH_MAX];
 
-    progname = argv[0];
-
-    if (argc > 1) {
-        fprintf(stderr, "Usage: %s\n", progname);
-        return (EXIT_FAILURE);
-    }
-
-    abs_srcdir = getenv("abs_srcdir");
-    if (!abs_srcdir)
-        abs_srcdir = getcwd(cwd, sizeof(cwd));
-
-#define DO_TEST(name) \
-    if (virtTestRun("Interface XML-2-XML " name, \
-                    1, testCompareXMLToXMLHelper, (name)) < 0) \
+#define DO_TEST(name)                                           \
+    if (virTestRun("Interface XML-2-XML " name,                 \
+                   testCompareXMLToXMLHelper, (name)) < 0)      \
         ret = -1
 
     DO_TEST("ethernet-dhcp");
+    DO_TEST("ethernet-dhcp-and-multi-static");
     DO_TEST("ethernet-static");
     DO_TEST("ethernet-static-no-prefix");
     DO_TEST("bridge");
@@ -98,7 +95,7 @@ mymain(int argc, char **argv)
     DO_TEST("ipv6-static-multi");
     DO_TEST("ipv6-static");
 
-    return (ret==0 ? EXIT_SUCCESS : EXIT_FAILURE);
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

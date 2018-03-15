@@ -3,6 +3,46 @@
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Enum: AutoStartWaitHeartbeatSetting
+ */
+
+static const esxVI_Enumeration _esxVI_AutoStartWaitHeartbeatSetting_Enumeration = {
+    esxVI_Type_AutoStartWaitHeartbeatSetting, {
+        { "yes", esxVI_AutoStartWaitHeartbeatSetting_Yes },
+        { "no", esxVI_AutoStartWaitHeartbeatSetting_No },
+        { "systemDefault", esxVI_AutoStartWaitHeartbeatSetting_SystemDefault },
+        { NULL, -1 },
+    },
+};
+
+/* esxVI_AutoStartWaitHeartbeatSetting_Serialize */
+ESX_VI__TEMPLATE__ENUMERATION__SERIALIZE(AutoStartWaitHeartbeatSetting)
+
+/* esxVI_AutoStartWaitHeartbeatSetting_Deserialize */
+ESX_VI__TEMPLATE__ENUMERATION__DESERIALIZE(AutoStartWaitHeartbeatSetting)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Enum: FibreChannelPortType
+ */
+
+static const esxVI_Enumeration _esxVI_FibreChannelPortType_Enumeration = {
+    esxVI_Type_FibreChannelPortType, {
+        { "fabric", esxVI_FibreChannelPortType_Fabric },
+        { "loop", esxVI_FibreChannelPortType_Loop },
+        { "pointToPoint", esxVI_FibreChannelPortType_PointToPoint },
+        { "unknown", esxVI_FibreChannelPortType_Unknown },
+        { NULL, -1 },
+    },
+};
+
+/* esxVI_FibreChannelPortType_Deserialize */
+ESX_VI__TEMPLATE__ENUMERATION__DESERIALIZE(FibreChannelPortType)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * VI Enum: ManagedEntityStatus
  */
 
@@ -18,9 +58,6 @@ static const esxVI_Enumeration _esxVI_ManagedEntityStatus_Enumeration = {
 
 /* esxVI_ManagedEntityStatus_CastFromAnyType */
 ESX_VI__TEMPLATE__ENUMERATION__CAST_FROM_ANY_TYPE(ManagedEntityStatus)
-
-/* esxVI_ManagedEntityStatus_Serialize */
-ESX_VI__TEMPLATE__ENUMERATION__SERIALIZE(ManagedEntityStatus)
 
 /* esxVI_ManagedEntityStatus_Deserialize */
 ESX_VI__TEMPLATE__ENUMERATION__DESERIALIZE(ManagedEntityStatus)
@@ -40,9 +77,6 @@ static const esxVI_Enumeration _esxVI_ObjectUpdateKind_Enumeration = {
     },
 };
 
-/* esxVI_ObjectUpdateKind_Serialize */
-ESX_VI__TEMPLATE__ENUMERATION__SERIALIZE(ObjectUpdateKind)
-
 /* esxVI_ObjectUpdateKind_Deserialize */
 ESX_VI__TEMPLATE__ENUMERATION__DESERIALIZE(ObjectUpdateKind)
 
@@ -60,9 +94,6 @@ static const esxVI_Enumeration _esxVI_PerfStatsType_Enumeration = {
         { NULL, -1 },
     },
 };
-
-/* esxVI_PerfStatsType_Serialize */
-ESX_VI__TEMPLATE__ENUMERATION__SERIALIZE(PerfStatsType)
 
 /* esxVI_PerfStatsType_Deserialize */
 ESX_VI__TEMPLATE__ENUMERATION__DESERIALIZE(PerfStatsType)
@@ -85,9 +116,6 @@ static const esxVI_Enumeration _esxVI_PerfSummaryType_Enumeration = {
     },
 };
 
-/* esxVI_PerfSummaryType_Serialize */
-ESX_VI__TEMPLATE__ENUMERATION__SERIALIZE(PerfSummaryType)
-
 /* esxVI_PerfSummaryType_Deserialize */
 ESX_VI__TEMPLATE__ENUMERATION__DESERIALIZE(PerfSummaryType)
 
@@ -106,9 +134,6 @@ static const esxVI_Enumeration _esxVI_PropertyChangeOp_Enumeration = {
         { NULL, -1 },
     },
 };
-
-/* esxVI_PropertyChangeOp_Serialize */
-ESX_VI__TEMPLATE__ENUMERATION__SERIALIZE(PropertyChangeOp)
 
 /* esxVI_PropertyChangeOp_Deserialize */
 ESX_VI__TEMPLATE__ENUMERATION__DESERIALIZE(PropertyChangeOp)
@@ -154,9 +179,6 @@ static const esxVI_Enumeration _esxVI_TaskInfoState_Enumeration = {
 /* esxVI_TaskInfoState_CastFromAnyType */
 ESX_VI__TEMPLATE__ENUMERATION__CAST_FROM_ANY_TYPE(TaskInfoState)
 
-/* esxVI_TaskInfoState_Serialize */
-ESX_VI__TEMPLATE__ENUMERATION__SERIALIZE(TaskInfoState)
-
 /* esxVI_TaskInfoState_Deserialize */
 ESX_VI__TEMPLATE__ENUMERATION__DESERIALIZE(TaskInfoState)
 
@@ -177,9 +199,6 @@ static const esxVI_Enumeration _esxVI_VirtualMachineMovePriority_Enumeration = {
 
 /* esxVI_VirtualMachineMovePriority_Serialize */
 ESX_VI__TEMPLATE__ENUMERATION__SERIALIZE(VirtualMachineMovePriority)
-
-/* esxVI_VirtualMachineMovePriority_Deserialize */
-ESX_VI__TEMPLATE__ENUMERATION__DESERIALIZE(VirtualMachineMovePriority)
 
 
 
@@ -208,7 +227,7 @@ ESX_VI__TEMPLATE__ENUMERATION__DESERIALIZE(VirtualMachinePowerState)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: AboutInfo
+ * VI Object: AboutInfo
  */
 
 /* esxVI_AboutInfo_Alloc */
@@ -228,6 +247,9 @@ ESX_VI__TEMPLATE__FREE(AboutInfo,
     VIR_FREE(item->productLineId);
     VIR_FREE(item->apiType);
     VIR_FREE(item->apiVersion);
+    VIR_FREE(item->instanceUuid);
+    VIR_FREE(item->licenseProductName);
+    VIR_FREE(item->licenseProductVersion);
 })
 
 /* esxVI_AboutInfo_Validate */
@@ -244,22 +266,6 @@ ESX_VI__TEMPLATE__VALIDATE(AboutInfo,
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(apiVersion)
 })
 
-/* esxVI_AboutInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(AboutInfo,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, name)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, fullName)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, vendor)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, version)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, build)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, localeVersion)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, localeBuild)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, osType)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, productLineId)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, apiType)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, apiVersion)
-})
-
 /* esxVI_AboutInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(AboutInfo,
 {
@@ -274,13 +280,135 @@ ESX_VI__TEMPLATE__DESERIALIZE(AboutInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, productLineId)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, apiType)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, apiVersion)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, instanceUuid)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, licenseProductName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, licenseProductVersion)
 })
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: ChoiceOption
- *          extends OptionType
+ * VI Object: AutoStartDefaults
+ */
+
+/* esxVI_AutoStartDefaults_Alloc */
+ESX_VI__TEMPLATE__ALLOC(AutoStartDefaults)
+
+/* esxVI_AutoStartDefaults_Free */
+ESX_VI__TEMPLATE__FREE(AutoStartDefaults,
+{
+    esxVI_Int_Free(&item->startDelay);
+    esxVI_Int_Free(&item->stopDelay);
+    VIR_FREE(item->stopAction);
+})
+
+/* esxVI_AutoStartDefaults_Validate */
+ESX_VI__TEMPLATE__VALIDATE(AutoStartDefaults,
+{
+    /* no required properties */
+})
+
+/* esxVI_AutoStartDefaults_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(AutoStartDefaults)
+
+/* esxVI_AutoStartDefaults_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(AutoStartDefaults,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, enabled)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, startDelay)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, stopDelay)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, waitForHeartbeat)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, stopAction)
+})
+
+/* esxVI_AutoStartDefaults_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(AutoStartDefaults,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, enabled)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, startDelay)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, stopDelay)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, waitForHeartbeat)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, stopAction)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: AutoStartPowerInfo
+ */
+
+/* esxVI_AutoStartPowerInfo_Alloc */
+ESX_VI__TEMPLATE__ALLOC(AutoStartPowerInfo)
+
+/* esxVI_AutoStartPowerInfo_Free */
+ESX_VI__TEMPLATE__FREE(AutoStartPowerInfo,
+{
+    esxVI_AutoStartPowerInfo_Free(&item->_next);
+
+    esxVI_ManagedObjectReference_Free(&item->key);
+    esxVI_Int_Free(&item->startOrder);
+    esxVI_Int_Free(&item->startDelay);
+    VIR_FREE(item->startAction);
+    esxVI_Int_Free(&item->stopDelay);
+    VIR_FREE(item->stopAction);
+})
+
+/* esxVI_AutoStartPowerInfo_Validate */
+ESX_VI__TEMPLATE__VALIDATE(AutoStartPowerInfo,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(startOrder)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(startDelay)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(waitForHeartbeat)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(startAction)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(stopDelay)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(stopAction)
+})
+
+/* esxVI_AutoStartPowerInfo_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(AutoStartPowerInfo)
+
+/* esxVI_AutoStartPowerInfo_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(AutoStartPowerInfo)
+
+/* esxVI_AutoStartPowerInfo_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(AutoStartPowerInfo)
+
+/* esxVI_AutoStartPowerInfo_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(AutoStartPowerInfo,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, key)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, startOrder)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, startDelay)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(AutoStartWaitHeartbeatSetting, waitForHeartbeat)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, startAction)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, stopDelay)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, stopAction)
+})
+
+/* esxVI_AutoStartPowerInfo_SerializeList */
+ESX_VI__TEMPLATE__LIST__SERIALIZE(AutoStartPowerInfo)
+
+/* esxVI_AutoStartPowerInfo_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(AutoStartPowerInfo,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, startOrder)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, startDelay)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(AutoStartWaitHeartbeatSetting, waitForHeartbeat)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, startAction)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, stopDelay)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, stopAction)
+})
+
+/* esxVI_AutoStartPowerInfo_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(AutoStartPowerInfo)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: ChoiceOption
+ *            extends OptionType
  */
 
 /* esxVI_ChoiceOption_Alloc */
@@ -307,17 +435,6 @@ ESX_VI__TEMPLATE__VALIDATE(ChoiceOption,
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(choiceInfo)
 })
 
-/* esxVI_ChoiceOption_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(ChoiceOption,
-{
-    /* OptionType */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, valueIsReadonly)
-
-    /* ChoiceOption */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(ElementDescription, choiceInfo)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, defaultIndex)
-})
-
 /* esxVI_ChoiceOption_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(ChoiceOption,
 {
@@ -332,7 +449,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(ChoiceOption,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: DatastoreHostMount
+ * VI Object: DatastoreHostMount
  */
 
 /* esxVI_DatastoreHostMount_Alloc */
@@ -368,22 +485,10 @@ ESX_VI__TEMPLATE__DEEP_COPY(DatastoreHostMount,
 ESX_VI__TEMPLATE__LIST__DEEP_COPY(DatastoreHostMount)
 
 /* esxVI_DatastoreHostMount_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(DatastoreHostMount,
-{
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(DatastoreHostMount)
 
 /* esxVI_DatastoreHostMount_CastListFromAnyType */
 ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(DatastoreHostMount)
-
-/* esxVI_DatastoreHostMount_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(DatastoreHostMount,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, key)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostMountInfo, mountInfo)
-})
-
-/* esxVI_DatastoreHostMount_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(DatastoreHostMount)
 
 /* esxVI_DatastoreHostMount_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(DatastoreHostMount,
@@ -398,10 +503,10 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(DatastoreHostMount)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: DatastoreInfo
- *          extended by LocalDatastoreInfo
- *                      NasDatastoreInfo
- *                      VmfsDatastoreInfo
+ * VI Object: DatastoreInfo
+ *            extended by LocalDatastoreInfo
+ *                        NasDatastoreInfo
+ *                        VmfsDatastoreInfo
  */
 
 /* esxVI_DatastoreInfo_Alloc */
@@ -410,6 +515,7 @@ ESX_VI__TEMPLATE__ALLOC(DatastoreInfo)
 /* esxVI_DatastoreInfo_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(DatastoreInfo,
 {
+    /* DatastoreInfo */
     ESX_VI__TEMPLATE__DISPATCH__FREE(LocalDatastoreInfo)
     ESX_VI__TEMPLATE__DISPATCH__FREE(NasDatastoreInfo)
     ESX_VI__TEMPLATE__DISPATCH__FREE(VmfsDatastoreInfo)
@@ -419,6 +525,7 @@ ESX_VI__TEMPLATE__DYNAMIC_FREE(DatastoreInfo,
     VIR_FREE(item->url);
     esxVI_Long_Free(&item->freeSpace);
     esxVI_Long_Free(&item->maxFileSize);
+    esxVI_DateTime_Free(&item->timestamp);
 })
 
 /* esxVI_DatastoreInfo_Validate */
@@ -440,30 +547,18 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(DatastoreInfo,
 })
 
 /* esxVI_DatastoreInfo_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(DatastoreInfo,
+ESX_VI__TEMPLATE__DYNAMIC_CAST_FROM_ANY_TYPE(DatastoreInfo,
 {
+    /* DatastoreInfo */
     ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(LocalDatastoreInfo)
     ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(NasDatastoreInfo)
     ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(VmfsDatastoreInfo)
 })
 
-/* esxVI_DatastoreInfo_Serialize */
-ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(DatastoreInfo,
-{
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(LocalDatastoreInfo)
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(NasDatastoreInfo)
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(VmfsDatastoreInfo)
-},
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, name)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, url)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, freeSpace)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, maxFileSize)
-})
-
 /* esxVI_DatastoreInfo_Deserialize */
 ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(DatastoreInfo,
 {
+    /* DatastoreInfo */
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(LocalDatastoreInfo)
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(NasDatastoreInfo)
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmfsDatastoreInfo)
@@ -473,13 +568,14 @@ ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(DatastoreInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, url)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, freeSpace)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, maxFileSize)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, timestamp)
 })
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: Description
- *          extended by ElementDescription
+ * VI Object: Description
+ *            extended by ElementDescription
  */
 
 /* esxVI_Description_Alloc */
@@ -488,7 +584,11 @@ ESX_VI__TEMPLATE__ALLOC(Description)
 /* esxVI_Description_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(Description,
 {
+    /* Description */
     ESX_VI__TEMPLATE__DISPATCH__FREE(ElementDescription)
+
+    /* ElementDescription */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(ExtendedElementDescription)
 },
 {
     esxVI_Description_Free(&item->_next);
@@ -504,26 +604,27 @@ ESX_VI__TEMPLATE__VALIDATE(Description,
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(summary)
 })
 
-/* esxVI_Description_AppendToList */
-ESX_VI__TEMPLATE__LIST__APPEND(Description)
+/* esxVI_Description_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(Description,
+{
+    /* Description */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(ElementDescription)
 
-/* esxVI_Description_Serialize */
-ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(Description,
-{
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(ElementDescription)
-},
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, label)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, summary)
+    /* ElementDescription */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(ExtendedElementDescription)
 })
 
-/* esxVI_Description_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(Description)
+/* esxVI_Description_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(Description)
 
 /* esxVI_Description_Deserialize */
 ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(Description,
 {
+    /* Description */
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(ElementDescription)
+
+    /* ElementDescription */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(ExtendedElementDescription)
 },
 {
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, label)
@@ -536,7 +637,55 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(Description)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: DynamicProperty
+ * VI Object: DeviceBackedVirtualDiskSpec
+ *            extends VirtualDiskSpec
+ */
+
+/* esxVI_DeviceBackedVirtualDiskSpec_Alloc */
+ESX_VI__TEMPLATE__ALLOC(DeviceBackedVirtualDiskSpec)
+
+/* esxVI_DeviceBackedVirtualDiskSpec_Free */
+ESX_VI__TEMPLATE__FREE(DeviceBackedVirtualDiskSpec,
+{
+    /* VirtualDiskSpec */
+    VIR_FREE(item->diskType);
+    VIR_FREE(item->adapterType);
+
+    /* DeviceBackedVirtualDiskSpec */
+    VIR_FREE(item->device);
+})
+
+/* esxVI_DeviceBackedVirtualDiskSpec_Validate */
+ESX_VI__TEMPLATE__VALIDATE(DeviceBackedVirtualDiskSpec,
+{
+    /* VirtualDiskSpec */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(diskType)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(adapterType)
+
+    /* DeviceBackedVirtualDiskSpec */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(device)
+})
+
+/* esxVI_DeviceBackedVirtualDiskSpec_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(DeviceBackedVirtualDiskSpec,
+{
+})
+
+/* esxVI_DeviceBackedVirtualDiskSpec_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(DeviceBackedVirtualDiskSpec,
+{
+    /* VirtualDiskSpec */
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, diskType)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, adapterType)
+
+    /* DeviceBackedVirtualDiskSpec */
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, device)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: DynamicProperty
  */
 
 /* esxVI_DynamicProperty_Alloc */
@@ -584,17 +733,25 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(DynamicProperty)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: ElementDescription
- *          extends Description
+ * VI Object: ElementDescription
+ *            extends Description
+ *            extended by ExtendedElementDescription
  */
 
 /* esxVI_ElementDescription_Alloc */
 ESX_VI__TEMPLATE__ALLOC(ElementDescription)
 
 /* esxVI_ElementDescription_Free */
-ESX_VI__TEMPLATE__FREE(ElementDescription,
+ESX_VI__TEMPLATE__DYNAMIC_FREE(ElementDescription,
 {
-    esxVI_Description_Free((esxVI_Description **)&item->_next);
+    /* ElementDescription */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(ExtendedElementDescription)
+},
+{
+    esxVI_Description *next = (esxVI_Description *)item->_next;
+
+    esxVI_Description_Free(&next);
+    item->_next = (esxVI_ElementDescription *)next;
 
     /* Description */
     VIR_FREE(item->label);
@@ -615,25 +772,22 @@ ESX_VI__TEMPLATE__VALIDATE(ElementDescription,
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
 })
 
+/* esxVI_ElementDescription_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(ElementDescription,
+{
+    /* ElementDescription */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(ExtendedElementDescription)
+})
+
 /* esxVI_ElementDescription_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(ElementDescription)
 
-/* esxVI_ElementDescription_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(ElementDescription,
-{
-    /* Description */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, label)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, summary)
-
-    /* ElementDescription */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, key)
-})
-
-/* esxVI_ElementDescription_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(ElementDescription)
-
 /* esxVI_ElementDescription_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(ElementDescription,
+ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(ElementDescription,
+{
+    /* ElementDescription */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(ExtendedElementDescription)
+},
 {
     /* Description */
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, label)
@@ -649,90 +803,224 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(ElementDescription)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: Event
+ * VI Object: EntityEventArgument
+ *            extends EventArgument
+ *            extended by VmEventArgument
  */
 
-/* esxVI_Event_Alloc */
-ESX_VI__TEMPLATE__ALLOC(Event)
+/* esxVI_EntityEventArgument_Alloc */
+ESX_VI__TEMPLATE__ALLOC(EntityEventArgument)
 
-/* esxVI_Event_Free */
-ESX_VI__TEMPLATE__FREE(Event,
+/* esxVI_EntityEventArgument_Free */
+ESX_VI__TEMPLATE__DYNAMIC_FREE(EntityEventArgument,
 {
-    esxVI_Event_Free(&item->_next);
+    /* EntityEventArgument */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(VmEventArgument)
+},
+{
+    /* EventArgument */
+    /* no properties */
 
-    esxVI_Int_Free(&item->key);
-    esxVI_Int_Free(&item->chainId);
-    esxVI_DateTime_Free(&item->createdTime);
-    VIR_FREE(item->userName);
-    /* FIXME: datacenter is currently ignored */
-    /* FIXME: computeResource is currently ignored */
-    /* FIXME: host is currently ignored */
-    /* FIXME: vm is currently ignored */
-    VIR_FREE(item->fullFormattedMessage);
+    /* EntityEventArgument */
+    VIR_FREE(item->name);
 })
 
-/* esxVI_Event_Validate */
-ESX_VI__TEMPLATE__VALIDATE(Event,
+/* esxVI_EntityEventArgument_Validate */
+ESX_VI__TEMPLATE__VALIDATE(EntityEventArgument,
 {
-    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
-    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(chainId)
-    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(createdTime)
-    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(userName)
-    /* FIXME: datacenter is currently ignored */
-    /* FIXME: computeResource is currently ignored */
-    /* FIXME: host is currently ignored */
-    /* FIXME: vm is currently ignored */
+    /* EventArgument */
+    /* no properties */
+
+    /* EntityEventArgument */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(name)
 })
 
-/* esxVI_Event_AppendToList */
-ESX_VI__TEMPLATE__LIST__APPEND(Event)
-
-/* esxVI_Event_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(Event,
+/* esxVI_EntityEventArgument_Deserialize */
+ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(EntityEventArgument,
 {
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, key)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, chainId)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, createdTime)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, userName)
-    /* FIXME: datacenter is currently ignored */
-    /* FIXME: computeResource is currently ignored */
-    /* FIXME: host is currently ignored */
-    /* FIXME: vm is currently ignored */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, fullFormattedMessage)
-})
-
-/* esxVI_Event_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(Event)
-
-/* esxVI_Event_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(Event,
+    /* EntityEventArgument */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmEventArgument)
+},
 {
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, key)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, chainId)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, createdTime)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, userName)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(datacenter) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(computeResource) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(host) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(vm) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, fullFormattedMessage)
-})
+    /* EventArgument */
+    /* no properties */
 
-/* esxVI_Event_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(Event)
+    /* EntityEventArgument */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, name)
+})
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: FileInfo
- *          extended by FloppyImageFileInfo
- *                      FolderFileInfo
- *                      IsoImageFileInfo
- *                      VmConfigFileInfo
- *                      VmDiskFileInfo
- *                      VmLogFileInfo
- *                      VmNvramFileInfo
- *                      VmSnapshotFileInfo
+ * VI Object: EventArgument
+ *            extended by EntityEventArgument
+ */
+
+/* esxVI_EventArgument_Alloc */
+ESX_VI__TEMPLATE__ALLOC(EventArgument)
+
+/* esxVI_EventArgument_Free */
+ESX_VI__TEMPLATE__DYNAMIC_FREE(EventArgument,
+{
+    /* EventArgument */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(EntityEventArgument)
+
+    /* EntityEventArgument */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(VmEventArgument)
+},
+{
+    /* no properties */
+})
+
+/* esxVI_EventArgument_Validate */
+ESX_VI__TEMPLATE__VALIDATE(EventArgument,
+{
+    /* no properties */
+})
+
+/* esxVI_EventArgument_Deserialize */
+ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(EventArgument,
+{
+    /* EventArgument */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(EntityEventArgument)
+
+    /* EntityEventArgument */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmEventArgument)
+},
+{
+    /* no properties */
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: ExtendedElementDescription
+ *            extends ElementDescription
+ */
+
+/* esxVI_ExtendedElementDescription_Alloc */
+ESX_VI__TEMPLATE__ALLOC(ExtendedElementDescription)
+
+/* esxVI_ExtendedElementDescription_Free */
+ESX_VI__TEMPLATE__FREE(ExtendedElementDescription,
+{
+    esxVI_ElementDescription *next = (esxVI_ElementDescription *)item->_next;
+
+    esxVI_ElementDescription_Free(&next);
+    item->_next = (esxVI_ExtendedElementDescription *)next;
+
+    /* Description */
+    VIR_FREE(item->label);
+    VIR_FREE(item->summary);
+
+    /* ElementDescription */
+    VIR_FREE(item->key);
+
+    /* ExtendedElementDescription */
+    VIR_FREE(item->messageCatalogKeyPrefix);
+    esxVI_KeyAnyValue_Free(&item->messageArg);
+})
+
+/* esxVI_ExtendedElementDescription_Validate */
+ESX_VI__TEMPLATE__VALIDATE(ExtendedElementDescription,
+{
+    /* Description */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(label)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(summary)
+
+    /* ElementDescription */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
+
+    /* ExtendedElementDescription */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(messageCatalogKeyPrefix)
+})
+
+/* esxVI_ExtendedElementDescription_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(ExtendedElementDescription,
+{
+})
+
+/* esxVI_ExtendedElementDescription_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(ExtendedElementDescription)
+
+/* esxVI_ExtendedElementDescription_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(ExtendedElementDescription,
+{
+    /* Description */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, label)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, summary)
+
+    /* ElementDescription */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+
+    /* ExtendedElementDescription */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, messageCatalogKeyPrefix)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(KeyAnyValue, messageArg)
+})
+
+/* esxVI_ExtendedElementDescription_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(ExtendedElementDescription)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: FileBackedVirtualDiskSpec
+ *            extends VirtualDiskSpec
+ */
+
+/* esxVI_FileBackedVirtualDiskSpec_Alloc */
+ESX_VI__TEMPLATE__ALLOC(FileBackedVirtualDiskSpec)
+
+/* esxVI_FileBackedVirtualDiskSpec_Free */
+ESX_VI__TEMPLATE__FREE(FileBackedVirtualDiskSpec,
+{
+    /* VirtualDiskSpec */
+    VIR_FREE(item->diskType);
+    VIR_FREE(item->adapterType);
+
+    /* FileBackedVirtualDiskSpec */
+    esxVI_Long_Free(&item->capacityKb);
+})
+
+/* esxVI_FileBackedVirtualDiskSpec_Validate */
+ESX_VI__TEMPLATE__VALIDATE(FileBackedVirtualDiskSpec,
+{
+    /* VirtualDiskSpec */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(diskType)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(adapterType)
+
+    /* FileBackedVirtualDiskSpec */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(capacityKb)
+})
+
+/* esxVI_FileBackedVirtualDiskSpec_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(FileBackedVirtualDiskSpec,
+{
+})
+
+/* esxVI_FileBackedVirtualDiskSpec_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(FileBackedVirtualDiskSpec,
+{
+    /* VirtualDiskSpec */
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, diskType)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, adapterType)
+
+    /* FileBackedVirtualDiskSpec */
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, capacityKb)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: FileInfo
+ *            extended by FloppyImageFileInfo
+ *                        FolderFileInfo
+ *                        IsoImageFileInfo
+ *                        VmConfigFileInfo
+ *                        VmDiskFileInfo
+ *                        VmLogFileInfo
+ *                        VmNvramFileInfo
+ *                        VmSnapshotFileInfo
  */
 
 /* esxVI_FileInfo_Alloc */
@@ -741,6 +1029,7 @@ ESX_VI__TEMPLATE__ALLOC(FileInfo)
 /* esxVI_FileInfo_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(FileInfo,
 {
+    /* FileInfo */
     ESX_VI__TEMPLATE__DISPATCH__FREE(FloppyImageFileInfo)
     ESX_VI__TEMPLATE__DISPATCH__FREE(FolderFileInfo)
     ESX_VI__TEMPLATE__DISPATCH__FREE(IsoImageFileInfo)
@@ -749,6 +1038,9 @@ ESX_VI__TEMPLATE__DYNAMIC_FREE(FileInfo,
     ESX_VI__TEMPLATE__DISPATCH__FREE(VmLogFileInfo)
     ESX_VI__TEMPLATE__DISPATCH__FREE(VmNvramFileInfo)
     ESX_VI__TEMPLATE__DISPATCH__FREE(VmSnapshotFileInfo)
+
+    /* VmConfigFileInfo */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(TemplateConfigFileInfo)
 },
 {
     esxVI_FileInfo_Free(&item->_next);
@@ -756,6 +1048,7 @@ ESX_VI__TEMPLATE__DYNAMIC_FREE(FileInfo,
     VIR_FREE(item->path);
     esxVI_Long_Free(&item->fileSize);
     esxVI_DateTime_Free(&item->modification);
+    VIR_FREE(item->owner);
 })
 
 /* esxVI_FileInfo_Validate */
@@ -784,30 +1077,10 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(FileInfo,
 /* esxVI_FileInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(FileInfo)
 
-/* esxVI_FileInfo_Serialize */
-ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(FileInfo,
-{
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(FloppyImageFileInfo)
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(FolderFileInfo)
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(IsoImageFileInfo)
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(VmConfigFileInfo)
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(VmDiskFileInfo)
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(VmLogFileInfo)
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(VmNvramFileInfo)
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(VmSnapshotFileInfo)
-},
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, modification)
-})
-
-/* esxVI_FileInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(FileInfo)
-
 /* esxVI_FileInfo_Deserialize */
 ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(FileInfo,
 {
+    /* FileInfo */
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(FloppyImageFileInfo)
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(FolderFileInfo)
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(IsoImageFileInfo)
@@ -816,11 +1089,15 @@ ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(FileInfo,
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmLogFileInfo)
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmNvramFileInfo)
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmSnapshotFileInfo)
+
+    /* VmConfigFileInfo */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(TemplateConfigFileInfo)
 },
 {
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, modification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, owner)
 })
 
 /* esxVI_FileInfo_DeserializeList */
@@ -829,15 +1106,15 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(FileInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: FileQuery
- *          extended by FloppyImageFileQuery
- *                      FolderFileQuery
- *                      IsoImageFileQuery
- *                      VmConfigFileQuery
- *                      VmDiskFileQuery
- *                      VmLogFileQuery
- *                      VmNvramFileQuery
- *                      VmSnapshotFileQuery
+ * VI Object: FileQuery
+ *            extended by FloppyImageFileQuery
+ *                        FolderFileQuery
+ *                        IsoImageFileQuery
+ *                        VmConfigFileQuery
+ *                        VmDiskFileQuery
+ *                        VmLogFileQuery
+ *                        VmNvramFileQuery
+ *                        VmSnapshotFileQuery
  */
 
 /* esxVI_FileQuery_Alloc */
@@ -846,6 +1123,7 @@ ESX_VI__TEMPLATE__ALLOC(FileQuery)
 /* esxVI_FileQuery_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(FileQuery,
 {
+    /* FileQuery */
     ESX_VI__TEMPLATE__DISPATCH__FREE(FloppyImageFileQuery)
     ESX_VI__TEMPLATE__DISPATCH__FREE(FolderFileQuery)
     ESX_VI__TEMPLATE__DISPATCH__FREE(IsoImageFileQuery)
@@ -854,6 +1132,9 @@ ESX_VI__TEMPLATE__DYNAMIC_FREE(FileQuery,
     ESX_VI__TEMPLATE__DISPATCH__FREE(VmLogFileQuery)
     ESX_VI__TEMPLATE__DISPATCH__FREE(VmNvramFileQuery)
     ESX_VI__TEMPLATE__DISPATCH__FREE(VmSnapshotFileQuery)
+
+    /* VmConfigFileQuery */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(TemplateConfigFileQuery)
 },
 {
     esxVI_FileQuery_Free(&item->_next);
@@ -890,6 +1171,7 @@ ESX_VI__TEMPLATE__LIST__APPEND(FileQuery)
 /* esxVI_FileQuery_Serialize */
 ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(FileQuery,
 {
+    /* FileQuery */
     ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(FloppyImageFileQuery)
     ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(FolderFileQuery)
     ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(IsoImageFileQuery)
@@ -898,6 +1180,9 @@ ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(FileQuery,
     ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(VmLogFileQuery)
     ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(VmNvramFileQuery)
     ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(VmSnapshotFileQuery)
+
+    /* VmConfigFileQuery */
+    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(TemplateConfigFileQuery)
 },
 {
     /* no properties */
@@ -906,29 +1191,10 @@ ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(FileQuery,
 /* esxVI_FileQuery_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(FileQuery)
 
-/* esxVI_FileQuery_Deserialize */
-ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(FileQuery,
-{
-    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(FloppyImageFileQuery)
-    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(FolderFileQuery)
-    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(IsoImageFileQuery)
-    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmConfigFileQuery)
-    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmDiskFileQuery)
-    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmLogFileQuery)
-    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmNvramFileQuery)
-    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(VmSnapshotFileQuery)
-},
-{
-    /* no properties */
-})
-
-/* esxVI_FileQuery_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(FileQuery)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: FileQueryFlags
+ * VI Object: FileQueryFlags
  */
 
 /* esxVI_FileQueryFlags_Alloc */
@@ -954,21 +1220,14 @@ ESX_VI__TEMPLATE__SERIALIZE(FileQueryFlags,
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, fileType)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, modification)
-})
-
-/* esxVI_FileQueryFlags_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(FileQueryFlags,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, fileType)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, modification)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, fileOwner)
 })
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: FloppyImageFileInfo
- *          extends FileInfo
+ * VI Object: FloppyImageFileInfo
+ *            extends FileInfo
  */
 
 /* esxVI_FloppyImageFileInfo_Alloc */
@@ -977,12 +1236,16 @@ ESX_VI__TEMPLATE__ALLOC(FloppyImageFileInfo)
 /* esxVI_FloppyImageFileInfo_Free */
 ESX_VI__TEMPLATE__FREE(FloppyImageFileInfo,
 {
-    esxVI_FileInfo_Free((esxVI_FileInfo **)&item->_next);
+    esxVI_FileInfo *next = (esxVI_FileInfo *)item->_next;
+
+    esxVI_FileInfo_Free(&next);
+    item->_next = (esxVI_FloppyImageFileInfo *)next;
 
     /* FileInfo */
     VIR_FREE(item->path);
     esxVI_Long_Free(&item->fileSize);
     esxVI_DateTime_Free(&item->modification);
+    VIR_FREE(item->owner);
 
     /* FloppyImageFileInfo */
     /* no properties */
@@ -1006,21 +1269,6 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(FloppyImageFileInfo,
 /* esxVI_FloppyImageFileInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(FloppyImageFileInfo)
 
-/* esxVI_FloppyImageFileInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(FloppyImageFileInfo,
-{
-    /* FileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, modification)
-
-    /* FloppyImageFileInfo */
-    /* no properties */
-})
-
-/* esxVI_FloppyImageFileInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(FloppyImageFileInfo)
-
 /* esxVI_FloppyImageFileInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(FloppyImageFileInfo,
 {
@@ -1028,6 +1276,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(FloppyImageFileInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, modification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, owner)
 
     /* FloppyImageFileInfo */
     /* no properties */
@@ -1039,8 +1288,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(FloppyImageFileInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: FloppyImageFileQuery
- *          extends FileQuery
+ * VI Object: FloppyImageFileQuery
+ *            extends FileQuery
  */
 
 /* esxVI_FloppyImageFileQuery_Alloc */
@@ -1049,7 +1298,10 @@ ESX_VI__TEMPLATE__ALLOC(FloppyImageFileQuery)
 /* esxVI_FloppyImageFileQuery_Free */
 ESX_VI__TEMPLATE__FREE(FloppyImageFileQuery,
 {
-    esxVI_FileQuery_Free((esxVI_FileQuery **)&item->_next);
+    esxVI_FileQuery *next = (esxVI_FileQuery *)item->_next;
+
+    esxVI_FileQuery_Free(&next);
+    item->_next = (esxVI_FloppyImageFileQuery *)next;
 
     /* FileQuery */
     /* no properties */
@@ -1089,24 +1341,11 @@ ESX_VI__TEMPLATE__SERIALIZE(FloppyImageFileQuery,
 /* esxVI_FloppyImageFileQuery_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(FloppyImageFileQuery)
 
-/* esxVI_FloppyImageFileQuery_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(FloppyImageFileQuery,
-{
-    /* FileQuery */
-    /* no properties */
-
-    /* FloppyImageFileQuery */
-    /* no properties */
-})
-
-/* esxVI_FloppyImageFileQuery_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(FloppyImageFileQuery)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: FolderFileInfo
- *          extends FileInfo
+ * VI Object: FolderFileInfo
+ *            extends FileInfo
  */
 
 /* esxVI_FolderFileInfo_Alloc */
@@ -1115,12 +1354,16 @@ ESX_VI__TEMPLATE__ALLOC(FolderFileInfo)
 /* esxVI_FolderFileInfo_Free */
 ESX_VI__TEMPLATE__FREE(FolderFileInfo,
 {
-    esxVI_FileInfo_Free((esxVI_FileInfo **)&item->_next);
+    esxVI_FileInfo *next = (esxVI_FileInfo *)item->_next;
+
+    esxVI_FileInfo_Free(&next);
+    item->_next = (esxVI_FolderFileInfo *)next;
 
     /* FileInfo */
     VIR_FREE(item->path);
     esxVI_Long_Free(&item->fileSize);
     esxVI_DateTime_Free(&item->modification);
+    VIR_FREE(item->owner);
 
     /* FolderFileInfo */
     /* no properties */
@@ -1144,21 +1387,6 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(FolderFileInfo,
 /* esxVI_FolderFileInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(FolderFileInfo)
 
-/* esxVI_FolderFileInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(FolderFileInfo,
-{
-    /* FileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, modification)
-
-    /* FolderFileInfo */
-    /* no properties */
-})
-
-/* esxVI_FolderFileInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(FolderFileInfo)
-
 /* esxVI_FolderFileInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(FolderFileInfo,
 {
@@ -1166,6 +1394,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(FolderFileInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, modification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, owner)
 
     /* FolderFileInfo */
     /* no properties */
@@ -1177,8 +1406,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(FolderFileInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: FolderFileQuery
- *          extends FileQuery
+ * VI Object: FolderFileQuery
+ *            extends FileQuery
  */
 
 /* esxVI_FolderFileQuery_Alloc */
@@ -1187,7 +1416,10 @@ ESX_VI__TEMPLATE__ALLOC(FolderFileQuery)
 /* esxVI_FolderFileQuery_Free */
 ESX_VI__TEMPLATE__FREE(FolderFileQuery,
 {
-    esxVI_FileQuery_Free((esxVI_FileQuery **)&item->_next);
+    esxVI_FileQuery *next = (esxVI_FileQuery *)item->_next;
+
+    esxVI_FileQuery_Free(&next);
+    item->_next = (esxVI_FolderFileQuery *)next;
 
     /* FileQuery */
     /* no properties */
@@ -1227,23 +1459,250 @@ ESX_VI__TEMPLATE__SERIALIZE(FolderFileQuery,
 /* esxVI_FolderFileQuery_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(FolderFileQuery)
 
-/* esxVI_FolderFileQuery_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(FolderFileQuery,
-{
-    /* FileQuery */
-    /* no properties */
 
-    /* FolderFileQuery */
-    /* no properties */
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostAutoStartManagerConfig
+ */
+
+/* esxVI_HostAutoStartManagerConfig_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostAutoStartManagerConfig)
+
+/* esxVI_HostAutoStartManagerConfig_Free */
+ESX_VI__TEMPLATE__FREE(HostAutoStartManagerConfig,
+{
+    esxVI_AutoStartDefaults_Free(&item->defaults);
+    esxVI_AutoStartPowerInfo_Free(&item->powerInfo);
 })
 
-/* esxVI_FolderFileQuery_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(FolderFileQuery)
+/* esxVI_HostAutoStartManagerConfig_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostAutoStartManagerConfig,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostAutoStartManagerConfig_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostAutoStartManagerConfig,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(AutoStartDefaults, defaults)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(AutoStartPowerInfo, powerInfo)
+})
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: HostCpuIdInfo
+ * VI Object: HostBlockAdapterTargetTransport
+ *            extends HostTargetTransport
+ */
+
+/* esxVI_HostBlockAdapterTargetTransport_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostBlockAdapterTargetTransport)
+
+/* esxVI_HostBlockAdapterTargetTransport_Free */
+ESX_VI__TEMPLATE__FREE(HostBlockAdapterTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostBlockAdapterTargetTransport */
+    /* no properties */
+})
+
+/* esxVI_HostBlockAdapterTargetTransport_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostBlockAdapterTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostBlockAdapterTargetTransport */
+    /* no properties */
+})
+
+/* esxVI_HostBlockAdapterTargetTransport_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostBlockAdapterTargetTransport,
+{
+})
+
+/* esxVI_HostBlockAdapterTargetTransport_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostBlockAdapterTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostBlockAdapterTargetTransport */
+    /* no properties */
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostBlockHba
+ *            extends HostHostBusAdapter
+ */
+
+/* esxVI_HostBlockHba_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostBlockHba)
+
+/* esxVI_HostBlockHba_Free */
+ESX_VI__TEMPLATE__FREE(HostBlockHba,
+{
+    esxVI_HostHostBusAdapter *next = (esxVI_HostHostBusAdapter *)item->_next;
+
+    esxVI_HostHostBusAdapter_Free(&next);
+    item->_next = (esxVI_HostBlockHba *)next;
+
+    /* HostHostBusAdapter */
+    VIR_FREE(item->key);
+    VIR_FREE(item->device);
+    esxVI_Int_Free(&item->bus);
+    VIR_FREE(item->status);
+    VIR_FREE(item->model);
+    VIR_FREE(item->driver);
+    VIR_FREE(item->pci);
+
+    /* HostBlockHba */
+    /* no properties */
+})
+
+/* esxVI_HostBlockHba_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostBlockHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(device)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(bus)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(status)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(model)
+
+    /* HostBlockHba */
+    /* no properties */
+})
+
+/* esxVI_HostBlockHba_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostBlockHba,
+{
+})
+
+/* esxVI_HostBlockHba_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostBlockHba)
+
+/* esxVI_HostBlockHba_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostBlockHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, bus)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, status)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, pci)
+
+    /* HostBlockHba */
+    /* no properties */
+})
+
+/* esxVI_HostBlockHba_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostBlockHba)
+
+/* esxVI_HostBlockHba_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostBlockHba)
+
+/* esxVI_HostBlockHba_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostBlockHba)
+
+/* esxVI_HostBlockHba_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostBlockHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, bus)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, status)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, pci)
+
+    /* HostBlockHba */
+    /* no properties */
+})
+
+/* esxVI_HostBlockHba_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostBlockHba)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostConfigManager
+ */
+
+/* esxVI_HostConfigManager_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostConfigManager)
+
+/* esxVI_HostConfigManager_Free */
+ESX_VI__TEMPLATE__FREE(HostConfigManager,
+{
+    esxVI_ManagedObjectReference_Free(&item->cpuScheduler);
+    esxVI_ManagedObjectReference_Free(&item->datastoreSystem);
+    esxVI_ManagedObjectReference_Free(&item->memoryManager);
+    esxVI_ManagedObjectReference_Free(&item->storageSystem);
+    esxVI_ManagedObjectReference_Free(&item->networkSystem);
+    esxVI_ManagedObjectReference_Free(&item->vmotionSystem);
+    esxVI_ManagedObjectReference_Free(&item->virtualNicManager);
+    esxVI_ManagedObjectReference_Free(&item->serviceSystem);
+    esxVI_ManagedObjectReference_Free(&item->firewallSystem);
+    esxVI_ManagedObjectReference_Free(&item->advancedOption);
+    esxVI_ManagedObjectReference_Free(&item->diagnosticSystem);
+    esxVI_ManagedObjectReference_Free(&item->autoStartManager);
+    esxVI_ManagedObjectReference_Free(&item->snmpSystem);
+    esxVI_ManagedObjectReference_Free(&item->dateTimeSystem);
+    esxVI_ManagedObjectReference_Free(&item->patchManager);
+    esxVI_ManagedObjectReference_Free(&item->bootDeviceSystem);
+    esxVI_ManagedObjectReference_Free(&item->firmwareSystem);
+    esxVI_ManagedObjectReference_Free(&item->healthStatusSystem);
+    esxVI_ManagedObjectReference_Free(&item->pciPassthruSystem);
+    esxVI_ManagedObjectReference_Free(&item->licenseManager);
+    esxVI_ManagedObjectReference_Free(&item->kernelModuleSystem);
+})
+
+/* esxVI_HostConfigManager_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostConfigManager,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostConfigManager_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostConfigManager)
+
+/* esxVI_HostConfigManager_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostConfigManager,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, cpuScheduler)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, datastoreSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, memoryManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, storageSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, networkSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, vmotionSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, virtualNicManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, serviceSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, firewallSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, advancedOption)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, diagnosticSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, autoStartManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, snmpSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, dateTimeSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, patchManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, bootDeviceSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, firmwareSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, healthStatusSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, pciPassthruSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, licenseManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, kernelModuleSystem)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostCpuIdInfo
  */
 
 /* esxVI_HostCpuIdInfo_Alloc */
@@ -1272,26 +1731,10 @@ ESX_VI__TEMPLATE__VALIDATE(HostCpuIdInfo,
 ESX_VI__TEMPLATE__LIST__APPEND(HostCpuIdInfo)
 
 /* esxVI_HostCpuIdInfo_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostCpuIdInfo,
-{
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostCpuIdInfo)
 
 /* esxVI_HostCpuIdInfo_CastListFromAnyType */
 ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostCpuIdInfo)
-
-/* esxVI_HostCpuIdInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(HostCpuIdInfo,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, level)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, vendor)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, eax)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, ebx)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, ecx)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, edx)
-})
-
-/* esxVI_HostCpuIdInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(HostCpuIdInfo)
 
 /* esxVI_HostCpuIdInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(HostCpuIdInfo,
@@ -1310,7 +1753,7 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostCpuIdInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: HostDatastoreBrowserSearchResults
+ * VI Object: HostDatastoreBrowserSearchResults
  */
 
 /* esxVI_HostDatastoreBrowserSearchResults_Alloc */
@@ -1336,23 +1779,10 @@ ESX_VI__TEMPLATE__VALIDATE(HostDatastoreBrowserSearchResults,
 ESX_VI__TEMPLATE__LIST__APPEND(HostDatastoreBrowserSearchResults)
 
 /* esxVI_HostDatastoreBrowserSearchResults_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostDatastoreBrowserSearchResults,
-{
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostDatastoreBrowserSearchResults)
 
 /* esxVI_HostDatastoreBrowserSearchResults_CastListFromAnyType */
 ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostDatastoreBrowserSearchResults)
-
-/* esxVI_HostDatastoreBrowserSearchResults_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(HostDatastoreBrowserSearchResults,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, datastore)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, folderPath)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(FileInfo, file)
-})
-
-/* esxVI_HostDatastoreBrowserSearchResults_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(HostDatastoreBrowserSearchResults)
 
 /* esxVI_HostDatastoreBrowserSearchResults_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(HostDatastoreBrowserSearchResults,
@@ -1368,7 +1798,7 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostDatastoreBrowserSearchResults)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: HostDatastoreBrowserSearchSpec
+ * VI Object: HostDatastoreBrowserSearchSpec
  */
 
 /* esxVI_HostDatastoreBrowserSearchSpec_Alloc */
@@ -1398,22 +1828,297 @@ ESX_VI__TEMPLATE__SERIALIZE(HostDatastoreBrowserSearchSpec,
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, sortFoldersFirst)
 })
 
-/* esxVI_HostDatastoreBrowserSearchSpec_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(HostDatastoreBrowserSearchSpec,
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostDevice
+ *            extended by ScsiLun
+ */
+
+/* esxVI_HostDevice_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostDevice)
+
+/* esxVI_HostDevice_Free */
+ESX_VI__TEMPLATE__DYNAMIC_FREE(HostDevice,
 {
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(FileQuery, query)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(FileQueryFlags, details)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, searchCaseInsensitive)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, matchPattern)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, sortFoldersFirst)
+    /* HostDevice */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(ScsiLun)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostScsiDisk)
+},
+{
+    esxVI_HostDevice_Free(&item->_next);
+
+    VIR_FREE(item->deviceName);
+    VIR_FREE(item->deviceType);
+})
+
+/* esxVI_HostDevice_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostDevice,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(deviceName)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(deviceType)
+})
+
+/* esxVI_HostDevice_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostDevice,
+{
+    /* HostDevice */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(ScsiLun)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostScsiDisk)
+})
+
+/* esxVI_HostDevice_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostDevice)
+
+/* esxVI_HostDevice_DeepCopy */
+ESX_VI__TEMPLATE__DYNAMIC_DEEP_COPY(HostDevice,
+{
+    /* HostDevice */
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(ScsiLun)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(HostScsiDisk)
+},
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, deviceName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, deviceType)
+})
+
+/* esxVI_HostDevice_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostDevice)
+
+/* esxVI_HostDevice_CastFromAnyType */
+ESX_VI__TEMPLATE__DYNAMIC_CAST_FROM_ANY_TYPE(HostDevice,
+{
+    /* HostDevice */
+    ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(ScsiLun)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(HostScsiDisk)
+})
+
+/* esxVI_HostDevice_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostDevice)
+
+/* esxVI_HostDevice_Deserialize */
+ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(HostDevice,
+{
+    /* HostDevice */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(ScsiLun)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostScsiDisk)
+},
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, deviceName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, deviceType)
+})
+
+/* esxVI_HostDevice_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostDevice)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostDiskDimensionsLba
+ */
+
+/* esxVI_HostDiskDimensionsLba_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostDiskDimensionsLba)
+
+/* esxVI_HostDiskDimensionsLba_Free */
+ESX_VI__TEMPLATE__FREE(HostDiskDimensionsLba,
+{
+    esxVI_Int_Free(&item->blockSize);
+    esxVI_Long_Free(&item->block);
+})
+
+/* esxVI_HostDiskDimensionsLba_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostDiskDimensionsLba,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(blockSize)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(block)
+})
+
+/* esxVI_HostDiskDimensionsLba_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostDiskDimensionsLba,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, blockSize)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Long, block)
+})
+
+/* esxVI_HostDiskDimensionsLba_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostDiskDimensionsLba,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, blockSize)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, block)
 })
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: HostFileSystemVolume
- *          extended by HostNasVolume
- *                      HostVmfsVolume
+ * VI Object: HostFibreChannelHba
+ *            extends HostHostBusAdapter
+ */
+
+/* esxVI_HostFibreChannelHba_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostFibreChannelHba)
+
+/* esxVI_HostFibreChannelHba_Free */
+ESX_VI__TEMPLATE__FREE(HostFibreChannelHba,
+{
+    esxVI_HostHostBusAdapter *next = (esxVI_HostHostBusAdapter *)item->_next;
+
+    esxVI_HostHostBusAdapter_Free(&next);
+    item->_next = (esxVI_HostFibreChannelHba *)next;
+
+    /* HostHostBusAdapter */
+    VIR_FREE(item->key);
+    VIR_FREE(item->device);
+    esxVI_Int_Free(&item->bus);
+    VIR_FREE(item->status);
+    VIR_FREE(item->model);
+    VIR_FREE(item->driver);
+    VIR_FREE(item->pci);
+
+    /* HostFibreChannelHba */
+    esxVI_Long_Free(&item->portWorldWideName);
+    esxVI_Long_Free(&item->nodeWorldWideName);
+    esxVI_Long_Free(&item->speed);
+})
+
+/* esxVI_HostFibreChannelHba_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostFibreChannelHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(device)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(bus)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(status)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(model)
+
+    /* HostFibreChannelHba */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(portWorldWideName)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(nodeWorldWideName)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(portType)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(speed)
+})
+
+/* esxVI_HostFibreChannelHba_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostFibreChannelHba,
+{
+})
+
+/* esxVI_HostFibreChannelHba_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostFibreChannelHba)
+
+/* esxVI_HostFibreChannelHba_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostFibreChannelHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, bus)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, status)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, pci)
+
+    /* HostFibreChannelHba */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Long, portWorldWideName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Long, nodeWorldWideName)
+    (*dest)->portType = src->portType;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Long, speed)
+})
+
+/* esxVI_HostFibreChannelHba_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostFibreChannelHba)
+
+/* esxVI_HostFibreChannelHba_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostFibreChannelHba)
+
+/* esxVI_HostFibreChannelHba_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostFibreChannelHba)
+
+/* esxVI_HostFibreChannelHba_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostFibreChannelHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, bus)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, status)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, pci)
+
+    /* HostFibreChannelHba */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, portWorldWideName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, nodeWorldWideName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(FibreChannelPortType, portType)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, speed)
+})
+
+/* esxVI_HostFibreChannelHba_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostFibreChannelHba)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostFibreChannelTargetTransport
+ *            extends HostTargetTransport
+ */
+
+/* esxVI_HostFibreChannelTargetTransport_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostFibreChannelTargetTransport)
+
+/* esxVI_HostFibreChannelTargetTransport_Free */
+ESX_VI__TEMPLATE__FREE(HostFibreChannelTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostFibreChannelTargetTransport */
+    esxVI_Long_Free(&item->portWorldWideName);
+    esxVI_Long_Free(&item->nodeWorldWideName);
+})
+
+/* esxVI_HostFibreChannelTargetTransport_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostFibreChannelTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostFibreChannelTargetTransport */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(portWorldWideName)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(nodeWorldWideName)
+})
+
+/* esxVI_HostFibreChannelTargetTransport_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostFibreChannelTargetTransport,
+{
+})
+
+/* esxVI_HostFibreChannelTargetTransport_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostFibreChannelTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostFibreChannelTargetTransport */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, portWorldWideName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, nodeWorldWideName)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostFileSystemVolume
+ *            extended by HostNasVolume
+ *                        HostVmfsVolume
  */
 
 /* esxVI_HostFileSystemVolume_Alloc */
@@ -1422,6 +2127,7 @@ ESX_VI__TEMPLATE__ALLOC(HostFileSystemVolume)
 /* esxVI_HostFileSystemVolume_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(HostFileSystemVolume,
 {
+    /* HostFileSystemVolume */
     ESX_VI__TEMPLATE__DISPATCH__FREE(HostNasVolume)
     ESX_VI__TEMPLATE__DISPATCH__FREE(HostVmfsVolume)
 },
@@ -1439,21 +2145,10 @@ ESX_VI__TEMPLATE__VALIDATE(HostFileSystemVolume,
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(capacity)
 })
 
-/* esxVI_HostFileSystemVolume_Serialize */
-ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(HostFileSystemVolume,
-{
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(HostNasVolume)
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(HostVmfsVolume)
-},
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, type)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, name)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, capacity)
-})
-
 /* esxVI_HostFileSystemVolume_Deserialize */
 ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(HostFileSystemVolume,
 {
+    /* HostFileSystemVolume */
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostNasVolume)
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostVmfsVolume)
 },
@@ -1466,7 +2161,963 @@ ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(HostFileSystemVolume,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: HostMountInfo
+ * VI Object: HostHostBusAdapter
+ *            extended by HostBlockHba
+ *                        HostFibreChannelHba
+ *                        HostInternetScsiHba
+ *                        HostParallelScsiHba
+ */
+
+/* esxVI_HostHostBusAdapter_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostHostBusAdapter)
+
+/* esxVI_HostHostBusAdapter_Free */
+ESX_VI__TEMPLATE__DYNAMIC_FREE(HostHostBusAdapter,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostBlockHba)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostFibreChannelHba)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostInternetScsiHba)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostParallelScsiHba)
+},
+{
+    esxVI_HostHostBusAdapter_Free(&item->_next);
+
+    VIR_FREE(item->key);
+    VIR_FREE(item->device);
+    esxVI_Int_Free(&item->bus);
+    VIR_FREE(item->status);
+    VIR_FREE(item->model);
+    VIR_FREE(item->driver);
+    VIR_FREE(item->pci);
+})
+
+/* esxVI_HostHostBusAdapter_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostHostBusAdapter,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(device)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(bus)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(status)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(model)
+})
+
+/* esxVI_HostHostBusAdapter_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostHostBusAdapter,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostBlockHba)
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostFibreChannelHba)
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostInternetScsiHba)
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostParallelScsiHba)
+})
+
+/* esxVI_HostHostBusAdapter_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostHostBusAdapter)
+
+/* esxVI_HostHostBusAdapter_DeepCopy */
+ESX_VI__TEMPLATE__DYNAMIC_DEEP_COPY(HostHostBusAdapter,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(HostBlockHba)
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(HostFibreChannelHba)
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(HostInternetScsiHba)
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(HostParallelScsiHba)
+},
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, bus)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, status)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, pci)
+})
+
+/* esxVI_HostHostBusAdapter_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostHostBusAdapter)
+
+/* esxVI_HostHostBusAdapter_CastFromAnyType */
+ESX_VI__TEMPLATE__DYNAMIC_CAST_FROM_ANY_TYPE(HostHostBusAdapter,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(HostBlockHba)
+    ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(HostFibreChannelHba)
+    ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(HostInternetScsiHba)
+    ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(HostParallelScsiHba)
+})
+
+/* esxVI_HostHostBusAdapter_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostHostBusAdapter)
+
+/* esxVI_HostHostBusAdapter_Deserialize */
+ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(HostHostBusAdapter,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostBlockHba)
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostFibreChannelHba)
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostInternetScsiHba)
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostParallelScsiHba)
+},
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, bus)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, status)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, pci)
+})
+
+/* esxVI_HostHostBusAdapter_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostHostBusAdapter)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHba
+ *            extends HostHostBusAdapter
+ */
+
+/* esxVI_HostInternetScsiHba_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHba)
+
+/* esxVI_HostInternetScsiHba_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHba,
+{
+    esxVI_HostHostBusAdapter *next = (esxVI_HostHostBusAdapter *)item->_next;
+
+    esxVI_HostHostBusAdapter_Free(&next);
+    item->_next = (esxVI_HostInternetScsiHba *)next;
+
+    /* HostHostBusAdapter */
+    VIR_FREE(item->key);
+    VIR_FREE(item->device);
+    esxVI_Int_Free(&item->bus);
+    VIR_FREE(item->status);
+    VIR_FREE(item->model);
+    VIR_FREE(item->driver);
+    VIR_FREE(item->pci);
+
+    /* HostInternetScsiHba */
+    esxVI_HostInternetScsiHbaDiscoveryCapabilities_Free(&item->discoveryCapabilities);
+    esxVI_HostInternetScsiHbaDiscoveryProperties_Free(&item->discoveryProperties);
+    esxVI_HostInternetScsiHbaAuthenticationCapabilities_Free(&item->authenticationCapabilities);
+    esxVI_HostInternetScsiHbaAuthenticationProperties_Free(&item->authenticationProperties);
+    esxVI_HostInternetScsiHbaDigestCapabilities_Free(&item->digestCapabilities);
+    esxVI_HostInternetScsiHbaDigestProperties_Free(&item->digestProperties);
+    esxVI_HostInternetScsiHbaIPCapabilities_Free(&item->ipCapabilities);
+    esxVI_HostInternetScsiHbaIPProperties_Free(&item->ipProperties);
+    /* FIXME: supportedAdvancedOptions is currently ignored */
+    esxVI_HostInternetScsiHbaParamValue_Free(&item->advancedOptions);
+    VIR_FREE(item->iScsiName);
+    VIR_FREE(item->iScsiAlias);
+    esxVI_HostInternetScsiHbaSendTarget_Free(&item->configuredSendTarget);
+    esxVI_HostInternetScsiHbaStaticTarget_Free(&item->configuredStaticTarget);
+    esxVI_Int_Free(&item->maxSpeedMb);
+    esxVI_Int_Free(&item->currentSpeedMb);
+})
+
+/* esxVI_HostInternetScsiHba_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(device)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(bus)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(status)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(model)
+
+    /* HostInternetScsiHba */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(isSoftwareBased)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(discoveryCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(discoveryProperties)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(authenticationCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(authenticationProperties)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(ipCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(ipProperties)
+    /* FIXME: supportedAdvancedOptions is currently ignored */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(iScsiName)
+})
+
+/* esxVI_HostInternetScsiHba_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostInternetScsiHba,
+{
+})
+
+/* esxVI_HostInternetScsiHba_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostInternetScsiHba)
+
+/* esxVI_HostInternetScsiHba_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, bus)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, status)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, pci)
+
+    /* HostInternetScsiHba */
+    (*dest)->isSoftwareBased = src->isSoftwareBased;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaDiscoveryCapabilities, discoveryCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaDiscoveryProperties, discoveryProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaAuthenticationCapabilities, authenticationCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaAuthenticationProperties, authenticationProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaDigestCapabilities, digestCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaDigestProperties, digestProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaIPCapabilities, ipCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaIPProperties, ipProperties)
+    /* FIXME: supportedAdvancedOptions is currently ignored */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(HostInternetScsiHbaParamValue, advancedOptions)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, iScsiName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, iScsiAlias)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(HostInternetScsiHbaSendTarget, configuredSendTarget)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(HostInternetScsiHbaStaticTarget, configuredStaticTarget)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, maxSpeedMb)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, currentSpeedMb)
+})
+
+/* esxVI_HostInternetScsiHba_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostInternetScsiHba)
+
+/* esxVI_HostInternetScsiHba_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostInternetScsiHba)
+
+/* esxVI_HostInternetScsiHba_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostInternetScsiHba)
+
+/* esxVI_HostInternetScsiHba_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, bus)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, status)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, pci)
+
+    /* HostInternetScsiHba */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, isSoftwareBased)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaDiscoveryCapabilities, discoveryCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaDiscoveryProperties, discoveryProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaAuthenticationCapabilities, authenticationCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaAuthenticationProperties, authenticationProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaDigestCapabilities, digestCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaDigestProperties, digestProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaIPCapabilities, ipCapabilities)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaIPProperties, ipProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(supportedAdvancedOptions) /* FIXME */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(HostInternetScsiHbaParamValue, advancedOptions)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, iScsiName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, iScsiAlias)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(HostInternetScsiHbaSendTarget, configuredSendTarget)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(HostInternetScsiHbaStaticTarget, configuredStaticTarget)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, maxSpeedMb)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, currentSpeedMb)
+})
+
+/* esxVI_HostInternetScsiHba_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostInternetScsiHba)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaAuthenticationCapabilities
+ */
+
+/* esxVI_HostInternetScsiHbaAuthenticationCapabilities_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaAuthenticationCapabilities)
+
+/* esxVI_HostInternetScsiHbaAuthenticationCapabilities_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaAuthenticationCapabilities,
+{
+    /* no properties to be freed */
+})
+
+/* esxVI_HostInternetScsiHbaAuthenticationCapabilities_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaAuthenticationCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(chapAuthSettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(krb5AuthSettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(srpAuthSettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(spkmAuthSettable)
+})
+
+/* esxVI_HostInternetScsiHbaAuthenticationCapabilities_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaAuthenticationCapabilities,
+{
+    (*dest)->chapAuthSettable = src->chapAuthSettable;
+    (*dest)->krb5AuthSettable = src->krb5AuthSettable;
+    (*dest)->srpAuthSettable = src->srpAuthSettable;
+    (*dest)->spkmAuthSettable = src->spkmAuthSettable;
+    (*dest)->mutualChapSettable = src->mutualChapSettable;
+    (*dest)->targetChapSettable = src->targetChapSettable;
+    (*dest)->targetMutualChapSettable = src->targetMutualChapSettable;
+})
+
+/* esxVI_HostInternetScsiHbaAuthenticationCapabilities_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaAuthenticationCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, chapAuthSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, krb5AuthSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, srpAuthSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, spkmAuthSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, mutualChapSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, targetChapSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, targetMutualChapSettable)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaAuthenticationProperties
+ */
+
+/* esxVI_HostInternetScsiHbaAuthenticationProperties_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaAuthenticationProperties)
+
+/* esxVI_HostInternetScsiHbaAuthenticationProperties_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaAuthenticationProperties,
+{
+    VIR_FREE(item->chapName);
+    VIR_FREE(item->chapSecret);
+    VIR_FREE(item->chapAuthenticationType);
+    VIR_FREE(item->mutualChapName);
+    VIR_FREE(item->mutualChapSecret);
+    VIR_FREE(item->mutualChapAuthenticationType);
+})
+
+/* esxVI_HostInternetScsiHbaAuthenticationProperties_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaAuthenticationProperties,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(chapAuthEnabled)
+})
+
+/* esxVI_HostInternetScsiHbaAuthenticationProperties_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaAuthenticationProperties,
+{
+    (*dest)->chapAuthEnabled = src->chapAuthEnabled;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, chapName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, chapSecret)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, chapAuthenticationType)
+    (*dest)->chapInherited = src->chapInherited;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, mutualChapName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, mutualChapSecret)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, mutualChapAuthenticationType)
+    (*dest)->mutualChapInherited = src->mutualChapInherited;
+})
+
+/* esxVI_HostInternetScsiHbaAuthenticationProperties_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaAuthenticationProperties,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, chapAuthEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, chapName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, chapSecret)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, chapAuthenticationType)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, chapInherited)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, mutualChapName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, mutualChapSecret)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, mutualChapAuthenticationType)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, mutualChapInherited)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaDigestCapabilities
+ */
+
+/* esxVI_HostInternetScsiHbaDigestCapabilities_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaDigestCapabilities)
+
+/* esxVI_HostInternetScsiHbaDigestCapabilities_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaDigestCapabilities,
+{
+    /* no properties to be freed */
+})
+
+/* esxVI_HostInternetScsiHbaDigestCapabilities_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaDigestCapabilities,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostInternetScsiHbaDigestCapabilities_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaDigestCapabilities,
+{
+    (*dest)->headerDigestSettable = src->headerDigestSettable;
+    (*dest)->dataDigestSettable = src->dataDigestSettable;
+    (*dest)->targetHeaderDigestSettable = src->targetHeaderDigestSettable;
+    (*dest)->targetDataDigestSettable = src->targetDataDigestSettable;
+})
+
+/* esxVI_HostInternetScsiHbaDigestCapabilities_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaDigestCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, headerDigestSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, dataDigestSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, targetHeaderDigestSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, targetDataDigestSettable)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaDigestProperties
+ */
+
+/* esxVI_HostInternetScsiHbaDigestProperties_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaDigestProperties)
+
+/* esxVI_HostInternetScsiHbaDigestProperties_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaDigestProperties,
+{
+    VIR_FREE(item->headerDigestType);
+    VIR_FREE(item->dataDigestType);
+})
+
+/* esxVI_HostInternetScsiHbaDigestProperties_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaDigestProperties,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostInternetScsiHbaDigestProperties_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaDigestProperties,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, headerDigestType)
+    (*dest)->headerDigestInherited = src->headerDigestInherited;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, dataDigestType)
+    (*dest)->dataDigestInherited = src->dataDigestInherited;
+})
+
+/* esxVI_HostInternetScsiHbaDigestProperties_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaDigestProperties,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, headerDigestType)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, headerDigestInherited)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, dataDigestType)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, dataDigestInherited)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaDiscoveryCapabilities
+ */
+
+/* esxVI_HostInternetScsiHbaDiscoveryCapabilities_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaDiscoveryCapabilities)
+
+/* esxVI_HostInternetScsiHbaDiscoveryCapabilities_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaDiscoveryCapabilities,
+{
+    /* no properties to be freed */
+})
+
+/* esxVI_HostInternetScsiHbaDiscoveryCapabilities_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaDiscoveryCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(iSnsDiscoverySettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(slpDiscoverySettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(staticTargetDiscoverySettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(sendTargetsDiscoverySettable)
+})
+
+/* esxVI_HostInternetScsiHbaDiscoveryCapabilities_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaDiscoveryCapabilities,
+{
+    (*dest)->iSnsDiscoverySettable = src->iSnsDiscoverySettable;
+    (*dest)->slpDiscoverySettable = src->slpDiscoverySettable;
+    (*dest)->staticTargetDiscoverySettable = src->staticTargetDiscoverySettable;
+    (*dest)->sendTargetsDiscoverySettable = src->sendTargetsDiscoverySettable;
+})
+
+/* esxVI_HostInternetScsiHbaDiscoveryCapabilities_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaDiscoveryCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, iSnsDiscoverySettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, slpDiscoverySettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, staticTargetDiscoverySettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, sendTargetsDiscoverySettable)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaDiscoveryProperties
+ */
+
+/* esxVI_HostInternetScsiHbaDiscoveryProperties_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaDiscoveryProperties)
+
+/* esxVI_HostInternetScsiHbaDiscoveryProperties_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaDiscoveryProperties,
+{
+    VIR_FREE(item->iSnsDiscoveryMethod);
+    VIR_FREE(item->iSnsHost);
+    VIR_FREE(item->slpDiscoveryMethod);
+    VIR_FREE(item->slpHost);
+})
+
+/* esxVI_HostInternetScsiHbaDiscoveryProperties_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaDiscoveryProperties,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(iSnsDiscoveryEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(slpDiscoveryEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(staticTargetDiscoveryEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(sendTargetsDiscoveryEnabled)
+})
+
+/* esxVI_HostInternetScsiHbaDiscoveryProperties_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaDiscoveryProperties,
+{
+    (*dest)->iSnsDiscoveryEnabled = src->iSnsDiscoveryEnabled;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, iSnsDiscoveryMethod)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, iSnsHost)
+    (*dest)->slpDiscoveryEnabled = src->slpDiscoveryEnabled;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, slpDiscoveryMethod)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, slpHost)
+    (*dest)->staticTargetDiscoveryEnabled = src->staticTargetDiscoveryEnabled;
+    (*dest)->sendTargetsDiscoveryEnabled = src->sendTargetsDiscoveryEnabled;
+})
+
+/* esxVI_HostInternetScsiHbaDiscoveryProperties_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaDiscoveryProperties,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, iSnsDiscoveryEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, iSnsDiscoveryMethod)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, iSnsHost)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, slpDiscoveryEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, slpDiscoveryMethod)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, slpHost)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, staticTargetDiscoveryEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, sendTargetsDiscoveryEnabled)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaIPCapabilities
+ */
+
+/* esxVI_HostInternetScsiHbaIPCapabilities_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaIPCapabilities)
+
+/* esxVI_HostInternetScsiHbaIPCapabilities_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaIPCapabilities,
+{
+    /* no properties to be freed */
+})
+
+/* esxVI_HostInternetScsiHbaIPCapabilities_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaIPCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(addressSettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(ipConfigurationMethodSettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(subnetMaskSettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(defaultGatewaySettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(primaryDnsServerAddressSettable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(alternateDnsServerAddressSettable)
+})
+
+/* esxVI_HostInternetScsiHbaIPCapabilities_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaIPCapabilities,
+{
+    (*dest)->addressSettable = src->addressSettable;
+    (*dest)->ipConfigurationMethodSettable = src->ipConfigurationMethodSettable;
+    (*dest)->subnetMaskSettable = src->subnetMaskSettable;
+    (*dest)->defaultGatewaySettable = src->defaultGatewaySettable;
+    (*dest)->primaryDnsServerAddressSettable = src->primaryDnsServerAddressSettable;
+    (*dest)->alternateDnsServerAddressSettable = src->alternateDnsServerAddressSettable;
+    (*dest)->ipv6Supported = src->ipv6Supported;
+    (*dest)->arpRedirectSettable = src->arpRedirectSettable;
+    (*dest)->mtuSettable = src->mtuSettable;
+    (*dest)->hostNameAsTargetAddress = src->hostNameAsTargetAddress;
+})
+
+/* esxVI_HostInternetScsiHbaIPCapabilities_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaIPCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, addressSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, ipConfigurationMethodSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, subnetMaskSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, defaultGatewaySettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, primaryDnsServerAddressSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, alternateDnsServerAddressSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, ipv6Supported)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, arpRedirectSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, mtuSettable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, hostNameAsTargetAddress)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaIPProperties
+ */
+
+/* esxVI_HostInternetScsiHbaIPProperties_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaIPProperties)
+
+/* esxVI_HostInternetScsiHbaIPProperties_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaIPProperties,
+{
+    VIR_FREE(item->mac);
+    VIR_FREE(item->address);
+    VIR_FREE(item->subnetMask);
+    VIR_FREE(item->defaultGateway);
+    VIR_FREE(item->primaryDnsServerAddress);
+    VIR_FREE(item->alternateDnsServerAddress);
+    VIR_FREE(item->ipv6Address);
+    VIR_FREE(item->ipv6SubnetMask);
+    VIR_FREE(item->ipv6DefaultGateway);
+    esxVI_Int_Free(&item->mtu);
+})
+
+/* esxVI_HostInternetScsiHbaIPProperties_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaIPProperties,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(dhcpConfigurationEnabled)
+})
+
+/* esxVI_HostInternetScsiHbaIPProperties_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaIPProperties,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, mac)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, address)
+    (*dest)->dhcpConfigurationEnabled = src->dhcpConfigurationEnabled;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, subnetMask)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, defaultGateway)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, primaryDnsServerAddress)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, alternateDnsServerAddress)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, ipv6Address)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, ipv6SubnetMask)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, ipv6DefaultGateway)
+    (*dest)->arpRedirectEnabled = src->arpRedirectEnabled;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, mtu)
+    (*dest)->jumboFramesEnabled = src->jumboFramesEnabled;
+})
+
+/* esxVI_HostInternetScsiHbaIPProperties_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaIPProperties,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, mac)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, address)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, dhcpConfigurationEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, subnetMask)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, defaultGateway)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, primaryDnsServerAddress)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, alternateDnsServerAddress)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, ipv6Address)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, ipv6SubnetMask)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, ipv6DefaultGateway)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, arpRedirectEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, mtu)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, jumboFramesEnabled)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaParamValue
+ *            extends OptionValue
+ */
+
+/* esxVI_HostInternetScsiHbaParamValue_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaParamValue)
+
+/* esxVI_HostInternetScsiHbaParamValue_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaParamValue,
+{
+    esxVI_OptionValue *next = (esxVI_OptionValue *)item->_next;
+
+    esxVI_OptionValue_Free(&next);
+    item->_next = (esxVI_HostInternetScsiHbaParamValue *)next;
+
+    /* OptionValue */
+    VIR_FREE(item->key);
+    esxVI_AnyType_Free(&item->value);
+
+    /* HostInternetScsiHbaParamValue */
+    /* no properties to be freed */
+})
+
+/* esxVI_HostInternetScsiHbaParamValue_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaParamValue,
+{
+    /* OptionValue */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
+
+    /* HostInternetScsiHbaParamValue */
+    /* no required properties */
+})
+
+/* esxVI_HostInternetScsiHbaParamValue_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostInternetScsiHbaParamValue,
+{
+})
+
+/* esxVI_HostInternetScsiHbaParamValue_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostInternetScsiHbaParamValue)
+
+/* esxVI_HostInternetScsiHbaParamValue_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaParamValue,
+{
+    /* OptionValue */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(AnyType, value)
+
+    /* HostInternetScsiHbaParamValue */
+    (*dest)->isInherited = src->isInherited;
+})
+
+/* esxVI_HostInternetScsiHbaParamValue_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostInternetScsiHbaParamValue)
+
+/* esxVI_HostInternetScsiHbaParamValue_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaParamValue,
+{
+    /* OptionValue */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(AnyType, value)
+
+    /* HostInternetScsiHbaParamValue */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, isInherited)
+})
+
+/* esxVI_HostInternetScsiHbaParamValue_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostInternetScsiHbaParamValue)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaSendTarget
+ */
+
+/* esxVI_HostInternetScsiHbaSendTarget_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaSendTarget)
+
+/* esxVI_HostInternetScsiHbaSendTarget_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaSendTarget,
+{
+    esxVI_HostInternetScsiHbaSendTarget_Free(&item->_next);
+
+    VIR_FREE(item->address);
+    esxVI_Int_Free(&item->port);
+    esxVI_HostInternetScsiHbaAuthenticationProperties_Free(&item->authenticationProperties);
+    esxVI_HostInternetScsiHbaDigestProperties_Free(&item->digestProperties);
+    /* FIXME: supportedAdvancedOptions is currently ignored */
+    esxVI_HostInternetScsiHbaParamValue_Free(&item->advancedOptions);
+    VIR_FREE(item->parent);
+})
+
+/* esxVI_HostInternetScsiHbaSendTarget_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaSendTarget,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(address)
+    /* FIXME: supportedAdvancedOptions is currently ignored */
+})
+
+/* esxVI_HostInternetScsiHbaSendTarget_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostInternetScsiHbaSendTarget)
+
+/* esxVI_HostInternetScsiHbaSendTarget_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaSendTarget,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, address)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, port)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaAuthenticationProperties, authenticationProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaDigestProperties, digestProperties)
+    /* FIXME: supportedAdvancedOptions is currently ignored */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(HostInternetScsiHbaParamValue, advancedOptions)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, parent)
+})
+
+/* esxVI_HostInternetScsiHbaSendTarget_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostInternetScsiHbaSendTarget)
+
+/* esxVI_HostInternetScsiHbaSendTarget_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaSendTarget,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, address)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, port)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaAuthenticationProperties, authenticationProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaDigestProperties, digestProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(supportedAdvancedOptions) /* FIXME */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(HostInternetScsiHbaParamValue, advancedOptions)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, parent)
+})
+
+/* esxVI_HostInternetScsiHbaSendTarget_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostInternetScsiHbaSendTarget)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiHbaStaticTarget
+ */
+
+/* esxVI_HostInternetScsiHbaStaticTarget_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiHbaStaticTarget)
+
+/* esxVI_HostInternetScsiHbaStaticTarget_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiHbaStaticTarget,
+{
+    esxVI_HostInternetScsiHbaStaticTarget_Free(&item->_next);
+
+    VIR_FREE(item->address);
+    esxVI_Int_Free(&item->port);
+    VIR_FREE(item->iScsiName);
+    esxVI_HostInternetScsiHbaAuthenticationProperties_Free(&item->authenticationProperties);
+    esxVI_HostInternetScsiHbaDigestProperties_Free(&item->digestProperties);
+    /* FIXME: supportedAdvancedOptions is currently ignored */
+    esxVI_HostInternetScsiHbaParamValue_Free(&item->advancedOptions);
+    VIR_FREE(item->parent);
+})
+
+/* esxVI_HostInternetScsiHbaStaticTarget_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiHbaStaticTarget,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(address)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(iScsiName)
+    /* FIXME: supportedAdvancedOptions is currently ignored */
+})
+
+/* esxVI_HostInternetScsiHbaStaticTarget_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostInternetScsiHbaStaticTarget)
+
+/* esxVI_HostInternetScsiHbaStaticTarget_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostInternetScsiHbaStaticTarget,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, address)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, port)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, iScsiName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaAuthenticationProperties, authenticationProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostInternetScsiHbaDigestProperties, digestProperties)
+    /* FIXME: supportedAdvancedOptions is currently ignored */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(HostInternetScsiHbaParamValue, advancedOptions)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, parent)
+})
+
+/* esxVI_HostInternetScsiHbaStaticTarget_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostInternetScsiHbaStaticTarget)
+
+/* esxVI_HostInternetScsiHbaStaticTarget_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiHbaStaticTarget,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, address)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, port)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, iScsiName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaAuthenticationProperties, authenticationProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostInternetScsiHbaDigestProperties, digestProperties)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(supportedAdvancedOptions) /* FIXME */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(HostInternetScsiHbaParamValue, advancedOptions)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, parent)
+})
+
+/* esxVI_HostInternetScsiHbaStaticTarget_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostInternetScsiHbaStaticTarget)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostInternetScsiTargetTransport
+ *            extends HostTargetTransport
+ */
+
+/* esxVI_HostInternetScsiTargetTransport_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostInternetScsiTargetTransport)
+
+/* esxVI_HostInternetScsiTargetTransport_Free */
+ESX_VI__TEMPLATE__FREE(HostInternetScsiTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostInternetScsiTargetTransport */
+    VIR_FREE(item->iScsiName);
+    VIR_FREE(item->iScsiAlias);
+    esxVI_String_Free(&item->address);
+})
+
+/* esxVI_HostInternetScsiTargetTransport_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostInternetScsiTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostInternetScsiTargetTransport */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(iScsiName)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(iScsiAlias)
+})
+
+/* esxVI_HostInternetScsiTargetTransport_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostInternetScsiTargetTransport,
+{
+})
+
+/* esxVI_HostInternetScsiTargetTransport_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostInternetScsiTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostInternetScsiTargetTransport */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, iScsiName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, iScsiAlias)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, address)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostIpConfig
+ */
+
+/* esxVI_HostIpConfig_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostIpConfig)
+
+/* esxVI_HostIpConfig_Free */
+ESX_VI__TEMPLATE__FREE(HostIpConfig,
+{
+    VIR_FREE(item->ipAddress);
+    VIR_FREE(item->subnetMask);
+    /* FIXME: ipV6Config is currently ignored */
+})
+
+/* esxVI_HostIpConfig_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostIpConfig,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(dhcp)
+    /* FIXME: ipV6Config is currently ignored */
+})
+
+/* esxVI_HostIpConfig_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostIpConfig,
+{
+    (*dest)->dhcp = src->dhcp;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, ipAddress)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, subnetMask)
+    /* FIXME: ipV6Config is currently ignored */
+})
+
+/* esxVI_HostIpConfig_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostIpConfig,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, dhcp)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, ipAddress)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, subnetMask)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(ipV6Config) /* FIXME */
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostMountInfo
  */
 
 /* esxVI_HostMountInfo_Alloc */
@@ -1493,14 +3144,6 @@ ESX_VI__TEMPLATE__DEEP_COPY(HostMountInfo,
     (*dest)->accessible = src->accessible;
 })
 
-/* esxVI_HostMountInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(HostMountInfo,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, accessMode)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, accessible)
-})
-
 /* esxVI_HostMountInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(HostMountInfo,
 {
@@ -1512,8 +3155,8 @@ ESX_VI__TEMPLATE__DESERIALIZE(HostMountInfo,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: HostNasVolume
- *          extends HostFileSystemVolume
+ * VI Object: HostNasVolume
+ *            extends HostFileSystemVolume
  */
 
 /* esxVI_HostNasVolume_Alloc */
@@ -1546,20 +3189,6 @@ ESX_VI__TEMPLATE__VALIDATE(HostNasVolume,
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(remotePath)
 })
 
-/* esxVI_HostNasVolume_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(HostNasVolume,
-{
-    /* HostFileSystemVolume */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, type)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, name)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, capacity)
-
-    /* HostNasVolume */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, remoteHost)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, remotePath)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, userName)
-})
-
 /* esxVI_HostNasVolume_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(HostNasVolume,
 {
@@ -1577,7 +3206,776 @@ ESX_VI__TEMPLATE__DESERIALIZE(HostNasVolume,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: HostScsiDiskPartition
+ * VI Object: HostNetOffloadCapabilities
+ */
+
+/* esxVI_HostNetOffloadCapabilities_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostNetOffloadCapabilities)
+
+/* esxVI_HostNetOffloadCapabilities_Free */
+ESX_VI__TEMPLATE__FREE(HostNetOffloadCapabilities,
+{
+    /* no properties to be freed */
+})
+
+/* esxVI_HostNetOffloadCapabilities_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostNetOffloadCapabilities,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostNetOffloadCapabilities_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostNetOffloadCapabilities,
+{
+    (*dest)->csumOffload = src->csumOffload;
+    (*dest)->tcpSegmentation = src->tcpSegmentation;
+    (*dest)->zeroCopyXmit = src->zeroCopyXmit;
+})
+
+/* esxVI_HostNetOffloadCapabilities_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostNetOffloadCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, csumOffload)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, tcpSegmentation)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, zeroCopyXmit)
+})
+
+/* esxVI_HostNetOffloadCapabilities_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostNetOffloadCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, csumOffload)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, tcpSegmentation)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, zeroCopyXmit)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostNetworkPolicy
+ */
+
+/* esxVI_HostNetworkPolicy_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostNetworkPolicy)
+
+/* esxVI_HostNetworkPolicy_Free */
+ESX_VI__TEMPLATE__FREE(HostNetworkPolicy,
+{
+    esxVI_HostNetworkSecurityPolicy_Free(&item->security);
+    esxVI_HostNicTeamingPolicy_Free(&item->nicTeaming);
+    esxVI_HostNetOffloadCapabilities_Free(&item->offloadPolicy);
+    esxVI_HostNetworkTrafficShapingPolicy_Free(&item->shapingPolicy);
+})
+
+/* esxVI_HostNetworkPolicy_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostNetworkPolicy,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostNetworkPolicy_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostNetworkPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostNetworkSecurityPolicy, security)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostNicTeamingPolicy, nicTeaming)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostNetOffloadCapabilities, offloadPolicy)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostNetworkTrafficShapingPolicy, shapingPolicy)
+})
+
+/* esxVI_HostNetworkPolicy_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostNetworkPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostNetworkSecurityPolicy, security)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostNicTeamingPolicy, nicTeaming)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostNetOffloadCapabilities, offloadPolicy)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostNetworkTrafficShapingPolicy, shapingPolicy)
+})
+
+/* esxVI_HostNetworkPolicy_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostNetworkPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostNetworkSecurityPolicy, security)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostNicTeamingPolicy, nicTeaming)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostNetOffloadCapabilities, offloadPolicy)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostNetworkTrafficShapingPolicy, shapingPolicy)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostNetworkSecurityPolicy
+ */
+
+/* esxVI_HostNetworkSecurityPolicy_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostNetworkSecurityPolicy)
+
+/* esxVI_HostNetworkSecurityPolicy_Free */
+ESX_VI__TEMPLATE__FREE(HostNetworkSecurityPolicy,
+{
+    /* no properties to be freed */
+})
+
+/* esxVI_HostNetworkSecurityPolicy_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostNetworkSecurityPolicy,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostNetworkSecurityPolicy_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostNetworkSecurityPolicy,
+{
+    (*dest)->allowPromiscuous = src->allowPromiscuous;
+    (*dest)->macChanges = src->macChanges;
+    (*dest)->forgedTransmits = src->forgedTransmits;
+})
+
+/* esxVI_HostNetworkSecurityPolicy_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostNetworkSecurityPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, allowPromiscuous)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, macChanges)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, forgedTransmits)
+})
+
+/* esxVI_HostNetworkSecurityPolicy_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostNetworkSecurityPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, allowPromiscuous)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, macChanges)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, forgedTransmits)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostNetworkTrafficShapingPolicy
+ */
+
+/* esxVI_HostNetworkTrafficShapingPolicy_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostNetworkTrafficShapingPolicy)
+
+/* esxVI_HostNetworkTrafficShapingPolicy_Free */
+ESX_VI__TEMPLATE__FREE(HostNetworkTrafficShapingPolicy,
+{
+    esxVI_Long_Free(&item->averageBandwidth);
+    esxVI_Long_Free(&item->peakBandwidth);
+    esxVI_Long_Free(&item->burstSize);
+})
+
+/* esxVI_HostNetworkTrafficShapingPolicy_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostNetworkTrafficShapingPolicy,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostNetworkTrafficShapingPolicy_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostNetworkTrafficShapingPolicy,
+{
+    (*dest)->enabled = src->enabled;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Long, averageBandwidth)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Long, peakBandwidth)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Long, burstSize)
+})
+
+/* esxVI_HostNetworkTrafficShapingPolicy_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostNetworkTrafficShapingPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, enabled)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, averageBandwidth)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, peakBandwidth)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, burstSize)
+})
+
+/* esxVI_HostNetworkTrafficShapingPolicy_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostNetworkTrafficShapingPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, enabled)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, averageBandwidth)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, peakBandwidth)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, burstSize)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostNicFailureCriteria
+ */
+
+/* esxVI_HostNicFailureCriteria_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostNicFailureCriteria)
+
+/* esxVI_HostNicFailureCriteria_Free */
+ESX_VI__TEMPLATE__FREE(HostNicFailureCriteria,
+{
+    VIR_FREE(item->checkSpeed);
+    esxVI_Int_Free(&item->speed);
+    esxVI_Int_Free(&item->percentage);
+})
+
+/* esxVI_HostNicFailureCriteria_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostNicFailureCriteria,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostNicFailureCriteria_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostNicFailureCriteria,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, checkSpeed)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, speed)
+    (*dest)->checkDuplex = src->checkDuplex;
+    (*dest)->fullDuplex = src->fullDuplex;
+    (*dest)->checkErrorPercent = src->checkErrorPercent;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, percentage)
+    (*dest)->checkBeacon = src->checkBeacon;
+})
+
+/* esxVI_HostNicFailureCriteria_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostNicFailureCriteria,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, checkSpeed)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, speed)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, checkDuplex)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, fullDuplex)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, checkErrorPercent)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, percentage)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, checkBeacon)
+})
+
+/* esxVI_HostNicFailureCriteria_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostNicFailureCriteria,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, checkSpeed)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, speed)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, checkDuplex)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, fullDuplex)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, checkErrorPercent)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, percentage)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, checkBeacon)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostNicOrderPolicy
+ */
+
+/* esxVI_HostNicOrderPolicy_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostNicOrderPolicy)
+
+/* esxVI_HostNicOrderPolicy_Free */
+ESX_VI__TEMPLATE__FREE(HostNicOrderPolicy,
+{
+    esxVI_String_Free(&item->activeNic);
+    esxVI_String_Free(&item->standbyNic);
+})
+
+/* esxVI_HostNicOrderPolicy_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostNicOrderPolicy,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostNicOrderPolicy_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostNicOrderPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(String, activeNic)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(String, standbyNic)
+})
+
+/* esxVI_HostNicOrderPolicy_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostNicOrderPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(String, activeNic)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(String, standbyNic)
+})
+
+/* esxVI_HostNicOrderPolicy_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostNicOrderPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, activeNic)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, standbyNic)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostNicTeamingPolicy
+ */
+
+/* esxVI_HostNicTeamingPolicy_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostNicTeamingPolicy)
+
+/* esxVI_HostNicTeamingPolicy_Free */
+ESX_VI__TEMPLATE__FREE(HostNicTeamingPolicy,
+{
+    VIR_FREE(item->policy);
+    esxVI_HostNicFailureCriteria_Free(&item->failureCriteria);
+    esxVI_HostNicOrderPolicy_Free(&item->nicOrder);
+})
+
+/* esxVI_HostNicTeamingPolicy_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostNicTeamingPolicy,
+{
+    /* no required properties */
+})
+
+/* esxVI_HostNicTeamingPolicy_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostNicTeamingPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, policy)
+    (*dest)->reversePolicy = src->reversePolicy;
+    (*dest)->notifySwitches = src->notifySwitches;
+    (*dest)->rollingOrder = src->rollingOrder;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostNicFailureCriteria, failureCriteria)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostNicOrderPolicy, nicOrder)
+})
+
+/* esxVI_HostNicTeamingPolicy_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostNicTeamingPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, policy)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, reversePolicy)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, notifySwitches)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, rollingOrder)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostNicFailureCriteria, failureCriteria)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostNicOrderPolicy, nicOrder)
+})
+
+/* esxVI_HostNicTeamingPolicy_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostNicTeamingPolicy,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, policy)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, reversePolicy)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, notifySwitches)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, rollingOrder)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostNicFailureCriteria, failureCriteria)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostNicOrderPolicy, nicOrder)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostParallelScsiHba
+ *            extends HostHostBusAdapter
+ */
+
+/* esxVI_HostParallelScsiHba_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostParallelScsiHba)
+
+/* esxVI_HostParallelScsiHba_Free */
+ESX_VI__TEMPLATE__FREE(HostParallelScsiHba,
+{
+    esxVI_HostHostBusAdapter *next = (esxVI_HostHostBusAdapter *)item->_next;
+
+    esxVI_HostHostBusAdapter_Free(&next);
+    item->_next = (esxVI_HostParallelScsiHba *)next;
+
+    /* HostHostBusAdapter */
+    VIR_FREE(item->key);
+    VIR_FREE(item->device);
+    esxVI_Int_Free(&item->bus);
+    VIR_FREE(item->status);
+    VIR_FREE(item->model);
+    VIR_FREE(item->driver);
+    VIR_FREE(item->pci);
+
+    /* HostParallelScsiHba */
+    /* no properties */
+})
+
+/* esxVI_HostParallelScsiHba_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostParallelScsiHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(device)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(bus)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(status)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(model)
+
+    /* HostParallelScsiHba */
+    /* no properties */
+})
+
+/* esxVI_HostParallelScsiHba_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostParallelScsiHba,
+{
+})
+
+/* esxVI_HostParallelScsiHba_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostParallelScsiHba)
+
+/* esxVI_HostParallelScsiHba_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostParallelScsiHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, bus)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, status)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, pci)
+
+    /* HostParallelScsiHba */
+    /* no properties */
+})
+
+/* esxVI_HostParallelScsiHba_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostParallelScsiHba)
+
+/* esxVI_HostParallelScsiHba_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostParallelScsiHba)
+
+/* esxVI_HostParallelScsiHba_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostParallelScsiHba)
+
+/* esxVI_HostParallelScsiHba_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostParallelScsiHba,
+{
+    /* HostHostBusAdapter */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, bus)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, status)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, pci)
+
+    /* HostParallelScsiHba */
+    /* no properties */
+})
+
+/* esxVI_HostParallelScsiHba_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostParallelScsiHba)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostParallelScsiTargetTransport
+ *            extends HostTargetTransport
+ */
+
+/* esxVI_HostParallelScsiTargetTransport_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostParallelScsiTargetTransport)
+
+/* esxVI_HostParallelScsiTargetTransport_Free */
+ESX_VI__TEMPLATE__FREE(HostParallelScsiTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostParallelScsiTargetTransport */
+    /* no properties */
+})
+
+/* esxVI_HostParallelScsiTargetTransport_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostParallelScsiTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostParallelScsiTargetTransport */
+    /* no properties */
+})
+
+/* esxVI_HostParallelScsiTargetTransport_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostParallelScsiTargetTransport,
+{
+})
+
+/* esxVI_HostParallelScsiTargetTransport_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostParallelScsiTargetTransport,
+{
+    /* HostTargetTransport */
+    /* no properties */
+
+    /* HostParallelScsiTargetTransport */
+    /* no properties */
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostPortGroup
+ */
+
+/* esxVI_HostPortGroup_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostPortGroup)
+
+/* esxVI_HostPortGroup_Free */
+ESX_VI__TEMPLATE__FREE(HostPortGroup,
+{
+    esxVI_HostPortGroup_Free(&item->_next);
+
+    VIR_FREE(item->key);
+    esxVI_HostPortGroupPort_Free(&item->port);
+    VIR_FREE(item->vswitch);
+    esxVI_HostNetworkPolicy_Free(&item->computedPolicy);
+    esxVI_HostPortGroupSpec_Free(&item->spec);
+})
+
+/* esxVI_HostPortGroup_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostPortGroup,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(computedPolicy)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(spec)
+})
+
+/* esxVI_HostPortGroup_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostPortGroup)
+
+/* esxVI_HostPortGroup_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostPortGroup)
+
+/* esxVI_HostPortGroup_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostPortGroup)
+
+/* esxVI_HostPortGroup_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostPortGroup,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(HostPortGroupPort, port)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, vswitch)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostNetworkPolicy, computedPolicy)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostPortGroupSpec, spec)
+})
+
+/* esxVI_HostPortGroup_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostPortGroup)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostPortGroupPort
+ */
+
+/* esxVI_HostPortGroupPort_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostPortGroupPort)
+
+/* esxVI_HostPortGroupPort_Free */
+ESX_VI__TEMPLATE__FREE(HostPortGroupPort,
+{
+    esxVI_HostPortGroupPort_Free(&item->_next);
+
+    VIR_FREE(item->key);
+    esxVI_String_Free(&item->mac);
+    VIR_FREE(item->type);
+})
+
+/* esxVI_HostPortGroupPort_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostPortGroupPort,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(type)
+})
+
+/* esxVI_HostPortGroupPort_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostPortGroupPort)
+
+/* esxVI_HostPortGroupPort_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostPortGroupPort,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, mac)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, type)
+})
+
+/* esxVI_HostPortGroupPort_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostPortGroupPort)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostPortGroupSpec
+ */
+
+/* esxVI_HostPortGroupSpec_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostPortGroupSpec)
+
+/* esxVI_HostPortGroupSpec_Free */
+ESX_VI__TEMPLATE__FREE(HostPortGroupSpec,
+{
+    VIR_FREE(item->name);
+    esxVI_Int_Free(&item->vlanId);
+    VIR_FREE(item->vswitchName);
+    esxVI_HostNetworkPolicy_Free(&item->policy);
+})
+
+/* esxVI_HostPortGroupSpec_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostPortGroupSpec,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(name)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(vlanId)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(vswitchName)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(policy)
+})
+
+/* esxVI_HostPortGroupSpec_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostPortGroupSpec,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, name)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, vlanId)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, vswitchName)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostNetworkPolicy, policy)
+})
+
+/* esxVI_HostPortGroupSpec_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostPortGroupSpec,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, name)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, vlanId)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, vswitchName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostNetworkPolicy, policy)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostScsiDisk
+ *            extends ScsiLun
+ */
+
+/* esxVI_HostScsiDisk_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostScsiDisk)
+
+/* esxVI_HostScsiDisk_Free */
+ESX_VI__TEMPLATE__FREE(HostScsiDisk,
+{
+    esxVI_ScsiLun *next = (esxVI_ScsiLun *)item->_next;
+
+    esxVI_ScsiLun_Free(&next);
+    item->_next = (esxVI_HostScsiDisk *)next;
+
+    /* HostDevice */
+    VIR_FREE(item->deviceName);
+    VIR_FREE(item->deviceType);
+
+    /* ScsiLun */
+    VIR_FREE(item->key);
+    VIR_FREE(item->uuid);
+    esxVI_ScsiLunDescriptor_Free(&item->descriptor);
+    VIR_FREE(item->canonicalName);
+    VIR_FREE(item->displayName);
+    VIR_FREE(item->lunType);
+    VIR_FREE(item->vendor);
+    VIR_FREE(item->model);
+    VIR_FREE(item->revision);
+    esxVI_Int_Free(&item->scsiLevel);
+    VIR_FREE(item->serialNumber);
+    esxVI_ScsiLunDurableName_Free(&item->durableName);
+    esxVI_ScsiLunDurableName_Free(&item->alternateName);
+    esxVI_Byte_Free(&item->standardInquiry);
+    esxVI_Int_Free(&item->queueDepth);
+    esxVI_String_Free(&item->operationalState);
+    esxVI_ScsiLunCapabilities_Free(&item->capabilities);
+
+    /* HostScsiDisk */
+    esxVI_HostDiskDimensionsLba_Free(&item->capacity);
+    VIR_FREE(item->devicePath);
+})
+
+/* esxVI_HostScsiDisk_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostScsiDisk,
+{
+    /* HostDevice */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(deviceName)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(deviceType)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(uuid)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(lunType)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(operationalState)
+
+    /* HostScsiDisk */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(capacity)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(devicePath)
+})
+
+/* esxVI_HostScsiDisk_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostScsiDisk,
+{
+})
+
+/* esxVI_HostScsiDisk_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostScsiDisk)
+
+/* esxVI_HostScsiDisk_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostScsiDisk,
+{
+    /* HostDevice */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, deviceName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, deviceType)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, uuid)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(ScsiLunDescriptor, descriptor)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, canonicalName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, displayName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, lunType)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, vendor)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, revision)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, scsiLevel)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, serialNumber)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(ScsiLunDurableName, durableName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(ScsiLunDurableName, alternateName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(Byte, standardInquiry)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, queueDepth)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(String, operationalState)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(ScsiLunCapabilities, capabilities)
+
+    /* HostScsiDisk */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostDiskDimensionsLba, capacity)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, devicePath)
+})
+
+/* esxVI_HostScsiDisk_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostScsiDisk)
+
+/* esxVI_HostScsiDisk_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostScsiDisk)
+
+/* esxVI_HostScsiDisk_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostScsiDisk)
+
+/* esxVI_HostScsiDisk_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostScsiDisk,
+{
+    /* HostDevice */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, deviceName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, deviceType)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, uuid)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(ScsiLunDescriptor, descriptor)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, canonicalName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, displayName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, lunType)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, vendor)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, revision)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, scsiLevel)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, serialNumber)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ScsiLunDurableName, durableName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(ScsiLunDurableName, alternateName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(Byte, standardInquiry)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, queueDepth)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, operationalState)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ScsiLunCapabilities, capabilities)
+
+    /* HostScsiDisk */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostDiskDimensionsLba, capacity)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, devicePath)
+})
+
+/* esxVI_HostScsiDisk_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostScsiDisk)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostScsiDiskPartition
  */
 
 /* esxVI_HostScsiDiskPartition_Alloc */
@@ -1602,16 +4000,6 @@ ESX_VI__TEMPLATE__VALIDATE(HostScsiDiskPartition,
 /* esxVI_HostScsiDiskPartition_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(HostScsiDiskPartition)
 
-/* esxVI_HostScsiDiskPartition_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(HostScsiDiskPartition,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, diskName)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, partition)
-})
-
-/* esxVI_HostScsiDiskPartition_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(HostScsiDiskPartition)
-
 /* esxVI_HostScsiDiskPartition_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(HostScsiDiskPartition,
 {
@@ -1625,8 +4013,659 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostScsiDiskPartition)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: HostVmfsVolume
- *          extends HostFileSystemVolume
+ * VI Object: HostScsiTopologyInterface
+ */
+
+/* esxVI_HostScsiTopologyInterface_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostScsiTopologyInterface)
+
+/* esxVI_HostScsiTopologyInterface_Free */
+ESX_VI__TEMPLATE__FREE(HostScsiTopologyInterface,
+{
+    esxVI_HostScsiTopologyInterface_Free(&item->_next);
+
+    VIR_FREE(item->key);
+    VIR_FREE(item->adapter);
+    esxVI_HostScsiTopologyTarget_Free(&item->target);
+})
+
+/* esxVI_HostScsiTopologyInterface_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostScsiTopologyInterface,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(adapter)
+})
+
+/* esxVI_HostScsiTopologyInterface_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostScsiTopologyInterface)
+
+/* esxVI_HostScsiTopologyInterface_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostScsiTopologyInterface)
+
+/* esxVI_HostScsiTopologyInterface_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostScsiTopologyInterface)
+
+/* esxVI_HostScsiTopologyInterface_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostScsiTopologyInterface,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, adapter)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(HostScsiTopologyTarget, target)
+})
+
+/* esxVI_HostScsiTopologyInterface_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostScsiTopologyInterface)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostScsiTopologyLun
+ */
+
+/* esxVI_HostScsiTopologyLun_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostScsiTopologyLun)
+
+/* esxVI_HostScsiTopologyLun_Free */
+ESX_VI__TEMPLATE__FREE(HostScsiTopologyLun,
+{
+    esxVI_HostScsiTopologyLun_Free(&item->_next);
+
+    VIR_FREE(item->key);
+    esxVI_Int_Free(&item->lun);
+    VIR_FREE(item->scsiLun);
+})
+
+/* esxVI_HostScsiTopologyLun_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostScsiTopologyLun,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(lun)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(scsiLun)
+})
+
+/* esxVI_HostScsiTopologyLun_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostScsiTopologyLun)
+
+/* esxVI_HostScsiTopologyLun_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostScsiTopologyLun,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, lun)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, scsiLun)
+})
+
+/* esxVI_HostScsiTopologyLun_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostScsiTopologyLun)
+
+/* esxVI_HostScsiTopologyLun_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostScsiTopologyLun)
+
+/* esxVI_HostScsiTopologyLun_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostScsiTopologyLun)
+
+/* esxVI_HostScsiTopologyLun_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostScsiTopologyLun,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, lun)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, scsiLun)
+})
+
+/* esxVI_HostScsiTopologyLun_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostScsiTopologyLun)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostScsiTopologyTarget
+ */
+
+/* esxVI_HostScsiTopologyTarget_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostScsiTopologyTarget)
+
+/* esxVI_HostScsiTopologyTarget_Free */
+ESX_VI__TEMPLATE__FREE(HostScsiTopologyTarget,
+{
+    esxVI_HostScsiTopologyTarget_Free(&item->_next);
+
+    VIR_FREE(item->key);
+    esxVI_Int_Free(&item->target);
+    esxVI_HostScsiTopologyLun_Free(&item->lun);
+    esxVI_HostTargetTransport_Free(&item->transport);
+})
+
+/* esxVI_HostScsiTopologyTarget_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostScsiTopologyTarget,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(target)
+})
+
+/* esxVI_HostScsiTopologyTarget_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostScsiTopologyTarget)
+
+/* esxVI_HostScsiTopologyTarget_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostScsiTopologyTarget)
+
+/* esxVI_HostScsiTopologyTarget_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostScsiTopologyTarget)
+
+/* esxVI_HostScsiTopologyTarget_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostScsiTopologyTarget,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, target)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(HostScsiTopologyLun, lun)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostTargetTransport, transport)
+})
+
+/* esxVI_HostScsiTopologyTarget_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostScsiTopologyTarget)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostTargetTransport
+ *            extended by HostBlockAdapterTargetTransport
+ *                        HostFibreChannelTargetTransport
+ *                        HostInternetScsiTargetTransport
+ *                        HostParallelScsiTargetTransport
+ */
+
+/* esxVI_HostTargetTransport_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostTargetTransport)
+
+/* esxVI_HostTargetTransport_Free */
+ESX_VI__TEMPLATE__DYNAMIC_FREE(HostTargetTransport,
+{
+    /* HostTargetTransport */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostBlockAdapterTargetTransport)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostFibreChannelTargetTransport)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostInternetScsiTargetTransport)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostParallelScsiTargetTransport)
+},
+{
+    /* no properties */
+})
+
+/* esxVI_HostTargetTransport_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostTargetTransport,
+{
+    /* no properties */
+})
+
+/* esxVI_HostTargetTransport_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostTargetTransport,
+{
+    /* HostTargetTransport */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostBlockAdapterTargetTransport)
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostFibreChannelTargetTransport)
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostInternetScsiTargetTransport)
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostParallelScsiTargetTransport)
+})
+
+/* esxVI_HostTargetTransport_Deserialize */
+ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(HostTargetTransport,
+{
+    /* HostTargetTransport */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostBlockAdapterTargetTransport)
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostFibreChannelTargetTransport)
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostInternetScsiTargetTransport)
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostParallelScsiTargetTransport)
+},
+{
+    /* no properties */
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostVirtualSwitch
+ */
+
+/* esxVI_HostVirtualSwitch_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostVirtualSwitch)
+
+/* esxVI_HostVirtualSwitch_Free */
+ESX_VI__TEMPLATE__FREE(HostVirtualSwitch,
+{
+    esxVI_HostVirtualSwitch_Free(&item->_next);
+
+    VIR_FREE(item->name);
+    VIR_FREE(item->key);
+    esxVI_Int_Free(&item->numPorts);
+    esxVI_Int_Free(&item->numPortsAvailable);
+    esxVI_Int_Free(&item->mtu);
+    esxVI_String_Free(&item->portgroup);
+    esxVI_String_Free(&item->pnic);
+    esxVI_HostVirtualSwitchSpec_Free(&item->spec);
+})
+
+/* esxVI_HostVirtualSwitch_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostVirtualSwitch,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(name)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(numPorts)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(numPortsAvailable)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(spec)
+})
+
+/* esxVI_HostVirtualSwitch_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(HostVirtualSwitch)
+
+/* esxVI_HostVirtualSwitch_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostVirtualSwitch,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, name)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, numPorts)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, numPortsAvailable)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, mtu)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(String, portgroup)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(String, pnic)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostVirtualSwitchSpec, spec)
+})
+
+/* esxVI_HostVirtualSwitch_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(HostVirtualSwitch)
+
+/* esxVI_HostVirtualSwitch_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(HostVirtualSwitch)
+
+/* esxVI_HostVirtualSwitch_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(HostVirtualSwitch)
+
+/* esxVI_HostVirtualSwitch_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostVirtualSwitch,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, name)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, numPorts)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, numPortsAvailable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, mtu)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, portgroup)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, pnic)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostVirtualSwitchSpec, spec)
+})
+
+/* esxVI_HostVirtualSwitch_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(HostVirtualSwitch)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostVirtualSwitchAutoBridge
+ *            extends HostVirtualSwitchBridge
+ */
+
+/* esxVI_HostVirtualSwitchAutoBridge_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostVirtualSwitchAutoBridge)
+
+/* esxVI_HostVirtualSwitchAutoBridge_Free */
+ESX_VI__TEMPLATE__FREE(HostVirtualSwitchAutoBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchAutoBridge */
+    esxVI_String_Free(&item->excludedNicDevice);
+})
+
+/* esxVI_HostVirtualSwitchAutoBridge_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostVirtualSwitchAutoBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchAutoBridge */
+    /* no required properties */
+})
+
+/* esxVI_HostVirtualSwitchAutoBridge_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostVirtualSwitchAutoBridge,
+{
+})
+
+/* esxVI_HostVirtualSwitchAutoBridge_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostVirtualSwitchAutoBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchAutoBridge */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(String, excludedNicDevice)
+})
+
+/* esxVI_HostVirtualSwitchAutoBridge_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostVirtualSwitchAutoBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchAutoBridge */
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(String, excludedNicDevice)
+})
+
+/* esxVI_HostVirtualSwitchAutoBridge_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostVirtualSwitchAutoBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchAutoBridge */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, excludedNicDevice)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostVirtualSwitchBeaconConfig
+ */
+
+/* esxVI_HostVirtualSwitchBeaconConfig_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostVirtualSwitchBeaconConfig)
+
+/* esxVI_HostVirtualSwitchBeaconConfig_Free */
+ESX_VI__TEMPLATE__FREE(HostVirtualSwitchBeaconConfig,
+{
+    esxVI_Int_Free(&item->interval);
+})
+
+/* esxVI_HostVirtualSwitchBeaconConfig_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostVirtualSwitchBeaconConfig,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(interval)
+})
+
+/* esxVI_HostVirtualSwitchBeaconConfig_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostVirtualSwitchBeaconConfig,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, interval)
+})
+
+/* esxVI_HostVirtualSwitchBeaconConfig_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostVirtualSwitchBeaconConfig,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, interval)
+})
+
+/* esxVI_HostVirtualSwitchBeaconConfig_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostVirtualSwitchBeaconConfig,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, interval)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostVirtualSwitchBondBridge
+ *            extends HostVirtualSwitchBridge
+ */
+
+/* esxVI_HostVirtualSwitchBondBridge_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostVirtualSwitchBondBridge)
+
+/* esxVI_HostVirtualSwitchBondBridge_Free */
+ESX_VI__TEMPLATE__FREE(HostVirtualSwitchBondBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchBondBridge */
+    esxVI_String_Free(&item->nicDevice);
+    esxVI_HostVirtualSwitchBeaconConfig_Free(&item->beacon);
+    /* FIXME: linkDiscoveryProtocolConfig is currently ignored */
+})
+
+/* esxVI_HostVirtualSwitchBondBridge_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostVirtualSwitchBondBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchBondBridge */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(nicDevice)
+    /* FIXME: linkDiscoveryProtocolConfig is currently ignored */
+})
+
+/* esxVI_HostVirtualSwitchBondBridge_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostVirtualSwitchBondBridge,
+{
+})
+
+/* esxVI_HostVirtualSwitchBondBridge_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostVirtualSwitchBondBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchBondBridge */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(String, nicDevice)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostVirtualSwitchBeaconConfig, beacon)
+    /* FIXME: linkDiscoveryProtocolConfig is currently ignored */
+})
+
+/* esxVI_HostVirtualSwitchBondBridge_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostVirtualSwitchBondBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchBondBridge */
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(String, nicDevice)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostVirtualSwitchBeaconConfig, beacon)
+    /* FIXME: linkDiscoveryProtocolConfig is currently ignored */
+})
+
+/* esxVI_HostVirtualSwitchBondBridge_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostVirtualSwitchBondBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchBondBridge */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, nicDevice)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostVirtualSwitchBeaconConfig, beacon)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(linkDiscoveryProtocolConfig) /* FIXME */
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostVirtualSwitchBridge
+ *            extended by HostVirtualSwitchAutoBridge
+ *                        HostVirtualSwitchBondBridge
+ *                        HostVirtualSwitchSimpleBridge
+ */
+
+/* esxVI_HostVirtualSwitchBridge_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostVirtualSwitchBridge)
+
+/* esxVI_HostVirtualSwitchBridge_Free */
+ESX_VI__TEMPLATE__DYNAMIC_FREE(HostVirtualSwitchBridge,
+{
+    /* HostVirtualSwitchBridge */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostVirtualSwitchAutoBridge)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostVirtualSwitchBondBridge)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostVirtualSwitchSimpleBridge)
+},
+{
+    /* no properties */
+})
+
+/* esxVI_HostVirtualSwitchBridge_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostVirtualSwitchBridge,
+{
+    /* no properties */
+})
+
+/* esxVI_HostVirtualSwitchBridge_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostVirtualSwitchBridge,
+{
+    /* HostVirtualSwitchBridge */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostVirtualSwitchAutoBridge)
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostVirtualSwitchBondBridge)
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostVirtualSwitchSimpleBridge)
+})
+
+/* esxVI_HostVirtualSwitchBridge_DeepCopy */
+ESX_VI__TEMPLATE__DYNAMIC_DEEP_COPY(HostVirtualSwitchBridge,
+{
+    /* HostVirtualSwitchBridge */
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(HostVirtualSwitchAutoBridge)
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(HostVirtualSwitchBondBridge)
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(HostVirtualSwitchSimpleBridge)
+},
+{
+    /* no properties */
+})
+
+/* esxVI_HostVirtualSwitchBridge_Serialize */
+ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(HostVirtualSwitchBridge,
+{
+    /* HostVirtualSwitchBridge */
+    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(HostVirtualSwitchAutoBridge)
+    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(HostVirtualSwitchBondBridge)
+    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(HostVirtualSwitchSimpleBridge)
+},
+{
+    /* no properties */
+})
+
+/* esxVI_HostVirtualSwitchBridge_Deserialize */
+ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(HostVirtualSwitchBridge,
+{
+    /* HostVirtualSwitchBridge */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostVirtualSwitchAutoBridge)
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostVirtualSwitchBondBridge)
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostVirtualSwitchSimpleBridge)
+},
+{
+    /* no properties */
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostVirtualSwitchSimpleBridge
+ *            extends HostVirtualSwitchBridge
+ */
+
+/* esxVI_HostVirtualSwitchSimpleBridge_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostVirtualSwitchSimpleBridge)
+
+/* esxVI_HostVirtualSwitchSimpleBridge_Free */
+ESX_VI__TEMPLATE__FREE(HostVirtualSwitchSimpleBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchSimpleBridge */
+    VIR_FREE(item->nicDevice);
+})
+
+/* esxVI_HostVirtualSwitchSimpleBridge_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostVirtualSwitchSimpleBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchSimpleBridge */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(nicDevice)
+})
+
+/* esxVI_HostVirtualSwitchSimpleBridge_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(HostVirtualSwitchSimpleBridge,
+{
+})
+
+/* esxVI_HostVirtualSwitchSimpleBridge_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostVirtualSwitchSimpleBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchSimpleBridge */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, nicDevice)
+})
+
+/* esxVI_HostVirtualSwitchSimpleBridge_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostVirtualSwitchSimpleBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchSimpleBridge */
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, nicDevice)
+})
+
+/* esxVI_HostVirtualSwitchSimpleBridge_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostVirtualSwitchSimpleBridge,
+{
+    /* HostVirtualSwitchBridge */
+    /* no properties */
+
+    /* HostVirtualSwitchSimpleBridge */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, nicDevice)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostVirtualSwitchSpec
+ */
+
+/* esxVI_HostVirtualSwitchSpec_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostVirtualSwitchSpec)
+
+/* esxVI_HostVirtualSwitchSpec_Free */
+ESX_VI__TEMPLATE__FREE(HostVirtualSwitchSpec,
+{
+    esxVI_Int_Free(&item->numPorts);
+    esxVI_HostVirtualSwitchBridge_Free(&item->bridge);
+    esxVI_HostNetworkPolicy_Free(&item->policy);
+    esxVI_Int_Free(&item->mtu);
+})
+
+/* esxVI_HostVirtualSwitchSpec_Validate */
+ESX_VI__TEMPLATE__VALIDATE(HostVirtualSwitchSpec,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(numPorts)
+})
+
+/* esxVI_HostVirtualSwitchSpec_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(HostVirtualSwitchSpec,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, numPorts)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostVirtualSwitchBridge, bridge)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostNetworkPolicy, policy)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, mtu)
+})
+
+/* esxVI_HostVirtualSwitchSpec_Serialize */
+ESX_VI__TEMPLATE__SERIALIZE(HostVirtualSwitchSpec,
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, numPorts)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostVirtualSwitchBridge, bridge)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostNetworkPolicy, policy)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, mtu)
+})
+
+/* esxVI_HostVirtualSwitchSpec_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(HostVirtualSwitchSpec,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, numPorts)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostVirtualSwitchBridge, bridge)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostNetworkPolicy, policy)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, mtu)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: HostVmfsVolume
+ *            extends HostFileSystemVolume
  */
 
 /* esxVI_HostVmfsVolume_Alloc */
@@ -1647,6 +4686,7 @@ ESX_VI__TEMPLATE__FREE(HostVmfsVolume,
     VIR_FREE(item->version);
     VIR_FREE(item->uuid);
     esxVI_HostScsiDiskPartition_Free(&item->extent);
+    /* FIXME: forceMountedInfo is currently ignored */
 })
 
 /* esxVI_HostVmfsVolume_Validate */
@@ -1665,24 +4705,7 @@ ESX_VI__TEMPLATE__VALIDATE(HostVmfsVolume,
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(uuid)
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(extent)
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(vmfsUpgradable)
-})
-
-/* esxVI_HostVmfsVolume_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(HostVmfsVolume,
-{
-    /* HostFileSystemVolume */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, type)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, name)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, capacity)
-
-    /* HostVmfsVolume */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, blockSizeMb)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, maxBlocks)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, majorVersion)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, version)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, uuid)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(HostScsiDiskPartition, extent)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, vmfsUpgradable)
+    /* FIXME: forceMountedInfo is currently ignored */
 })
 
 /* esxVI_HostVmfsVolume_Deserialize */
@@ -1701,13 +4724,14 @@ ESX_VI__TEMPLATE__DESERIALIZE(HostVmfsVolume,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, uuid)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(HostScsiDiskPartition, extent)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, vmfsUpgradable)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(forceMountedInfo) /* FIXME */
 })
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: IsoImageFileInfo
- *          extends FileInfo
+ * VI Object: IsoImageFileInfo
+ *            extends FileInfo
  */
 
 /* esxVI_IsoImageFileInfo_Alloc */
@@ -1716,12 +4740,16 @@ ESX_VI__TEMPLATE__ALLOC(IsoImageFileInfo)
 /* esxVI_IsoImageFileInfo_Free */
 ESX_VI__TEMPLATE__FREE(IsoImageFileInfo,
 {
-    esxVI_FileInfo_Free((esxVI_FileInfo **)&item->_next);
+    esxVI_FileInfo *next = (esxVI_FileInfo *)item->_next;
+
+    esxVI_FileInfo_Free(&next);
+    item->_next = (esxVI_IsoImageFileInfo *)next;
 
     /* FileInfo */
     VIR_FREE(item->path);
     esxVI_Long_Free(&item->fileSize);
     esxVI_DateTime_Free(&item->modification);
+    VIR_FREE(item->owner);
 
     /* IsoImageFileInfo */
     /* no properties */
@@ -1745,21 +4773,6 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(IsoImageFileInfo,
 /* esxVI_IsoImageFileInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(IsoImageFileInfo)
 
-/* esxVI_IsoImageFileInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(IsoImageFileInfo,
-{
-    /* FileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, modification)
-
-    /* IsoImageFileInfo */
-    /* no properties */
-})
-
-/* esxVI_IsoImageFileInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(IsoImageFileInfo)
-
 /* esxVI_IsoImageFileInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(IsoImageFileInfo,
 {
@@ -1767,6 +4780,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(IsoImageFileInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, modification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, owner)
 
     /* IsoImageFileInfo */
     /* no properties */
@@ -1778,8 +4792,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(IsoImageFileInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: IsoImageFileQuery
- *          extends FileQuery
+ * VI Object: IsoImageFileQuery
+ *            extends FileQuery
  */
 
 /* esxVI_IsoImageFileQuery_Alloc */
@@ -1788,7 +4802,10 @@ ESX_VI__TEMPLATE__ALLOC(IsoImageFileQuery)
 /* esxVI_IsoImageFileQuery_Free */
 ESX_VI__TEMPLATE__FREE(IsoImageFileQuery,
 {
-    esxVI_FileQuery_Free((esxVI_FileQuery **)&item->_next);
+    esxVI_FileQuery *next = (esxVI_FileQuery *)item->_next;
+
+    esxVI_FileQuery_Free(&next);
+    item->_next = (esxVI_IsoImageFileQuery *)next;
 
     /* FileQuery */
     /* no properties */
@@ -1828,24 +4845,49 @@ ESX_VI__TEMPLATE__SERIALIZE(IsoImageFileQuery,
 /* esxVI_IsoImageFileQuery_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(IsoImageFileQuery)
 
-/* esxVI_IsoImageFileQuery_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(IsoImageFileQuery,
-{
-    /* FileQuery */
-    /* no properties */
 
-    /* IsoImageFileQuery */
-    /* no properties */
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: KeyAnyValue
+ */
+
+/* esxVI_KeyAnyValue_Alloc */
+ESX_VI__TEMPLATE__ALLOC(KeyAnyValue)
+
+/* esxVI_KeyAnyValue_Free */
+ESX_VI__TEMPLATE__FREE(KeyAnyValue,
+{
+    esxVI_KeyAnyValue_Free(&item->_next);
+
+    VIR_FREE(item->key);
+    esxVI_AnyType_Free(&item->value);
 })
 
-/* esxVI_IsoImageFileQuery_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(IsoImageFileQuery)
+/* esxVI_KeyAnyValue_Validate */
+ESX_VI__TEMPLATE__VALIDATE(KeyAnyValue,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(value)
+})
+
+/* esxVI_KeyAnyValue_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(KeyAnyValue)
+
+/* esxVI_KeyAnyValue_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(KeyAnyValue,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(AnyType, value)
+})
+
+/* esxVI_KeyAnyValue_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(KeyAnyValue)
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: LocalDatastoreInfo
- *          extends DatastoreInfo
+ * VI Object: LocalDatastoreInfo
+ *            extends DatastoreInfo
  */
 
 /* esxVI_LocalDatastoreInfo_Alloc */
@@ -1859,6 +4901,7 @@ ESX_VI__TEMPLATE__FREE(LocalDatastoreInfo,
     VIR_FREE(item->url);
     esxVI_Long_Free(&item->freeSpace);
     esxVI_Long_Free(&item->maxFileSize);
+    esxVI_DateTime_Free(&item->timestamp);
 
     /* LocalDatastoreInfo */
     VIR_FREE(item->path);
@@ -1883,22 +4926,7 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(LocalDatastoreInfo,
 })
 
 /* esxVI_LocalDatastoreInfo_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(LocalDatastoreInfo,
-{
-})
-
-/* esxVI_LocalDatastoreInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(LocalDatastoreInfo,
-{
-    /* DatastoreInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, name)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, url)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, freeSpace)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, maxFileSize)
-
-    /* LocalDatastoreInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(LocalDatastoreInfo)
 
 /* esxVI_LocalDatastoreInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(LocalDatastoreInfo,
@@ -1908,6 +4936,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(LocalDatastoreInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, url)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, freeSpace)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, maxFileSize)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, timestamp)
 
     /* LocalDatastoreInfo */
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
@@ -1916,8 +4945,37 @@ ESX_VI__TEMPLATE__DESERIALIZE(LocalDatastoreInfo,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: NasDatastoreInfo
- *          extends DatastoreInfo
+ * VI Object: LocalizedMethodFault
+ */
+
+/* esxVI_LocalizedMethodFault_Alloc */
+ESX_VI__TEMPLATE__ALLOC(LocalizedMethodFault)
+
+/* esxVI_LocalizedMethodFault_Free */
+ESX_VI__TEMPLATE__FREE(LocalizedMethodFault,
+{
+    esxVI_MethodFault_Free(&item->fault);
+    VIR_FREE(item->localizedMessage);
+})
+
+/* esxVI_LocalizedMethodFault_Validate */
+ESX_VI__TEMPLATE__VALIDATE(LocalizedMethodFault,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(fault)
+})
+
+/* esxVI_LocalizedMethodFault_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(LocalizedMethodFault,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(MethodFault, fault)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, localizedMessage)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: NasDatastoreInfo
+ *            extends DatastoreInfo
  */
 
 /* esxVI_NasDatastoreInfo_Alloc */
@@ -1931,6 +4989,7 @@ ESX_VI__TEMPLATE__FREE(NasDatastoreInfo,
     VIR_FREE(item->url);
     esxVI_Long_Free(&item->freeSpace);
     esxVI_Long_Free(&item->maxFileSize);
+    esxVI_DateTime_Free(&item->timestamp);
 
     /* NasDatastoreInfo */
     esxVI_HostNasVolume_Free(&item->nas);
@@ -1955,22 +5014,7 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(NasDatastoreInfo,
 })
 
 /* esxVI_NasDatastoreInfo_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(NasDatastoreInfo,
-{
-})
-
-/* esxVI_NasDatastoreInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(NasDatastoreInfo,
-{
-    /* DatastoreInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, name)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, url)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, freeSpace)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, maxFileSize)
-
-    /* NasDatastoreInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostNasVolume, nas)
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(NasDatastoreInfo)
 
 /* esxVI_NasDatastoreInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(NasDatastoreInfo,
@@ -1980,6 +5024,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(NasDatastoreInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, url)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, freeSpace)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, maxFileSize)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, timestamp)
 
     /* NasDatastoreInfo */
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostNasVolume, nas)
@@ -1988,7 +5033,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(NasDatastoreInfo,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: ObjectContent
+ * VI Object: ObjectContent
  */
 
 /* esxVI_ObjectContent_Alloc */
@@ -2039,7 +5084,7 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(ObjectContent)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: ObjectSpec
+ * VI Object: ObjectSpec
  */
 
 /* esxVI_ObjectSpec_Alloc */
@@ -2074,21 +5119,10 @@ ESX_VI__TEMPLATE__SERIALIZE(ObjectSpec,
 /* esxVI_ObjectSpec_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(ObjectSpec)
 
-/* esxVI_ObjectSpec_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(ObjectSpec,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, obj)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, skip)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(SelectionSpec, selectSet)
-})
-
-/* esxVI_ObjectSpec_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(ObjectSpec)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: ObjectUpdate
+ * VI Object: ObjectUpdate
  */
 
 /* esxVI_ObjectUpdate_Alloc */
@@ -2130,8 +5164,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(ObjectUpdate)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: OptionType
- *          extended by ChoiceOption
+ * VI Object: OptionType
+ *            extended by ChoiceOption
  */
 
 /* esxVI_OptionType_Alloc */
@@ -2140,6 +5174,7 @@ ESX_VI__TEMPLATE__ALLOC(OptionType)
 /* esxVI_OptionType_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(OptionType,
 {
+    /* OptionType */
     ESX_VI__TEMPLATE__DISPATCH__FREE(ChoiceOption)
 },
 {
@@ -2152,18 +5187,10 @@ ESX_VI__TEMPLATE__VALIDATE(OptionType,
     /* no required properties */
 })
 
-/* esxVI_OptionType_Serialize */
-ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(OptionType,
-{
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(ChoiceOption)
-},
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, valueIsReadonly)
-})
-
 /* esxVI_OptionType_Deserialize */
 ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(OptionType,
 {
+    /* OptionType */
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(ChoiceOption)
 },
 {
@@ -2173,7 +5200,74 @@ ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(OptionType,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PerfCounterInfo
+ * VI Object: OptionValue
+ *            extended by HostInternetScsiHbaParamValue
+ */
+
+/* esxVI_OptionValue_Alloc */
+ESX_VI__TEMPLATE__ALLOC(OptionValue)
+
+/* esxVI_OptionValue_Free */
+ESX_VI__TEMPLATE__DYNAMIC_FREE(OptionValue,
+{
+    /* OptionValue */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostInternetScsiHbaParamValue)
+},
+{
+    esxVI_OptionValue_Free(&item->_next);
+
+    VIR_FREE(item->key);
+    esxVI_AnyType_Free(&item->value);
+})
+
+/* esxVI_OptionValue_Validate */
+ESX_VI__TEMPLATE__VALIDATE(OptionValue,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
+})
+
+/* esxVI_OptionValue_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(OptionValue,
+{
+    /* OptionValue */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostInternetScsiHbaParamValue)
+})
+
+/* esxVI_OptionValue_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(OptionValue)
+
+/* esxVI_OptionValue_DeepCopy */
+ESX_VI__TEMPLATE__DYNAMIC_DEEP_COPY(OptionValue,
+{
+    /* OptionValue */
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(HostInternetScsiHbaParamValue)
+},
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(AnyType, value)
+})
+
+/* esxVI_OptionValue_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(OptionValue)
+
+/* esxVI_OptionValue_Deserialize */
+ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(OptionValue,
+{
+    /* OptionValue */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostInternetScsiHbaParamValue)
+},
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(AnyType, value)
+})
+
+/* esxVI_OptionValue_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(OptionValue)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: PerfCounterInfo
  */
 
 /* esxVI_PerfCounterInfo_Alloc */
@@ -2206,22 +5300,6 @@ ESX_VI__TEMPLATE__VALIDATE(PerfCounterInfo,
 /* esxVI_PerfCounterInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(PerfCounterInfo)
 
-/* esxVI_PerfCounterInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(PerfCounterInfo,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, key)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ElementDescription, nameInfo)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ElementDescription, groupInfo)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ElementDescription, unitInfo)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(PerfSummaryType, rollupType)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(PerfStatsType, statsType)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, level)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(Int, associatedCounterId)
-})
-
-/* esxVI_PerfCounterInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(PerfCounterInfo)
-
 /* esxVI_PerfCounterInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(PerfCounterInfo,
 {
@@ -2241,8 +5319,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(PerfCounterInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PerfEntityMetric
- *          extends PerfEntityMetricBase
+ * VI Object: PerfEntityMetric
+ *            extends PerfEntityMetricBase
  */
 
 /* esxVI_PerfEntityMetric_Alloc */
@@ -2251,7 +5329,10 @@ ESX_VI__TEMPLATE__ALLOC(PerfEntityMetric)
 /* esxVI_PerfEntityMetric_Free */
 ESX_VI__TEMPLATE__FREE(PerfEntityMetric,
 {
-    esxVI_PerfEntityMetricBase_Free((esxVI_PerfEntityMetricBase **)&item->_next);
+    esxVI_PerfEntityMetricBase *next = (esxVI_PerfEntityMetricBase *)item->_next;
+
+    esxVI_PerfEntityMetricBase_Free(&next);
+    item->_next = (esxVI_PerfEntityMetric *)next;
 
     /* PerfEntityMetricBase */
     esxVI_ManagedObjectReference_Free(&item->entity);
@@ -2279,20 +5360,6 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(PerfEntityMetric,
 /* esxVI_PerfEntityMetric_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(PerfEntityMetric)
 
-/* esxVI_PerfEntityMetric_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(PerfEntityMetric,
-{
-    /* PerfEntityMetricBase */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, entity)
-
-    /* PerfEntityMetric */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(PerfSampleInfo, sampleInfo)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(PerfMetricSeries, value)
-})
-
-/* esxVI_PerfEntityMetric_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(PerfEntityMetric)
-
 /* esxVI_PerfEntityMetric_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(PerfEntityMetric,
 {
@@ -2310,8 +5377,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(PerfEntityMetric)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PerfEntityMetricBase
- *          extended by PerfEntityMetric
+ * VI Object: PerfEntityMetricBase
+ *            extended by PerfEntityMetric
  */
 
 /* esxVI_PerfEntityMetricBase_Alloc */
@@ -2320,6 +5387,7 @@ ESX_VI__TEMPLATE__ALLOC(PerfEntityMetricBase)
 /* esxVI_PerfEntityMetricBase_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(PerfEntityMetricBase,
 {
+    /* PerfEntityMetricBase */
     ESX_VI__TEMPLATE__DISPATCH__FREE(PerfEntityMetric)
 },
 {
@@ -2344,21 +5412,10 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(PerfEntityMetricBase,
 /* esxVI_PerfEntityMetricBase_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(PerfEntityMetricBase)
 
-/* esxVI_PerfEntityMetricBase_Serialize */
-ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(PerfEntityMetricBase,
-{
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(PerfEntityMetric)
-},
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, entity)
-})
-
-/* esxVI_PerfEntityMetricBase_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(PerfEntityMetricBase)
-
 /* esxVI_PerfEntityMetricBase_Deserialize */
 ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(PerfEntityMetricBase,
 {
+    /* PerfEntityMetricBase */
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(PerfEntityMetric)
 },
 {
@@ -2371,7 +5428,7 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(PerfEntityMetricBase)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PerfMetricId
+ * VI Object: PerfMetricId
  */
 
 /* esxVI_PerfMetricId_Alloc */
@@ -2419,8 +5476,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(PerfMetricId)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PerfMetricIntSeries
- *          extends PerfMetricSeries
+ * VI Object: PerfMetricIntSeries
+ *            extends PerfMetricSeries
  */
 
 /* esxVI_PerfMetricIntSeries_Alloc */
@@ -2429,7 +5486,10 @@ ESX_VI__TEMPLATE__ALLOC(PerfMetricIntSeries)
 /* esxVI_PerfMetricIntSeries_Free */
 ESX_VI__TEMPLATE__FREE(PerfMetricIntSeries,
 {
-    esxVI_PerfMetricSeries_Free((esxVI_PerfMetricSeries **)&item->_next);
+    esxVI_PerfMetricSeries *next = (esxVI_PerfMetricSeries *)item->_next;
+
+    esxVI_PerfMetricSeries_Free(&next);
+    item->_next = (esxVI_PerfMetricIntSeries *)next;
 
     /* PerfMetricSeries */
     esxVI_PerfMetricId_Free(&item->id);
@@ -2456,19 +5516,6 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(PerfMetricIntSeries,
 /* esxVI_PerfMetricIntSeries_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(PerfMetricIntSeries)
 
-/* esxVI_PerfMetricIntSeries_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(PerfMetricIntSeries,
-{
-    /* PerfMetricSeries */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(PerfMetricId, id)
-
-    /* PerfMetricIntSeries */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(Long, value)
-})
-
-/* esxVI_PerfMetricIntSeries_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(PerfMetricIntSeries)
-
 /* esxVI_PerfMetricIntSeries_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(PerfMetricIntSeries,
 {
@@ -2485,8 +5532,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(PerfMetricIntSeries)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PerfMetricSeries
- *          extended by PerfMetricIntSeries
+ * VI Object: PerfMetricSeries
+ *            extended by PerfMetricIntSeries
  */
 
 /* esxVI_PerfMetricSeries_Alloc */
@@ -2495,6 +5542,7 @@ ESX_VI__TEMPLATE__ALLOC(PerfMetricSeries)
 /* esxVI_PerfMetricSeries_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(PerfMetricSeries,
 {
+    /* PerfMetricSeries */
     ESX_VI__TEMPLATE__DISPATCH__FREE(PerfMetricIntSeries)
 },
 {
@@ -2519,21 +5567,10 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(PerfMetricSeries,
 /* esxVI_PerfMetricSeries_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(PerfMetricSeries)
 
-/* esxVI_PerfMetricSeries_Serialize */
-ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(PerfMetricSeries,
-{
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(PerfMetricIntSeries)
-},
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(PerfMetricId, id)
-})
-
-/* esxVI_PerfMetricSeries_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(PerfMetricSeries)
-
 /* esxVI_PerfMetricSeries_Deserialize */
 ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(PerfMetricSeries,
 {
+    /* PerfMetricSeries */
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(PerfMetricIntSeries)
 },
 {
@@ -2546,7 +5583,7 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(PerfMetricSeries)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PerfQuerySpec
+ * VI Object: PerfQuerySpec
  */
 
 /* esxVI_PerfQuerySpec_Alloc */
@@ -2590,25 +5627,10 @@ ESX_VI__TEMPLATE__SERIALIZE(PerfQuerySpec,
 /* esxVI_PerfQuerySpec_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(PerfQuerySpec)
 
-/* esxVI_PerfQuerySpec_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(PerfQuerySpec,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, entity)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, startTime)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, endTime)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, maxSample)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(PerfMetricId, metricId)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, intervalId)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, format)
-})
-
-/* esxVI_PerfQuerySpec_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(PerfQuerySpec)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PerfSampleInfo
+ * VI Object: PerfSampleInfo
  */
 
 /* esxVI_PerfSampleInfo_Alloc */
@@ -2633,16 +5655,6 @@ ESX_VI__TEMPLATE__VALIDATE(PerfSampleInfo,
 /* esxVI_PerfSampleInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(PerfSampleInfo)
 
-/* esxVI_PerfSampleInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(PerfSampleInfo,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, timestamp)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, interval)
-})
-
-/* esxVI_PerfSampleInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(PerfSampleInfo)
-
 /* esxVI_PerfSampleInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(PerfSampleInfo,
 {
@@ -2656,7 +5668,167 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(PerfSampleInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PropertyChange
+ * VI Object: PhysicalNic
+ */
+
+/* esxVI_PhysicalNic_Alloc */
+ESX_VI__TEMPLATE__ALLOC(PhysicalNic)
+
+/* esxVI_PhysicalNic_Free */
+ESX_VI__TEMPLATE__FREE(PhysicalNic,
+{
+    esxVI_PhysicalNic_Free(&item->_next);
+
+    VIR_FREE(item->key);
+    VIR_FREE(item->device);
+    VIR_FREE(item->pci);
+    VIR_FREE(item->driver);
+    esxVI_PhysicalNicLinkInfo_Free(&item->linkSpeed);
+    esxVI_PhysicalNicLinkInfo_Free(&item->validLinkSpecification);
+    esxVI_PhysicalNicSpec_Free(&item->spec);
+    VIR_FREE(item->mac);
+})
+
+/* esxVI_PhysicalNic_Validate */
+ESX_VI__TEMPLATE__VALIDATE(PhysicalNic,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(device)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(pci)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(spec)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(wakeOnLanSupported)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(mac)
+})
+
+/* esxVI_PhysicalNic_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(PhysicalNic)
+
+/* esxVI_PhysicalNic_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(PhysicalNic,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, pci)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(PhysicalNicLinkInfo, linkSpeed)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(PhysicalNicLinkInfo, validLinkSpecification)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(PhysicalNicSpec, spec)
+    (*dest)->wakeOnLanSupported = src->wakeOnLanSupported;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, mac)
+})
+
+/* esxVI_PhysicalNic_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(PhysicalNic)
+
+/* esxVI_PhysicalNic_CastFromAnyType */
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(PhysicalNic)
+
+/* esxVI_PhysicalNic_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(PhysicalNic)
+
+/* esxVI_PhysicalNic_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(PhysicalNic,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, device)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, pci)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, driver)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(PhysicalNicLinkInfo, linkSpeed)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(PhysicalNicLinkInfo, validLinkSpecification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(PhysicalNicSpec, spec)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, wakeOnLanSupported)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, mac)
+})
+
+/* esxVI_PhysicalNic_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(PhysicalNic)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: PhysicalNicLinkInfo
+ */
+
+/* esxVI_PhysicalNicLinkInfo_Alloc */
+ESX_VI__TEMPLATE__ALLOC(PhysicalNicLinkInfo)
+
+/* esxVI_PhysicalNicLinkInfo_Free */
+ESX_VI__TEMPLATE__FREE(PhysicalNicLinkInfo,
+{
+    esxVI_PhysicalNicLinkInfo_Free(&item->_next);
+
+    esxVI_Int_Free(&item->speedMb);
+})
+
+/* esxVI_PhysicalNicLinkInfo_Validate */
+ESX_VI__TEMPLATE__VALIDATE(PhysicalNicLinkInfo,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(speedMb)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(duplex)
+})
+
+/* esxVI_PhysicalNicLinkInfo_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(PhysicalNicLinkInfo)
+
+/* esxVI_PhysicalNicLinkInfo_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(PhysicalNicLinkInfo,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, speedMb)
+    (*dest)->duplex = src->duplex;
+})
+
+/* esxVI_PhysicalNicLinkInfo_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(PhysicalNicLinkInfo)
+
+/* esxVI_PhysicalNicLinkInfo_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(PhysicalNicLinkInfo,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, speedMb)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, duplex)
+})
+
+/* esxVI_PhysicalNicLinkInfo_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(PhysicalNicLinkInfo)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: PhysicalNicSpec
+ */
+
+/* esxVI_PhysicalNicSpec_Alloc */
+ESX_VI__TEMPLATE__ALLOC(PhysicalNicSpec)
+
+/* esxVI_PhysicalNicSpec_Free */
+ESX_VI__TEMPLATE__FREE(PhysicalNicSpec,
+{
+    esxVI_HostIpConfig_Free(&item->ip);
+    esxVI_PhysicalNicLinkInfo_Free(&item->linkSpeed);
+})
+
+/* esxVI_PhysicalNicSpec_Validate */
+ESX_VI__TEMPLATE__VALIDATE(PhysicalNicSpec,
+{
+    /* no required properties */
+})
+
+/* esxVI_PhysicalNicSpec_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(PhysicalNicSpec,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(HostIpConfig, ip)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(PhysicalNicLinkInfo, linkSpeed)
+})
+
+/* esxVI_PhysicalNicSpec_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(PhysicalNicSpec,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostIpConfig, ip)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(PhysicalNicLinkInfo, linkSpeed)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: PropertyChange
  */
 
 /* esxVI_PropertyChange_Alloc */
@@ -2695,7 +5867,7 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(PropertyChange)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PropertyFilterSpec
+ * VI Object: PropertyFilterSpec
  */
 
 /* esxVI_PropertyFilterSpec_Alloc */
@@ -2730,20 +5902,10 @@ ESX_VI__TEMPLATE__SERIALIZE(PropertyFilterSpec,
 /* esxVI_PropertyFilterSpec_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(PropertyFilterSpec)
 
-/* esxVI_PropertyFilterSpec_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(PropertyFilterSpec,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(PropertySpec, propSet)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(ObjectSpec, objectSet)
-})
-
-/* esxVI_PropertyFilterSpec_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(PropertyFilterSpec)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PropertyFilterUpdate
+ * VI Object: PropertyFilterUpdate
  */
 
 /* esxVI_PropertyFilterUpdate_Alloc */
@@ -2783,7 +5945,7 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(PropertyFilterUpdate)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: PropertySpec
+ * VI Object: PropertySpec
  */
 
 /* esxVI_PropertySpec_Alloc */
@@ -2818,21 +5980,10 @@ ESX_VI__TEMPLATE__SERIALIZE(PropertySpec,
 /* esxVI_PropertySpec_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(PropertySpec)
 
-/* esxVI_PropertySpec_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(PropertySpec,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, type)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, all)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, pathSet)
-})
-
-/* esxVI_PropertySpec_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(PropertySpec)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: ResourceAllocationInfo
+ * VI Object: ResourceAllocationInfo
  */
 
 /* esxVI_ResourceAllocationInfo_Alloc */
@@ -2863,20 +6014,10 @@ ESX_VI__TEMPLATE__SERIALIZE(ResourceAllocationInfo,
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, overheadLimit)
 })
 
-/* esxVI_ResourceAllocationInfo_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(ResourceAllocationInfo,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, reservation)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, expandableReservation)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, limit)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(SharesInfo, shares)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, overheadLimit)
-})
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: ResourcePoolResourceUsage
+ * VI Object: ResourcePoolResourceUsage
  */
 
 /* esxVI_ResourcePoolResourceUsage_Alloc */
@@ -2905,20 +6046,7 @@ ESX_VI__TEMPLATE__VALIDATE(ResourcePoolResourceUsage,
 })
 
 /* esxVI_ResourcePoolResourceUsage_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(ResourcePoolResourceUsage,
-{
-})
-
-/* esxVI_ResourcePoolResourceUsage_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(ResourcePoolResourceUsage,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, reservationUsed)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, reservationUsedForVm)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, unreservedForPool)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, unreservedForVm)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, overallUsage)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, maxUsage)
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(ResourcePoolResourceUsage)
 
 /* esxVI_ResourcePoolResourceUsage_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(ResourcePoolResourceUsage,
@@ -2934,8 +6062,288 @@ ESX_VI__TEMPLATE__DESERIALIZE(ResourcePoolResourceUsage,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: SelectionSpec
- *          extended by TraversalSpec
+ * VI Object: ScsiLun
+ *            extends HostDevice
+ *            extended by HostScsiDisk
+ */
+
+/* esxVI_ScsiLun_Alloc */
+ESX_VI__TEMPLATE__ALLOC(ScsiLun)
+
+/* esxVI_ScsiLun_Free */
+ESX_VI__TEMPLATE__DYNAMIC_FREE(ScsiLun,
+{
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostScsiDisk)
+},
+{
+    esxVI_HostDevice *next = (esxVI_HostDevice *)item->_next;
+
+    esxVI_HostDevice_Free(&next);
+    item->_next = (esxVI_ScsiLun *)next;
+
+    /* HostDevice */
+    VIR_FREE(item->deviceName);
+    VIR_FREE(item->deviceType);
+
+    /* ScsiLun */
+    VIR_FREE(item->key);
+    VIR_FREE(item->uuid);
+    esxVI_ScsiLunDescriptor_Free(&item->descriptor);
+    VIR_FREE(item->canonicalName);
+    VIR_FREE(item->displayName);
+    VIR_FREE(item->lunType);
+    VIR_FREE(item->vendor);
+    VIR_FREE(item->model);
+    VIR_FREE(item->revision);
+    esxVI_Int_Free(&item->scsiLevel);
+    VIR_FREE(item->serialNumber);
+    esxVI_ScsiLunDurableName_Free(&item->durableName);
+    esxVI_ScsiLunDurableName_Free(&item->alternateName);
+    esxVI_Byte_Free(&item->standardInquiry);
+    esxVI_Int_Free(&item->queueDepth);
+    esxVI_String_Free(&item->operationalState);
+    esxVI_ScsiLunCapabilities_Free(&item->capabilities);
+})
+
+/* esxVI_ScsiLun_Validate */
+ESX_VI__TEMPLATE__VALIDATE(ScsiLun,
+{
+    /* HostDevice */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(deviceName)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(deviceType)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(uuid)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(lunType)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(operationalState)
+})
+
+/* esxVI_ScsiLun_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(ScsiLun,
+{
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(HostScsiDisk)
+})
+
+/* esxVI_ScsiLun_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(ScsiLun)
+
+/* esxVI_ScsiLun_DeepCopy */
+ESX_VI__TEMPLATE__DYNAMIC_DEEP_COPY(ScsiLun,
+{
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__DISPATCH__DEEP_COPY(HostScsiDisk)
+},
+{
+    /* HostDevice */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, deviceName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, deviceType)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, uuid)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(ScsiLunDescriptor, descriptor)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, canonicalName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, displayName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, lunType)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, vendor)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, revision)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, scsiLevel)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, serialNumber)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(ScsiLunDurableName, durableName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(ScsiLunDurableName, alternateName)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(Byte, standardInquiry)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, queueDepth)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(String, operationalState)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(ScsiLunCapabilities, capabilities)
+})
+
+/* esxVI_ScsiLun_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(ScsiLun)
+
+/* esxVI_ScsiLun_CastFromAnyType */
+ESX_VI__TEMPLATE__DYNAMIC_CAST_FROM_ANY_TYPE(ScsiLun,
+{
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__DISPATCH__CAST_FROM_ANY_TYPE(HostScsiDisk)
+})
+
+/* esxVI_ScsiLun_CastListFromAnyType */
+ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(ScsiLun)
+
+/* esxVI_ScsiLun_Deserialize */
+ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(ScsiLun,
+{
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(HostScsiDisk)
+},
+{
+    /* HostDevice */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, deviceName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, deviceType)
+
+    /* ScsiLun */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, uuid)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(ScsiLunDescriptor, descriptor)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, canonicalName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, displayName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, lunType)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, vendor)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, model)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, revision)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, scsiLevel)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, serialNumber)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ScsiLunDurableName, durableName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(ScsiLunDurableName, alternateName)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(Byte, standardInquiry)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, queueDepth)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, operationalState)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ScsiLunCapabilities, capabilities)
+})
+
+/* esxVI_ScsiLun_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(ScsiLun)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: ScsiLunCapabilities
+ */
+
+/* esxVI_ScsiLunCapabilities_Alloc */
+ESX_VI__TEMPLATE__ALLOC(ScsiLunCapabilities)
+
+/* esxVI_ScsiLunCapabilities_Free */
+ESX_VI__TEMPLATE__FREE(ScsiLunCapabilities,
+{
+    /* no properties to be freed */
+})
+
+/* esxVI_ScsiLunCapabilities_Validate */
+ESX_VI__TEMPLATE__VALIDATE(ScsiLunCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(updateDisplayNameSupported)
+})
+
+/* esxVI_ScsiLunCapabilities_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(ScsiLunCapabilities,
+{
+    (*dest)->updateDisplayNameSupported = src->updateDisplayNameSupported;
+})
+
+/* esxVI_ScsiLunCapabilities_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(ScsiLunCapabilities,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, updateDisplayNameSupported)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: ScsiLunDescriptor
+ */
+
+/* esxVI_ScsiLunDescriptor_Alloc */
+ESX_VI__TEMPLATE__ALLOC(ScsiLunDescriptor)
+
+/* esxVI_ScsiLunDescriptor_Free */
+ESX_VI__TEMPLATE__FREE(ScsiLunDescriptor,
+{
+    esxVI_ScsiLunDescriptor_Free(&item->_next);
+
+    VIR_FREE(item->quality);
+    VIR_FREE(item->id);
+})
+
+/* esxVI_ScsiLunDescriptor_Validate */
+ESX_VI__TEMPLATE__VALIDATE(ScsiLunDescriptor,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(quality)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(id)
+})
+
+/* esxVI_ScsiLunDescriptor_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(ScsiLunDescriptor)
+
+/* esxVI_ScsiLunDescriptor_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(ScsiLunDescriptor,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, quality)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, id)
+})
+
+/* esxVI_ScsiLunDescriptor_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(ScsiLunDescriptor)
+
+/* esxVI_ScsiLunDescriptor_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(ScsiLunDescriptor,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, quality)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, id)
+})
+
+/* esxVI_ScsiLunDescriptor_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(ScsiLunDescriptor)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: ScsiLunDurableName
+ */
+
+/* esxVI_ScsiLunDurableName_Alloc */
+ESX_VI__TEMPLATE__ALLOC(ScsiLunDurableName)
+
+/* esxVI_ScsiLunDurableName_Free */
+ESX_VI__TEMPLATE__FREE(ScsiLunDurableName,
+{
+    esxVI_ScsiLunDurableName_Free(&item->_next);
+
+    VIR_FREE(item->namespace);
+    esxVI_Byte_Free(&item->namespaceId);
+    esxVI_Byte_Free(&item->data);
+})
+
+/* esxVI_ScsiLunDurableName_Validate */
+ESX_VI__TEMPLATE__VALIDATE(ScsiLunDurableName,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(namespace)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(namespaceId)
+})
+
+/* esxVI_ScsiLunDurableName_AppendToList */
+ESX_VI__TEMPLATE__LIST__APPEND(ScsiLunDurableName)
+
+/* esxVI_ScsiLunDurableName_DeepCopy */
+ESX_VI__TEMPLATE__DEEP_COPY(ScsiLunDurableName,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, namespace)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Byte, namespaceId)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(Byte, data)
+})
+
+/* esxVI_ScsiLunDurableName_DeepCopyList */
+ESX_VI__TEMPLATE__LIST__DEEP_COPY(ScsiLunDurableName)
+
+/* esxVI_ScsiLunDurableName_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(ScsiLunDurableName,
+{
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, namespace)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Byte, namespaceId)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(Byte, data)
+})
+
+/* esxVI_ScsiLunDurableName_DeserializeList */
+ESX_VI__TEMPLATE__LIST__DESERIALIZE(ScsiLunDurableName)
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: SelectionSpec
+ *            extended by TraversalSpec
  */
 
 /* esxVI_SelectionSpec_Alloc */
@@ -2944,6 +6352,7 @@ ESX_VI__TEMPLATE__ALLOC(SelectionSpec)
 /* esxVI_SelectionSpec_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(SelectionSpec,
 {
+    /* SelectionSpec */
     ESX_VI__TEMPLATE__DISPATCH__FREE(TraversalSpec)
 },
 {
@@ -2971,6 +6380,7 @@ ESX_VI__TEMPLATE__LIST__APPEND(SelectionSpec)
 /* esxVI_SelectionSpec_Serialize */
 ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(SelectionSpec,
 {
+    /* SelectionSpec */
     ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(TraversalSpec)
 },
 {
@@ -2980,22 +6390,10 @@ ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(SelectionSpec,
 /* esxVI_SelectionSpec_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(SelectionSpec)
 
-/* esxVI_SelectionSpec_Deserialize */
-ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(SelectionSpec,
-{
-    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(TraversalSpec)
-},
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, name)
-})
-
-/* esxVI_SelectionSpec_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(SelectionSpec)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: ServiceContent
+ * VI Object: ServiceContent
  */
 
 /* esxVI_ServiceContent_Alloc */
@@ -3027,6 +6425,16 @@ ESX_VI__TEMPLATE__FREE(ServiceContent,
     esxVI_ManagedObjectReference_Free(&item->fileManager);
     esxVI_ManagedObjectReference_Free(&item->virtualDiskManager);
     esxVI_ManagedObjectReference_Free(&item->virtualizationManager);
+    esxVI_ManagedObjectReference_Free(&item->snmpSystem);
+    esxVI_ManagedObjectReference_Free(&item->vmProvisioningChecker);
+    esxVI_ManagedObjectReference_Free(&item->vmCompatibilityChecker);
+    esxVI_ManagedObjectReference_Free(&item->ovfManager);
+    esxVI_ManagedObjectReference_Free(&item->ipPoolManager);
+    esxVI_ManagedObjectReference_Free(&item->dvSwitchManager);
+    esxVI_ManagedObjectReference_Free(&item->hostProfileManager);
+    esxVI_ManagedObjectReference_Free(&item->clusterProfileManager);
+    esxVI_ManagedObjectReference_Free(&item->complianceManager);
+    esxVI_ManagedObjectReference_Free(&item->localizationManager);
 })
 
 /* esxVI_ServiceContent_Validate */
@@ -3035,34 +6443,6 @@ ESX_VI__TEMPLATE__VALIDATE(ServiceContent,
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(rootFolder)
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(propertyCollector)
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(about)
-})
-
-/* esxVI_ServiceContent_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(ServiceContent,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, rootFolder)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, propertyCollector)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, viewManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(AboutInfo, about)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, setting)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, userDirectory)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, sessionManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, authorizationManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, perfManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, scheduledTaskManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, alarmManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, eventManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, taskManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, extensionManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, customizationSpecManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, customFieldsManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, accountManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, diagnosticManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, licenseManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, searchIndex)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, fileManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, virtualDiskManager)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ManagedObjectReference, virtualizationManager)
 })
 
 /* esxVI_ServiceContent_Deserialize */
@@ -3091,12 +6471,22 @@ ESX_VI__TEMPLATE__DESERIALIZE(ServiceContent,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, fileManager)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, virtualDiskManager)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, virtualizationManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, snmpSystem)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, vmProvisioningChecker)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, vmCompatibilityChecker)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, ovfManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, ipPoolManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, dvSwitchManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, hostProfileManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, clusterProfileManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, complianceManager)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, localizationManager)
 })
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: SharesInfo
+ * VI Object: SharesInfo
  */
 
 /* esxVI_SharesInfo_Alloc */
@@ -3116,9 +6506,7 @@ ESX_VI__TEMPLATE__VALIDATE(SharesInfo,
 })
 
 /* esxVI_SharesInfo_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(SharesInfo,
-{
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(SharesInfo)
 
 /* esxVI_SharesInfo_Serialize */
 ESX_VI__TEMPLATE__SERIALIZE(SharesInfo,
@@ -3137,7 +6525,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(SharesInfo,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: TaskInfo
+ * VI Object: TaskInfo
  */
 
 /* esxVI_TaskInfo_Alloc */
@@ -3150,12 +6538,13 @@ ESX_VI__TEMPLATE__FREE(TaskInfo,
 
     VIR_FREE(item->key);
     esxVI_ManagedObjectReference_Free(&item->task);
+    /* FIXME: description is currently ignored */
     VIR_FREE(item->name);
     VIR_FREE(item->descriptionId);
     esxVI_ManagedObjectReference_Free(&item->entity);
     VIR_FREE(item->entityName);
     esxVI_ManagedObjectReference_Free(&item->locked);
-    /* FIXME: error is currently ignored */
+    esxVI_LocalizedMethodFault_Free(&item->error);
     esxVI_AnyType_Free(&item->result);
     esxVI_Int_Free(&item->progress);
     /* FIXME: reason is currently ignored */
@@ -3163,6 +6552,9 @@ ESX_VI__TEMPLATE__FREE(TaskInfo,
     esxVI_DateTime_Free(&item->startTime);
     esxVI_DateTime_Free(&item->completeTime);
     esxVI_Int_Free(&item->eventChainId);
+    VIR_FREE(item->changeTag);
+    VIR_FREE(item->parentTaskKey);
+    VIR_FREE(item->rootTaskKey);
 })
 
 /* esxVI_TaskInfo_Validate */
@@ -3170,11 +6562,11 @@ ESX_VI__TEMPLATE__VALIDATE(TaskInfo,
 {
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(key)
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(task)
+    /* FIXME: description is currently ignored */
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(descriptionId)
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(state)
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(cancelled)
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(cancelable)
-    /* FIXME: error is currently ignored */
     /* FIXME: reason is currently ignored */
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(queueTime)
     ESX_VI__TEMPLATE__PROPERTY__REQUIRE(eventChainId)
@@ -3184,9 +6576,7 @@ ESX_VI__TEMPLATE__VALIDATE(TaskInfo,
 ESX_VI__TEMPLATE__LIST__APPEND(TaskInfo)
 
 /* esxVI_TaskInfo_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(TaskInfo,
-{
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(TaskInfo)
 
 /* esxVI_TaskInfo_CastListFromAnyType */
 ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(TaskInfo)
@@ -3196,6 +6586,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(TaskInfo,
 {
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, key)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, task)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(description) /* FIXME */
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, name)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, descriptionId)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, entity)
@@ -3204,7 +6595,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(TaskInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(TaskInfoState, state)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, cancelled)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, cancelable)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(error) /* FIXME */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(LocalizedMethodFault, error)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(AnyType, result)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, progress)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(reason) /* FIXME */
@@ -3212,6 +6603,9 @@ ESX_VI__TEMPLATE__DESERIALIZE(TaskInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, startTime)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, completeTime)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, eventChainId)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, changeTag)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, parentTaskKey)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, rootTaskKey)
 })
 
 /* esxVI_TaskInfo_DeserializeList */
@@ -3220,8 +6614,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(TaskInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: TemplateConfigFileInfo
- *          extends VmConfigFileInfo
+ * VI Object: TemplateConfigFileInfo
+ *            extends VmConfigFileInfo
  */
 
 /* esxVI_TemplateConfigFileInfo_Alloc */
@@ -3230,12 +6624,16 @@ ESX_VI__TEMPLATE__ALLOC(TemplateConfigFileInfo)
 /* esxVI_TemplateConfigFileInfo_Free */
 ESX_VI__TEMPLATE__FREE(TemplateConfigFileInfo,
 {
-    esxVI_VmConfigFileInfo_Free((esxVI_VmConfigFileInfo **)&item->_next);
+    esxVI_VmConfigFileInfo *next = (esxVI_VmConfigFileInfo *)item->_next;
+
+    esxVI_VmConfigFileInfo_Free(&next);
+    item->_next = (esxVI_TemplateConfigFileInfo *)next;
 
     /* FileInfo */
     VIR_FREE(item->path);
     esxVI_Long_Free(&item->fileSize);
     esxVI_DateTime_Free(&item->modification);
+    VIR_FREE(item->owner);
 
     /* VmConfigFileInfo */
     esxVI_Int_Free(&item->configVersion);
@@ -3265,24 +6663,6 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(TemplateConfigFileInfo,
 /* esxVI_TemplateConfigFileInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(TemplateConfigFileInfo)
 
-/* esxVI_TemplateConfigFileInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(TemplateConfigFileInfo,
-{
-    /* FileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, modification)
-
-    /* VmConfigFileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, configVersion)
-
-    /* TemplateConfigFileInfo */
-    /* no properties */
-})
-
-/* esxVI_TemplateConfigFileInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(TemplateConfigFileInfo)
-
 /* esxVI_TemplateConfigFileInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(TemplateConfigFileInfo,
 {
@@ -3290,6 +6670,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(TemplateConfigFileInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, modification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, owner)
 
     /* VmConfigFileInfo */
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, configVersion)
@@ -3304,8 +6685,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(TemplateConfigFileInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: TemplateConfigFileQuery
- *          extends VmConfigFileQuery
+ * VI Object: TemplateConfigFileQuery
+ *            extends VmConfigFileQuery
  */
 
 /* esxVI_TemplateConfigFileQuery_Alloc */
@@ -3314,7 +6695,10 @@ ESX_VI__TEMPLATE__ALLOC(TemplateConfigFileQuery)
 /* esxVI_TemplateConfigFileQuery_Free */
 ESX_VI__TEMPLATE__FREE(TemplateConfigFileQuery,
 {
-    esxVI_VmConfigFileQuery_Free((esxVI_VmConfigFileQuery **)&item->_next);
+    esxVI_VmConfigFileQuery *next = (esxVI_VmConfigFileQuery *)item->_next;
+
+    esxVI_VmConfigFileQuery_Free(&next);
+    item->_next = (esxVI_TemplateConfigFileQuery *)next;
 
     /* FileQuery */
     /* no properties */
@@ -3365,28 +6749,11 @@ ESX_VI__TEMPLATE__SERIALIZE(TemplateConfigFileQuery,
 /* esxVI_TemplateConfigFileQuery_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(TemplateConfigFileQuery)
 
-/* esxVI_TemplateConfigFileQuery_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(TemplateConfigFileQuery,
-{
-    /* FileQuery */
-    /* no properties */
-
-    /* VmConfigFileQuery */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(VmConfigFileQueryFilter, filter)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(VmConfigFileQueryFlags, details)
-
-    /* TemplateConfigFileQuery */
-    /* no properties */
-})
-
-/* esxVI_TemplateConfigFileQuery_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(TemplateConfigFileQuery)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: TraversalSpec
- *          extends SelectionSpec
+ * VI Object: TraversalSpec
+ *            extends SelectionSpec
  */
 
 /* esxVI_TraversalSpec_Alloc */
@@ -3395,7 +6762,10 @@ ESX_VI__TEMPLATE__ALLOC(TraversalSpec)
 /* esxVI_TraversalSpec_Free */
 ESX_VI__TEMPLATE__FREE(TraversalSpec,
 {
-    esxVI_SelectionSpec_Free((esxVI_SelectionSpec **)&item->_next);
+    esxVI_SelectionSpec *next = (esxVI_SelectionSpec *)item->_next;
+
+    esxVI_SelectionSpec_Free(&next);
+    item->_next = (esxVI_TraversalSpec *)next;
 
     /* SelectionSpec */
     VIR_FREE(item->name);
@@ -3441,26 +6811,10 @@ ESX_VI__TEMPLATE__SERIALIZE(TraversalSpec,
 /* esxVI_TraversalSpec_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(TraversalSpec)
 
-/* esxVI_TraversalSpec_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(TraversalSpec,
-{
-    /* SelectionSpec */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, name)
-
-    /* TraversalSpec */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, type)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, skip)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(SelectionSpec, selectSet)
-})
-
-/* esxVI_TraversalSpec_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(TraversalSpec)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: UpdateSet
+ * VI Object: UpdateSet
  */
 
 /* esxVI_UpdateSet_Alloc */
@@ -3489,7 +6843,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(UpdateSet,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: UserSession
+ * VI Object: UserSession
  */
 
 /* esxVI_UserSession_Alloc */
@@ -3520,21 +6874,7 @@ ESX_VI__TEMPLATE__VALIDATE(UserSession,
 })
 
 /* esxVI_UserSession_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(UserSession,
-{
-})
-
-/* esxVI_UserSession_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(UserSession,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, key)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, userName)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, fullName)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, loginTime)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, lastActiveTime)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, locale)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, messageLocale)
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(UserSession)
 
 /* esxVI_UserSession_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(UserSession,
@@ -3551,7 +6891,57 @@ ESX_VI__TEMPLATE__DESERIALIZE(UserSession,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VirtualMachineConfigSpec
+ * VI Object: VirtualDiskSpec
+ *            extended by DeviceBackedVirtualDiskSpec
+ *                        FileBackedVirtualDiskSpec
+ */
+
+/* esxVI_VirtualDiskSpec_Alloc */
+ESX_VI__TEMPLATE__ALLOC(VirtualDiskSpec)
+
+/* esxVI_VirtualDiskSpec_Free */
+ESX_VI__TEMPLATE__DYNAMIC_FREE(VirtualDiskSpec,
+{
+    /* VirtualDiskSpec */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(DeviceBackedVirtualDiskSpec)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(FileBackedVirtualDiskSpec)
+},
+{
+    VIR_FREE(item->diskType);
+    VIR_FREE(item->adapterType);
+})
+
+/* esxVI_VirtualDiskSpec_Validate */
+ESX_VI__TEMPLATE__VALIDATE(VirtualDiskSpec,
+{
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(diskType)
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(adapterType)
+})
+
+/* esxVI_VirtualDiskSpec_DynamicCast */
+ESX_VI__TEMPLATE__DYNAMIC_CAST(VirtualDiskSpec,
+{
+    /* VirtualDiskSpec */
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(DeviceBackedVirtualDiskSpec)
+    ESX_VI__TEMPLATE__DYNAMIC_CAST__ACCEPT(FileBackedVirtualDiskSpec)
+})
+
+/* esxVI_VirtualDiskSpec_Serialize */
+ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(VirtualDiskSpec,
+{
+    /* VirtualDiskSpec */
+    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(DeviceBackedVirtualDiskSpec)
+    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(FileBackedVirtualDiskSpec)
+},
+{
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, diskType)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, adapterType)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: VirtualMachineConfigSpec
  */
 
 /* esxVI_VirtualMachineConfigSpec_Alloc */
@@ -3564,9 +6954,12 @@ ESX_VI__TEMPLATE__FREE(VirtualMachineConfigSpec,
     VIR_FREE(item->name);
     VIR_FREE(item->version);
     VIR_FREE(item->uuid);
+    VIR_FREE(item->instanceUuid);
     esxVI_Long_Free(&item->npivNodeWorldWideName);
     esxVI_Long_Free(&item->npivPortWorldWideName);
     VIR_FREE(item->npivWorldWideNameType);
+    /* FIXME: npivDesiredNodeWwns is currently ignored */
+    /* FIXME: npivDesiredPortWwns is currently ignored */
     VIR_FREE(item->npivWorldWideNameOp);
     VIR_FREE(item->locationId);
     VIR_FREE(item->guestId);
@@ -3589,11 +6982,15 @@ ESX_VI__TEMPLATE__FREE(VirtualMachineConfigSpec,
     /* FIXME: extraConfig is currently ignored */
     VIR_FREE(item->swapPlacement);
     /* FIXME: bootOptions is currently ignored */
+    /* FIXME: vAppConfig is currently ignored */
+    /* FIXME: ftInfo is currently ignored */
 })
 
 /* esxVI_VirtualMachineConfigSpec_Validate */
 ESX_VI__TEMPLATE__VALIDATE(VirtualMachineConfigSpec,
 {
+    /* FIXME: npivDesiredNodeWwns is currently ignored */
+    /* FIXME: npivDesiredPortWwns is currently ignored */
     /* FIXME: files is currently ignored */
     /* FIXME: tools is currently ignored */
     /* FIXME: flags is currently ignored */
@@ -3606,6 +7003,8 @@ ESX_VI__TEMPLATE__VALIDATE(VirtualMachineConfigSpec,
     /* FIXME: cpuFeatureMask is currently ignored */
     /* FIXME: extraConfig is currently ignored */
     /* FIXME: bootOptions is currently ignored */
+    /* FIXME: vAppConfig is currently ignored */
+    /* FIXME: ftInfo is currently ignored */
 })
 
 /* esxVI_VirtualMachineConfigSpec_Serialize */
@@ -3615,9 +7014,14 @@ ESX_VI__TEMPLATE__SERIALIZE(VirtualMachineConfigSpec,
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, name)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, version)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, uuid)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, instanceUuid)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(Long, npivNodeWorldWideName)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(Long, npivPortWorldWideName)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, npivWorldWideNameType)
+    /* FIXME: npivDesiredNodeWwns is currently ignored */
+    /* FIXME: npivDesiredPortWwns is currently ignored */
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, npivTemporaryDisabled)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, npivOnNonRdmDisks)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, npivWorldWideNameOp)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, locationId)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, guestId)
@@ -3630,6 +7034,9 @@ ESX_VI__TEMPLATE__SERIALIZE(VirtualMachineConfigSpec,
     /* FIXME: powerOpInfo is currently ignored */
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, numCPUs)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, memoryMB)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, memoryHotAddEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, cpuHotAddEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, cpuHotRemoveEnabled)
     /* FIXME: deviceChange is currently ignored */
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ResourceAllocationInfo, cpuAllocation)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ResourceAllocationInfo, memoryAllocation)
@@ -3640,46 +7047,17 @@ ESX_VI__TEMPLATE__SERIALIZE(VirtualMachineConfigSpec,
     /* FIXME: extraConfig is currently ignored */
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, swapPlacement)
     /* FIXME: bootOptions is currently ignored */
-})
-
-/* esxVI_VirtualMachineConfigSpec_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(VirtualMachineConfigSpec,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, changeVersion)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, name)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, version)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, uuid)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(Long, npivNodeWorldWideName)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(Long, npivPortWorldWideName)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, npivWorldWideNameType)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, npivWorldWideNameOp)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, locationId)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, guestId)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, alternateGuestName)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, annotation)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(files) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(tools) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(flags) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(consolePreferences) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(powerOpInfo) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, numCPUs)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, memoryMB)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(deviceChange) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ResourceAllocationInfo, cpuAllocation)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ResourceAllocationInfo, memoryAllocation)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(cpuAffinity) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(memoryAffinity) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(networkShaper) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(cpuFeatureMask) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(extraConfig) /* FIXME */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, swapPlacement)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_IGNORE(bootOptions) /* FIXME */
+    /* FIXME: vAppConfig is currently ignored */
+    /* FIXME: ftInfo is currently ignored */
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, vAppConfigRemoved)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, vAssertsEnabled)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, changeTrackingEnabled)
 })
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VirtualMachineQuestionInfo
+ * VI Object: VirtualMachineQuestionInfo
  */
 
 /* esxVI_VirtualMachineQuestionInfo_Alloc */
@@ -3704,18 +7082,7 @@ ESX_VI__TEMPLATE__VALIDATE(VirtualMachineQuestionInfo,
 })
 
 /* esxVI_VirtualMachineQuestionInfo_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(VirtualMachineQuestionInfo,
-{
-})
-
-/* esxVI_VirtualMachineQuestionInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(VirtualMachineQuestionInfo,
-{
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, id)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, text)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(ChoiceOption, choice)
-    /* FIXME: message is currently ignored */
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(VirtualMachineQuestionInfo)
 
 /* esxVI_VirtualMachineQuestionInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(VirtualMachineQuestionInfo,
@@ -3729,7 +7096,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(VirtualMachineQuestionInfo,
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VirtualMachineSnapshotTree
+ * VI Object: VirtualMachineSnapshotTree
  */
 
 /* esxVI_VirtualMachineSnapshotTree_Alloc */
@@ -3744,7 +7111,9 @@ ESX_VI__TEMPLATE__FREE(VirtualMachineSnapshotTree,
     esxVI_ManagedObjectReference_Free(&item->vm);
     VIR_FREE(item->name);
     VIR_FREE(item->description);
+    esxVI_Int_Free(&item->id);
     esxVI_DateTime_Free(&item->createTime);
+    VIR_FREE(item->backupManifest);
     esxVI_VirtualMachineSnapshotTree_Free(&item->childSnapshotList);
 })
 
@@ -3770,19 +7139,20 @@ ESX_VI__TEMPLATE__DEEP_COPY(VirtualMachineSnapshotTree,
     ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(ManagedObjectReference, vm)
     ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, name)
     ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, description)
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(Int, id)
     ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY(DateTime, createTime)
     (*dest)->state = src->state;
     (*dest)->quiesced = src->quiesced;
+    ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_VALUE(String, backupManifest)
     ESX_VI__TEMPLATE__PROPERTY__DEEP_COPY_LIST(VirtualMachineSnapshotTree, childSnapshotList)
+    (*dest)->replaySupported = src->replaySupported;
 })
 
 /* esxVI_VirtualMachineSnapshotTree_DeepCopyList */
 ESX_VI__TEMPLATE__LIST__DEEP_COPY(VirtualMachineSnapshotTree)
 
 /* esxVI_VirtualMachineSnapshotTree_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(VirtualMachineSnapshotTree,
-{
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(VirtualMachineSnapshotTree)
 
 /* esxVI_VirtualMachineSnapshotTree_CastListFromAnyType */
 ESX_VI__TEMPLATE__LIST__CAST_FROM_ANY_TYPE(VirtualMachineSnapshotTree)
@@ -3794,10 +7164,13 @@ ESX_VI__TEMPLATE__DESERIALIZE(VirtualMachineSnapshotTree,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, vm)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, name)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, description)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, id)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, createTime)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(VirtualMachinePowerState, state)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, quiesced)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, backupManifest)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(VirtualMachineSnapshotTree, childSnapshotList)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, replaySupported)
 })
 
 /* esxVI_VirtualMachineSnapshotTree_DeserializeList */
@@ -3806,9 +7179,9 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(VirtualMachineSnapshotTree)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmConfigFileInfo
- *          extends FileInfo
- *          extended by TemplateConfigFileInfo
+ * VI Object: VmConfigFileInfo
+ *            extends FileInfo
+ *            extended by TemplateConfigFileInfo
  */
 
 /* esxVI_VmConfigFileInfo_Alloc */
@@ -3817,15 +7190,20 @@ ESX_VI__TEMPLATE__ALLOC(VmConfigFileInfo)
 /* esxVI_VmConfigFileInfo_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(VmConfigFileInfo,
 {
+    /* VmConfigFileInfo */
     ESX_VI__TEMPLATE__DISPATCH__FREE(TemplateConfigFileInfo)
 },
 {
-    esxVI_FileInfo_Free((esxVI_FileInfo **)&item->_next);
+    esxVI_FileInfo *next = (esxVI_FileInfo *)item->_next;
+
+    esxVI_FileInfo_Free(&next);
+    item->_next = (esxVI_VmConfigFileInfo *)next;
 
     /* FileInfo */
     VIR_FREE(item->path);
     esxVI_Long_Free(&item->fileSize);
     esxVI_DateTime_Free(&item->modification);
+    VIR_FREE(item->owner);
 
     /* VmConfigFileInfo */
     esxVI_Int_Free(&item->configVersion);
@@ -3851,27 +7229,10 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(VmConfigFileInfo,
 /* esxVI_VmConfigFileInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(VmConfigFileInfo)
 
-/* esxVI_VmConfigFileInfo_Serialize */
-ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(VmConfigFileInfo,
-{
-    ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(TemplateConfigFileInfo)
-},
-{
-    /* FileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, modification)
-
-    /* VmConfigFileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, configVersion)
-})
-
-/* esxVI_VmConfigFileInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(VmConfigFileInfo)
-
 /* esxVI_VmConfigFileInfo_Deserialize */
 ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(VmConfigFileInfo,
 {
+    /* VmConfigFileInfo */
     ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(TemplateConfigFileInfo)
 },
 {
@@ -3879,6 +7240,7 @@ ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(VmConfigFileInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, modification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, owner)
 
     /* VmConfigFileInfo */
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, configVersion)
@@ -3890,9 +7252,9 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(VmConfigFileInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmConfigFileQuery
- *          extends FileQuery
- *          extended by TemplateConfigFileQuery
+ * VI Object: VmConfigFileQuery
+ *            extends FileQuery
+ *            extended by TemplateConfigFileQuery
  */
 
 /* esxVI_VmConfigFileQuery_Alloc */
@@ -3901,10 +7263,14 @@ ESX_VI__TEMPLATE__ALLOC(VmConfigFileQuery)
 /* esxVI_VmConfigFileQuery_Free */
 ESX_VI__TEMPLATE__DYNAMIC_FREE(VmConfigFileQuery,
 {
+    /* VmConfigFileQuery */
     ESX_VI__TEMPLATE__DISPATCH__FREE(TemplateConfigFileQuery)
 },
 {
-    esxVI_FileQuery_Free((esxVI_FileQuery **)&item->_next);
+    esxVI_FileQuery *next = (esxVI_FileQuery *)item->_next;
+
+    esxVI_FileQuery_Free(&next);
+    item->_next = (esxVI_VmConfigFileQuery *)next;
 
     /* FileQuery */
     /* no properties */
@@ -3937,6 +7303,7 @@ ESX_VI__TEMPLATE__LIST__APPEND(VmConfigFileQuery)
 /* esxVI_VmConfigFileQuery_Serialize */
 ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(VmConfigFileQuery,
 {
+    /* VmConfigFileQuery */
     ESX_VI__TEMPLATE__DISPATCH__SERIALIZE(TemplateConfigFileQuery)
 },
 {
@@ -3951,27 +7318,10 @@ ESX_VI__TEMPLATE__DYNAMIC_SERIALIZE(VmConfigFileQuery,
 /* esxVI_VmConfigFileQuery_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(VmConfigFileQuery)
 
-/* esxVI_VmConfigFileQuery_Deserialize */
-ESX_VI__TEMPLATE__DYNAMIC_DESERIALIZE(VmConfigFileQuery,
-{
-    ESX_VI__TEMPLATE__DISPATCH__DESERIALIZE(TemplateConfigFileQuery)
-},
-{
-    /* FileQuery */
-    /* no properties */
-
-    /* VmConfigFileQuery */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(VmConfigFileQueryFilter, filter)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(VmConfigFileQueryFlags, details)
-})
-
-/* esxVI_VmConfigFileQuery_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(VmConfigFileQuery)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmConfigFileQueryFilter
+ * VI Object: VmConfigFileQueryFilter
  */
 
 /* esxVI_VmConfigFileQueryFilter_Alloc */
@@ -3995,16 +7345,10 @@ ESX_VI__TEMPLATE__SERIALIZE(VmConfigFileQueryFilter,
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(Int, matchConfigVersion)
 })
 
-/* esxVI_VmConfigFileQueryFilter_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(VmConfigFileQueryFilter,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(Int, matchConfigVersion)
-})
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmConfigFileQueryFlags
+ * VI Object: VmConfigFileQueryFlags
  */
 
 /* esxVI_VmConfigFileQueryFlags_Alloc */
@@ -4028,17 +7372,11 @@ ESX_VI__TEMPLATE__SERIALIZE(VmConfigFileQueryFlags,
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, configVersion)
 })
 
-/* esxVI_VmConfigFileQueryFlags_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(VmConfigFileQueryFlags,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, configVersion)
-})
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmDiskFileInfo
- *          extends FileInfo
+ * VI Object: VmDiskFileInfo
+ *            extends FileInfo
  */
 
 /* esxVI_VmDiskFileInfo_Alloc */
@@ -4047,12 +7385,16 @@ ESX_VI__TEMPLATE__ALLOC(VmDiskFileInfo)
 /* esxVI_VmDiskFileInfo_Free */
 ESX_VI__TEMPLATE__FREE(VmDiskFileInfo,
 {
-    esxVI_FileInfo_Free((esxVI_FileInfo **)&item->_next);
+    esxVI_FileInfo *next = (esxVI_FileInfo *)item->_next;
+
+    esxVI_FileInfo_Free(&next);
+    item->_next = (esxVI_VmDiskFileInfo *)next;
 
     /* FileInfo */
     VIR_FREE(item->path);
     esxVI_Long_Free(&item->fileSize);
     esxVI_DateTime_Free(&item->modification);
+    VIR_FREE(item->owner);
 
     /* VmDiskFileInfo */
     VIR_FREE(item->diskType);
@@ -4080,25 +7422,6 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(VmDiskFileInfo,
 /* esxVI_VmDiskFileInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(VmDiskFileInfo)
 
-/* esxVI_VmDiskFileInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(VmDiskFileInfo,
-{
-    /* FileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, modification)
-
-    /* VmDiskFileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, diskType)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, capacityKb)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Int, hardwareVersion)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, controllerType)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(String, diskExtents)
-})
-
-/* esxVI_VmDiskFileInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(VmDiskFileInfo)
-
 /* esxVI_VmDiskFileInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(VmDiskFileInfo,
 {
@@ -4106,6 +7429,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(VmDiskFileInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, modification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, owner)
 
     /* VmDiskFileInfo */
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, diskType)
@@ -4113,6 +7437,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(VmDiskFileInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Int, hardwareVersion)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, controllerType)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, diskExtents)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, thin)
 })
 
 /* esxVI_VmDiskFileInfo_DeserializeList */
@@ -4121,8 +7446,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(VmDiskFileInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmDiskFileQuery
- *          extends FileQuery
+ * VI Object: VmDiskFileQuery
+ *            extends FileQuery
  */
 
 /* esxVI_VmDiskFileQuery_Alloc */
@@ -4131,7 +7456,10 @@ ESX_VI__TEMPLATE__ALLOC(VmDiskFileQuery)
 /* esxVI_VmDiskFileQuery_Free */
 ESX_VI__TEMPLATE__FREE(VmDiskFileQuery,
 {
-    esxVI_FileQuery_Free((esxVI_FileQuery **)&item->_next);
+    esxVI_FileQuery *next = (esxVI_FileQuery *)item->_next;
+
+    esxVI_FileQuery_Free(&next);
+    item->_next = (esxVI_VmDiskFileQuery *)next;
 
     /* FileQuery */
     /* no properties */
@@ -4173,24 +7501,10 @@ ESX_VI__TEMPLATE__SERIALIZE(VmDiskFileQuery,
 /* esxVI_VmDiskFileQuery_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(VmDiskFileQuery)
 
-/* esxVI_VmDiskFileQuery_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(VmDiskFileQuery,
-{
-    /* FileQuery */
-    /* no properties */
-
-    /* VmDiskFileQuery */
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(VmDiskFileQueryFilter, filter)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(VmDiskFileQueryFlags, details)
-})
-
-/* esxVI_VmDiskFileQuery_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(VmDiskFileQuery)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmDiskFileQueryFilter
+ * VI Object: VmDiskFileQueryFilter
  */
 
 /* esxVI_VmDiskFileQueryFilter_Alloc */
@@ -4216,20 +7530,13 @@ ESX_VI__TEMPLATE__SERIALIZE(VmDiskFileQueryFilter,
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(String, diskType)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(Int, matchHardwareVersion)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_LIST(String, controllerType)
-})
-
-/* esxVI_VmDiskFileQueryFilter_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(VmDiskFileQueryFilter,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, diskType)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(Int, matchHardwareVersion)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_LIST(String, controllerType)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, thin)
 })
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmDiskFileQueryFlags
+ * VI Object: VmDiskFileQueryFlags
  */
 
 /* esxVI_VmDiskFileQueryFlags_Alloc */
@@ -4257,23 +7564,63 @@ ESX_VI__TEMPLATE__SERIALIZE(VmDiskFileQueryFlags,
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, hardwareVersion)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, controllerType)
     ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, diskExtents)
-})
-
-/* esxVI_VmDiskFileQueryFlags_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(VmDiskFileQueryFlags,
-{
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, diskType)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, capacityKb)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, hardwareVersion)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, controllerType)
-    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Boolean, diskExtents)
+    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Boolean, thin)
 })
 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmLogFileInfo
- *          extends FileInfo
+ * VI Object: VmEventArgument
+ *            extends EntityEventArgument
+ */
+
+/* esxVI_VmEventArgument_Alloc */
+ESX_VI__TEMPLATE__ALLOC(VmEventArgument)
+
+/* esxVI_VmEventArgument_Free */
+ESX_VI__TEMPLATE__FREE(VmEventArgument,
+{
+    /* EventArgument */
+    /* no properties */
+
+    /* EntityEventArgument */
+    VIR_FREE(item->name);
+
+    /* VmEventArgument */
+    esxVI_ManagedObjectReference_Free(&item->vm);
+})
+
+/* esxVI_VmEventArgument_Validate */
+ESX_VI__TEMPLATE__VALIDATE(VmEventArgument,
+{
+    /* EventArgument */
+    /* no properties */
+
+    /* EntityEventArgument */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(name)
+
+    /* VmEventArgument */
+    ESX_VI__TEMPLATE__PROPERTY__REQUIRE(vm)
+})
+
+/* esxVI_VmEventArgument_Deserialize */
+ESX_VI__TEMPLATE__DESERIALIZE(VmEventArgument,
+{
+    /* EventArgument */
+    /* no properties */
+
+    /* EntityEventArgument */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, name)
+
+    /* VmEventArgument */
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(ManagedObjectReference, vm)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Object: VmLogFileInfo
+ *            extends FileInfo
  */
 
 /* esxVI_VmLogFileInfo_Alloc */
@@ -4282,12 +7629,16 @@ ESX_VI__TEMPLATE__ALLOC(VmLogFileInfo)
 /* esxVI_VmLogFileInfo_Free */
 ESX_VI__TEMPLATE__FREE(VmLogFileInfo,
 {
-    esxVI_FileInfo_Free((esxVI_FileInfo **)&item->_next);
+    esxVI_FileInfo *next = (esxVI_FileInfo *)item->_next;
+
+    esxVI_FileInfo_Free(&next);
+    item->_next = (esxVI_VmLogFileInfo *)next;
 
     /* FileInfo */
     VIR_FREE(item->path);
     esxVI_Long_Free(&item->fileSize);
     esxVI_DateTime_Free(&item->modification);
+    VIR_FREE(item->owner);
 
     /* VmLogFileInfo */
     /* no properties */
@@ -4311,21 +7662,6 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(VmLogFileInfo,
 /* esxVI_VmLogFileInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(VmLogFileInfo)
 
-/* esxVI_VmLogFileInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(VmLogFileInfo,
-{
-    /* FileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, modification)
-
-    /* VmLogFileInfo */
-    /* no properties */
-})
-
-/* esxVI_VmLogFileInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(VmLogFileInfo)
-
 /* esxVI_VmLogFileInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(VmLogFileInfo,
 {
@@ -4333,6 +7669,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(VmLogFileInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, modification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, owner)
 
     /* VmLogFileInfo */
     /* no properties */
@@ -4344,8 +7681,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(VmLogFileInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmLogFileQuery
- *          extends FileQuery
+ * VI Object: VmLogFileQuery
+ *            extends FileQuery
  */
 
 /* esxVI_VmLogFileQuery_Alloc */
@@ -4354,7 +7691,10 @@ ESX_VI__TEMPLATE__ALLOC(VmLogFileQuery)
 /* esxVI_VmLogFileQuery_Free */
 ESX_VI__TEMPLATE__FREE(VmLogFileQuery,
 {
-    esxVI_FileQuery_Free((esxVI_FileQuery **)&item->_next);
+    esxVI_FileQuery *next = (esxVI_FileQuery *)item->_next;
+
+    esxVI_FileQuery_Free(&next);
+    item->_next = (esxVI_VmLogFileQuery *)next;
 
     /* FileQuery */
     /* no properties */
@@ -4394,24 +7734,11 @@ ESX_VI__TEMPLATE__SERIALIZE(VmLogFileQuery,
 /* esxVI_VmLogFileQuery_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(VmLogFileQuery)
 
-/* esxVI_VmLogFileQuery_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(VmLogFileQuery,
-{
-    /* FileQuery */
-    /* no properties */
-
-    /* VmLogFileQuery */
-    /* no properties */
-})
-
-/* esxVI_VmLogFileQuery_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(VmLogFileQuery)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmNvramFileInfo
- *          extends FileInfo
+ * VI Object: VmNvramFileInfo
+ *            extends FileInfo
  */
 
 /* esxVI_VmNvramFileInfo_Alloc */
@@ -4420,12 +7747,16 @@ ESX_VI__TEMPLATE__ALLOC(VmNvramFileInfo)
 /* esxVI_VmNvramFileInfo_Free */
 ESX_VI__TEMPLATE__FREE(VmNvramFileInfo,
 {
-    esxVI_FileInfo_Free((esxVI_FileInfo **)&item->_next);
+    esxVI_FileInfo *next = (esxVI_FileInfo *)item->_next;
+
+    esxVI_FileInfo_Free(&next);
+    item->_next = (esxVI_VmNvramFileInfo *)next;
 
     /* FileInfo */
     VIR_FREE(item->path);
     esxVI_Long_Free(&item->fileSize);
     esxVI_DateTime_Free(&item->modification);
+    VIR_FREE(item->owner);
 
     /* VmNvramFileInfo */
     /* no properties */
@@ -4449,21 +7780,6 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(VmNvramFileInfo,
 /* esxVI_VmNvramFileInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(VmNvramFileInfo)
 
-/* esxVI_VmNvramFileInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(VmNvramFileInfo,
-{
-    /* FileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, modification)
-
-    /* VmNvramFileInfo */
-    /* no properties */
-})
-
-/* esxVI_VmNvramFileInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(VmNvramFileInfo)
-
 /* esxVI_VmNvramFileInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(VmNvramFileInfo,
 {
@@ -4471,6 +7787,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(VmNvramFileInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, modification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, owner)
 
     /* VmNvramFileInfo */
     /* no properties */
@@ -4482,8 +7799,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(VmNvramFileInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmNvramFileQuery
- *          extends FileQuery
+ * VI Object: VmNvramFileQuery
+ *            extends FileQuery
  */
 
 /* esxVI_VmNvramFileQuery_Alloc */
@@ -4492,7 +7809,10 @@ ESX_VI__TEMPLATE__ALLOC(VmNvramFileQuery)
 /* esxVI_VmNvramFileQuery_Free */
 ESX_VI__TEMPLATE__FREE(VmNvramFileQuery,
 {
-    esxVI_FileQuery_Free((esxVI_FileQuery **)&item->_next);
+    esxVI_FileQuery *next = (esxVI_FileQuery *)item->_next;
+
+    esxVI_FileQuery_Free(&next);
+    item->_next = (esxVI_VmNvramFileQuery *)next;
 
     /* FileQuery */
     /* no properties */
@@ -4532,24 +7852,11 @@ ESX_VI__TEMPLATE__SERIALIZE(VmNvramFileQuery,
 /* esxVI_VmNvramFileQuery_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(VmNvramFileQuery)
 
-/* esxVI_VmNvramFileQuery_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(VmNvramFileQuery,
-{
-    /* FileQuery */
-    /* no properties */
-
-    /* VmNvramFileQuery */
-    /* no properties */
-})
-
-/* esxVI_VmNvramFileQuery_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(VmNvramFileQuery)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmSnapshotFileInfo
- *          extends FileInfo
+ * VI Object: VmSnapshotFileInfo
+ *            extends FileInfo
  */
 
 /* esxVI_VmSnapshotFileInfo_Alloc */
@@ -4558,12 +7865,16 @@ ESX_VI__TEMPLATE__ALLOC(VmSnapshotFileInfo)
 /* esxVI_VmSnapshotFileInfo_Free */
 ESX_VI__TEMPLATE__FREE(VmSnapshotFileInfo,
 {
-    esxVI_FileInfo_Free((esxVI_FileInfo **)&item->_next);
+    esxVI_FileInfo *next = (esxVI_FileInfo *)item->_next;
+
+    esxVI_FileInfo_Free(&next);
+    item->_next = (esxVI_VmSnapshotFileInfo *)next;
 
     /* FileInfo */
     VIR_FREE(item->path);
     esxVI_Long_Free(&item->fileSize);
     esxVI_DateTime_Free(&item->modification);
+    VIR_FREE(item->owner);
 
     /* VmSnapshotFileInfo */
     /* no properties */
@@ -4587,21 +7898,6 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(VmSnapshotFileInfo,
 /* esxVI_VmSnapshotFileInfo_AppendToList */
 ESX_VI__TEMPLATE__LIST__APPEND(VmSnapshotFileInfo)
 
-/* esxVI_VmSnapshotFileInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(VmSnapshotFileInfo,
-{
-    /* FileInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, path)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, fileSize)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(DateTime, modification)
-
-    /* VmSnapshotFileInfo */
-    /* no properties */
-})
-
-/* esxVI_VmSnapshotFileInfo_SerializeList */
-ESX_VI__TEMPLATE__LIST__SERIALIZE(VmSnapshotFileInfo)
-
 /* esxVI_VmSnapshotFileInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(VmSnapshotFileInfo,
 {
@@ -4609,6 +7905,7 @@ ESX_VI__TEMPLATE__DESERIALIZE(VmSnapshotFileInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, path)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, fileSize)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, modification)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, owner)
 
     /* VmSnapshotFileInfo */
     /* no properties */
@@ -4620,8 +7917,8 @@ ESX_VI__TEMPLATE__LIST__DESERIALIZE(VmSnapshotFileInfo)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmSnapshotFileQuery
- *          extends FileQuery
+ * VI Object: VmSnapshotFileQuery
+ *            extends FileQuery
  */
 
 /* esxVI_VmSnapshotFileQuery_Alloc */
@@ -4630,7 +7927,10 @@ ESX_VI__TEMPLATE__ALLOC(VmSnapshotFileQuery)
 /* esxVI_VmSnapshotFileQuery_Free */
 ESX_VI__TEMPLATE__FREE(VmSnapshotFileQuery,
 {
-    esxVI_FileQuery_Free((esxVI_FileQuery **)&item->_next);
+    esxVI_FileQuery *next = (esxVI_FileQuery *)item->_next;
+
+    esxVI_FileQuery_Free(&next);
+    item->_next = (esxVI_VmSnapshotFileQuery *)next;
 
     /* FileQuery */
     /* no properties */
@@ -4670,24 +7970,11 @@ ESX_VI__TEMPLATE__SERIALIZE(VmSnapshotFileQuery,
 /* esxVI_VmSnapshotFileQuery_SerializeList */
 ESX_VI__TEMPLATE__LIST__SERIALIZE(VmSnapshotFileQuery)
 
-/* esxVI_VmSnapshotFileQuery_Deserialize */
-ESX_VI__TEMPLATE__DESERIALIZE(VmSnapshotFileQuery,
-{
-    /* FileQuery */
-    /* no properties */
-
-    /* VmSnapshotFileQuery */
-    /* no properties */
-})
-
-/* esxVI_VmSnapshotFileQuery_DeserializeList */
-ESX_VI__TEMPLATE__LIST__DESERIALIZE(VmSnapshotFileQuery)
-
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * VI Type: VmfsDatastoreInfo
- *          extends DatastoreInfo
+ * VI Object: VmfsDatastoreInfo
+ *            extends DatastoreInfo
  */
 
 /* esxVI_VmfsDatastoreInfo_Alloc */
@@ -4701,6 +7988,7 @@ ESX_VI__TEMPLATE__FREE(VmfsDatastoreInfo,
     VIR_FREE(item->url);
     esxVI_Long_Free(&item->freeSpace);
     esxVI_Long_Free(&item->maxFileSize);
+    esxVI_DateTime_Free(&item->timestamp);
 
     /* VmfsDatastoreInfo */
     esxVI_HostVmfsVolume_Free(&item->vmfs);
@@ -4725,22 +8013,7 @@ ESX_VI__TEMPLATE__DYNAMIC_CAST(VmfsDatastoreInfo,
 })
 
 /* esxVI_VmfsDatastoreInfo_CastFromAnyType */
-ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(VmfsDatastoreInfo,
-{
-})
-
-/* esxVI_VmfsDatastoreInfo_Serialize */
-ESX_VI__TEMPLATE__SERIALIZE(VmfsDatastoreInfo,
-{
-    /* DatastoreInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, name)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE_VALUE(String, url)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, freeSpace)
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(Long, maxFileSize)
-
-    /* VmfsDatastoreInfo */
-    ESX_VI__TEMPLATE__PROPERTY__SERIALIZE(HostVmfsVolume, vmfs)
-})
+ESX_VI__TEMPLATE__CAST_FROM_ANY_TYPE(VmfsDatastoreInfo)
 
 /* esxVI_VmfsDatastoreInfo_Deserialize */
 ESX_VI__TEMPLATE__DESERIALIZE(VmfsDatastoreInfo,
@@ -4750,9 +8023,175 @@ ESX_VI__TEMPLATE__DESERIALIZE(VmfsDatastoreInfo,
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE_VALUE(String, url)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, freeSpace)
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(Long, maxFileSize)
+    ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(DateTime, timestamp)
 
     /* VmfsDatastoreInfo */
     ESX_VI__TEMPLATE__PROPERTY__DESERIALIZE(HostVmfsVolume, vmfs)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Managed Object: ComputeResource
+ *                    extends ManagedEntity
+ */
+
+/* esxVI_ComputeResource_Alloc */
+ESX_VI__TEMPLATE__ALLOC(ComputeResource)
+
+/* esxVI_ComputeResource_Free */
+ESX_VI__TEMPLATE__FREE(ComputeResource,
+{
+    esxVI_ManagedObjectReference_Free(&item->_reference);
+
+    /* ManagedEntity */
+    VIR_FREE(item->name);
+
+    /* ComputeResource */
+    esxVI_ManagedObjectReference_Free(&item->host);
+    esxVI_ManagedObjectReference_Free(&item->resourcePool);
+})
+
+/* esxVI_ComputeResource_Validate */
+ESX_VI__TEMPLATE__MANAGED_VALIDATE(ComputeResource,
+{
+    /* ManagedEntity */
+    ESX_VI__TEMPLATE__PROPERTY__MANAGED_REQUIRE(name)
+
+    /* ComputeResource */
+    /* no required properties */
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Managed Object: Datacenter
+ *                    extends ManagedEntity
+ */
+
+/* esxVI_Datacenter_Alloc */
+ESX_VI__TEMPLATE__ALLOC(Datacenter)
+
+/* esxVI_Datacenter_Free */
+ESX_VI__TEMPLATE__FREE(Datacenter,
+{
+    esxVI_ManagedObjectReference_Free(&item->_reference);
+
+    /* ManagedEntity */
+    VIR_FREE(item->name);
+
+    /* Datacenter */
+    esxVI_ManagedObjectReference_Free(&item->hostFolder);
+    esxVI_ManagedObjectReference_Free(&item->vmFolder);
+})
+
+/* esxVI_Datacenter_Validate */
+ESX_VI__TEMPLATE__MANAGED_VALIDATE(Datacenter,
+{
+    /* ManagedEntity */
+    ESX_VI__TEMPLATE__PROPERTY__MANAGED_REQUIRE(name)
+
+    /* Datacenter */
+    ESX_VI__TEMPLATE__PROPERTY__MANAGED_REQUIRE(hostFolder)
+    ESX_VI__TEMPLATE__PROPERTY__MANAGED_REQUIRE(vmFolder)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Managed Object: Folder
+ *                    extends ManagedEntity
+ */
+
+/* esxVI_Folder_Alloc */
+ESX_VI__TEMPLATE__ALLOC(Folder)
+
+/* esxVI_Folder_Free */
+ESX_VI__TEMPLATE__FREE(Folder,
+{
+    esxVI_ManagedObjectReference_Free(&item->_reference);
+
+    /* ManagedEntity */
+    VIR_FREE(item->name);
+
+    /* Folder */
+    /* no properties */
+})
+
+/* esxVI_Folder_Validate */
+ESX_VI__TEMPLATE__MANAGED_VALIDATE(Folder,
+{
+    /* ManagedEntity */
+    ESX_VI__TEMPLATE__PROPERTY__MANAGED_REQUIRE(name)
+
+    /* Folder */
+    /* no properties */
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Managed Object: HostSystem
+ *                    extends ManagedEntity
+ */
+
+/* esxVI_HostSystem_Alloc */
+ESX_VI__TEMPLATE__ALLOC(HostSystem)
+
+/* esxVI_HostSystem_Free */
+ESX_VI__TEMPLATE__FREE(HostSystem,
+{
+    esxVI_ManagedObjectReference_Free(&item->_reference);
+
+    /* ManagedEntity */
+    VIR_FREE(item->name);
+
+    /* HostSystem */
+    esxVI_HostConfigManager_Free(&item->configManager);
+})
+
+/* esxVI_HostSystem_Validate */
+ESX_VI__TEMPLATE__MANAGED_VALIDATE(HostSystem,
+{
+    /* ManagedEntity */
+    ESX_VI__TEMPLATE__PROPERTY__MANAGED_REQUIRE(name)
+
+    /* HostSystem */
+    ESX_VI__TEMPLATE__PROPERTY__MANAGED_REQUIRE(configManager)
+})
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * VI Managed Object: ManagedEntity
+ *                    extended by ComputeResource
+ *                                Datacenter
+ *                                Folder
+ *                                HostSystem
+ */
+
+/* esxVI_ManagedEntity_Alloc */
+ESX_VI__TEMPLATE__ALLOC(ManagedEntity)
+
+/* esxVI_ManagedEntity_Free */
+ESX_VI__TEMPLATE__DYNAMIC_FREE(ManagedEntity,
+{
+    /* ManagedEntity */
+    ESX_VI__TEMPLATE__DISPATCH__FREE(ComputeResource)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(Datacenter)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(Folder)
+    ESX_VI__TEMPLATE__DISPATCH__FREE(HostSystem)
+},
+{
+    esxVI_ManagedObjectReference_Free(&item->_reference);
+
+    VIR_FREE(item->name);
+})
+
+/* esxVI_ManagedEntity_Validate */
+ESX_VI__TEMPLATE__MANAGED_VALIDATE(ManagedEntity,
+{
+    ESX_VI__TEMPLATE__PROPERTY__MANAGED_REQUIRE(name)
 })
 
 

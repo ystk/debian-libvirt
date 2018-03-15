@@ -1,8 +1,6 @@
-/* -*- buffer-read-only: t -*- vi: set ro: */
-/* DO NOT EDIT! GENERATED AUTOMATICALLY! */
 /* A substitute for POSIX 2008 <stddef.h>, for platforms that have issues.
 
-   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2009-2017 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as published by
@@ -15,8 +13,7 @@
    GNU Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public License
-   along with this program; if not, write to the Free Software Foundation,
-   Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  */
+   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
 
 /* Written by Eric Blake.  */
 
@@ -28,6 +25,7 @@
 #if __GNUC__ >= 3
 @PRAGMA_SYSTEM_HEADER@
 #endif
+@PRAGMA_COLUMNS@
 
 #if defined __need_wchar_t || defined __need_size_t  \
   || defined __need_ptrdiff_t || defined __need_NULL \
@@ -39,9 +37,8 @@
    remember if special invocation has ever been used to obtain wint_t,
    in which case we need to clean up NULL yet again.  */
 
-# if !(defined _GL_STDDEF_H && defined _GL_STDDEF_WINT_T)
+# if !(defined _@GUARD_PREFIX@_STDDEF_H && defined _GL_STDDEF_WINT_T)
 #  ifdef __need_wint_t
-#   undef _GL_STDDEF_H
 #   define _GL_STDDEF_WINT_T
 #  endif
 #  @INCLUDE_NEXT@ @NEXT_STDDEF_H@
@@ -50,39 +47,64 @@
 #else
 /* Normal invocation convention.  */
 
-# ifndef _GL_STDDEF_H
+# ifndef _@GUARD_PREFIX@_STDDEF_H
 
 /* The include_next requires a split double-inclusion guard.  */
 
 #  @INCLUDE_NEXT@ @NEXT_STDDEF_H@
 
-#  ifndef _GL_STDDEF_H
-#   define _GL_STDDEF_H
-
 /* On NetBSD 5.0, the definition of NULL lacks proper parentheses.  */
-#if @REPLACE_NULL@
-# undef NULL
-# ifdef __cplusplus
+#  if (@REPLACE_NULL@ \
+       && (!defined _@GUARD_PREFIX@_STDDEF_H || defined _GL_STDDEF_WINT_T))
+#   undef NULL
+#   ifdef __cplusplus
    /* ISO C++ says that the macro NULL must expand to an integer constant
       expression, hence '((void *) 0)' is not allowed in C++.  */
-#  if __GNUG__ >= 3
+#    if __GNUG__ >= 3
     /* GNU C++ has a __null macro that behaves like an integer ('int' or
        'long') but has the same size as a pointer.  Use that, to avoid
        warnings.  */
-#   define NULL __null
-#  else
-#   define NULL 0L
+#     define NULL __null
+#    else
+#     define NULL 0L
+#    endif
+#   else
+#    define NULL ((void *) 0)
+#   endif
 #  endif
-# else
-#  define NULL ((void *) 0)
-# endif
-#endif
+
+#  ifndef _@GUARD_PREFIX@_STDDEF_H
+#   define _@GUARD_PREFIX@_STDDEF_H
 
 /* Some platforms lack wchar_t.  */
 #if !@HAVE_WCHAR_T@
 # define wchar_t int
 #endif
 
-#  endif /* _GL_STDDEF_H */
-# endif /* _GL_STDDEF_H */
+/* Some platforms lack max_align_t.  The check for _GCC_MAX_ALIGN_T is
+   a hack in case the configure-time test was done with g++ even though
+   we are currently compiling with gcc.  */
+#if ! (@HAVE_MAX_ALIGN_T@ || defined _GCC_MAX_ALIGN_T)
+/* On the x86, the maximum storage alignment of double, long, etc. is 4,
+   but GCC's C11 ABI for x86 says that max_align_t has an alignment of 8,
+   and the C11 standard allows this.  Work around this problem by
+   using __alignof__ (which returns 8 for double) rather than _Alignof
+   (which returns 4), and align each union member accordingly.  */
+# ifdef __GNUC__
+#  define _GL_STDDEF_ALIGNAS(type) \
+     __attribute__ ((__aligned__ (__alignof__ (type))))
+# else
+#  define _GL_STDDEF_ALIGNAS(type) /* */
+# endif
+typedef union
+{
+  char *__p _GL_STDDEF_ALIGNAS (char *);
+  double __d _GL_STDDEF_ALIGNAS (double);
+  long double __ld _GL_STDDEF_ALIGNAS (long double);
+  long int __i _GL_STDDEF_ALIGNAS (long int);
+} max_align_t;
+#endif
+
+#  endif /* _@GUARD_PREFIX@_STDDEF_H */
+# endif /* _@GUARD_PREFIX@_STDDEF_H */
 #endif /* __need_XXX */

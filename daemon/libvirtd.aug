@@ -13,7 +13,7 @@ module Libvirtd =
 
    let str_val = del /\"/ "\"" . store /[^\"]*/ . del /\"/ "\""
    let bool_val = store /0|1/
-   let int_val = store /[0-9]+/
+   let int_val = store /-?[0-9]+/
    let str_array_element = [ seq "el" . str_val ] . del /[ \t\n]*/ ""
    let str_array_val = counter "el" . array_start . ( str_array_element . ( array_sep . str_array_element ) * ) ? . array_end
 
@@ -35,6 +35,7 @@ module Libvirtd =
    let sock_acl_entry = str_entry "unix_sock_group"
                       | str_entry "unix_sock_ro_perms"
                       | str_entry "unix_sock_rw_perms"
+                      | str_entry "unix_sock_admin_perms"
                       | str_entry "unix_sock_dir"
 
    let authentication_entry = str_entry "auth_unix_ro"
@@ -48,18 +49,45 @@ module Libvirtd =
                          | str_entry "crl_file"
 
    let authorization_entry = bool_entry "tls_no_verify_certificate"
+                           | bool_entry "tls_no_sanity_certificate"
                            | str_array_entry "tls_allowed_dn_list"
                            | str_array_entry "sasl_allowed_username_list"
+                           | str_array_entry "access_drivers"
+                           | str_entry "tls_priority"
 
    let processing_entry = int_entry "min_workers"
                         | int_entry "max_workers"
                         | int_entry "max_clients"
+                        | int_entry "max_queued_clients"
+                        | int_entry "max_anonymous_clients"
                         | int_entry "max_requests"
                         | int_entry "max_client_requests"
+                        | int_entry "prio_workers"
+
+   let admin_processing_entry = int_entry "admin_min_workers"
+                              | int_entry "admin_max_workers"
+                              | int_entry "admin_max_clients"
+                              | int_entry "admin_max_queued_clients"
+                              | int_entry "admin_max_client_requests"
 
    let logging_entry = int_entry "log_level"
                      | str_entry "log_filters"
                      | str_entry "log_outputs"
+                     | int_entry "log_buffer_size"
+
+   let auditing_entry = int_entry "audit_level"
+                      | bool_entry "audit_logging"
+
+   let keepalive_entry = int_entry "keepalive_interval"
+                       | int_entry "keepalive_count"
+                       | bool_entry "keepalive_required"
+
+   let admin_keepalive_entry = int_entry "admin_keepalive_interval"
+                             | int_entry "admin_keepalive_count"
+                             | bool_entry "admin_keepalive_required"
+
+   let misc_entry = str_entry "host_uuid"
+                  | str_entry "host_uuid_source"
 
    (* Each enty in the config is one of the following three ... *)
    let entry = network_entry
@@ -68,7 +96,12 @@ module Libvirtd =
              | certificate_entry
              | authorization_entry
              | processing_entry
+             | admin_processing_entry
              | logging_entry
+             | auditing_entry
+             | keepalive_entry
+             | admin_keepalive_entry
+             | misc_entry
    let comment = [ label "#comment" . del /#[ \t]*/ "# " .  store /([^ \t\n][^\n]*)?/ . del /\n/ "\n" ]
    let empty = [ label "#empty" . eol ]
 

@@ -1,9 +1,21 @@
 /*
  * Linux block and network stats.
  *
- * Copyright (C) 2007-2009 Red Hat, Inc.
+ * Copyright (C) 2007-2009, 2013 Red Hat, Inc.
  *
- * See COPYING.LIB for the License of this software
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Richard W.M. Jones <rjones@redhat.com>
  */
@@ -20,45 +32,21 @@
 # include <unistd.h>
 # include <regex.h>
 
-# include <xs.h>
+# if HAVE_XENSTORE_H
+#  include <xenstore.h>
+# else
+#  include <xs.h>
+# endif
 
-# include "virterror_internal.h"
+# include "virerror.h"
 # include "datatypes.h"
-# include "util.h"
 # include "block_stats.h"
-# include "memory.h"
+# include "viralloc.h"
+# include "virfile.h"
+# include "virstring.h"
 
 # define VIR_FROM_THIS VIR_FROM_STATS_LINUX
 
-/**
- * statsErrorFunc:
- * @conn: the connection
- * @error: the error number
- * @func: the function failing
- * @info: extra information string
- * @value: extra information number
- *
- * Handle a stats error.
- */
-static void
-statsErrorFunc (virConnectPtr conn,
-                virErrorNumber error, const char *func, const char *info,
-                int value)
-{
-    char fullinfo[1000];
-    const char *errmsg;
-
-    errmsg = virErrorMsg(error, info);
-    if (func != NULL) {
-        snprintf(fullinfo, sizeof (fullinfo) - 1, "%s: %s", func, info);
-        fullinfo[sizeof (fullinfo) - 1] = 0;
-        info = fullinfo;
-    }
-    virRaiseError(conn, NULL, NULL, VIR_FROM_STATS_LINUX, error,
-                    VIR_ERR_ERROR,
-                    errmsg, info, NULL, value, 0, errmsg, info,
-                    value);
-}
 
 /*-------------------- Xen: block stats --------------------*/
 
@@ -71,63 +59,59 @@ statsErrorFunc (virConnectPtr conn,
 #  define XENVBD_MAJOR 202
 # endif
 
-static int
-xstrtoint64 (char const *s, int base, int64_t *result)
-{
-    long long int lli;
-    char *p;
-
-    errno = 0;
-    lli = strtoll (s, &p, base);
-    if (errno || !(*p == 0 || *p == '\n') || p == s || (int64_t) lli != lli)
-        return -1;
-    *result = lli;
-    return 0;
-}
-
 static int64_t
-read_stat (const char *path)
+read_stat(const char *path)
 {
     char str[64];
-    int64_t r;
-    int i;
+    long long r;
+    size_t i;
     FILE *fp;
 
-    fp = fopen (path, "r");
+    fp = fopen(path, "r");
     if (!fp)
       return -1;
 
     /* read, but don't bail out before closing */
-    i = fread (str, 1, sizeof str - 1, fp);
+    i = fread(str, 1, sizeof(str) - 1, fp);
 
-    if (fclose (fp) != 0        /* disk error */
+    if (VIR_FCLOSE(fp) != 0        /* disk error */
         || i < 1)               /* ensure we read at least one byte */
         return -1;
 
     str[i] = '\0';              /* make sure the string is nul-terminated */
-    if (xstrtoint64 (str, 10, &r) == -1)
+    if (virStrToLong_ll(str, NULL, 10, &r) < 0)
         return -1;
 
     return r;
 }
 
 static int64_t
-read_bd_stat (int device, int domid, const char *str)
+read_bd_stat(int device, int domid, const char *str)
 {
-    char path[PATH_MAX];
+    static const char *paths[] = {
+        "/sys/bus/xen-backend/devices/vbd-%d-%d/statistics/%s",
+        "/sys/bus/xen-backend/devices/tap-%d-%d/statistics/%s",
+        "/sys/devices/xen-backend/vbd-%d-%d/statistics/%s",
+        "/sys/devices/xen-backend/tap-%d-%d/statistics/%s"
+    };
+
+    size_t i;
+    char *path;
     int64_t r;
 
-    snprintf (path, sizeof path,
-              "/sys/devices/xen-backend/vbd-%d-%d/statistics/%s",
-              domid, device, str);
-    r = read_stat (path);
-    if (r >= 0) return r;
+    for (i = 0; i < ARRAY_CARDINALITY(paths); ++i) {
+        if (virAsprintf(&path, paths[i], domid, device, str) < 0)
+            return -1;
 
-    snprintf (path, sizeof path,
-              "/sys/devices/xen-backend/tap-%d-%d/statistics/%s",
-              domid, device, str);
-    r = read_stat (path);
-    return r;
+        r = read_stat(path);
+
+        VIR_FREE(path);
+
+        if (r >= 0)
+            return r;
+    }
+
+    return -1;
 }
 
 /* In Xenstore, /local/domain/0/backend/vbd/<domid>/<device>/state,
@@ -135,7 +119,7 @@ read_bd_stat (int device, int domid, const char *str)
  * is no connected device.
  */
 static int
-check_bd_connected (xenUnifiedPrivatePtr priv, int device, int domid)
+check_bd_connected(xenUnifiedPrivatePtr priv, int device, int domid)
 {
     char s[256], *rs;
     int r;
@@ -145,11 +129,11 @@ check_bd_connected (xenUnifiedPrivatePtr priv, int device, int domid)
      * xenstore, etc.
      */
     if (!priv->xshandle) return 1;
-    snprintf (s, sizeof s, "/local/domain/0/backend/vbd/%d/%d/state",
-              domid, device);
-    s[sizeof s - 1] = '\0';
+    snprintf(s, sizeof(s), "/local/domain/0/backend/vbd/%d/%d/state",
+             domid, device);
+    s[sizeof(s) - 1] = '\0';
 
-    rs = xs_read (priv->xshandle, 0, s, &len);
+    rs = xs_read(priv->xshandle, 0, s, &len);
     if (!rs) return 1;
     if (len == 0) {
         /* Hmmm ... we can get to xenstore but it returns an empty
@@ -160,20 +144,20 @@ check_bd_connected (xenUnifiedPrivatePtr priv, int device, int domid)
         return 0;
     }
 
-    r = STREQ (rs, "4");
+    r = STREQ(rs, "4");
     VIR_FREE(rs);
     return r;
 }
 
 static int
-read_bd_stats (virConnectPtr conn, xenUnifiedPrivatePtr priv,
-               int device, int domid, struct _virDomainBlockStats *stats)
+read_bd_stats(xenUnifiedPrivatePtr priv,
+              int device, int domid, virDomainBlockStatsPtr stats)
 {
-    stats->rd_req   = read_bd_stat (device, domid, "rd_req");
-    stats->rd_bytes = read_bd_stat (device, domid, "rd_sect");
-    stats->wr_req   = read_bd_stat (device, domid, "wr_req");
-    stats->wr_bytes = read_bd_stat (device, domid, "wr_sect");
-    stats->errs     = read_bd_stat (device, domid, "oo_req");
+    stats->rd_req   = read_bd_stat(device, domid, "rd_req");
+    stats->rd_bytes = read_bd_stat(device, domid, "rd_sect");
+    stats->wr_req   = read_bd_stat(device, domid, "wr_req");
+    stats->wr_bytes = read_bd_stat(device, domid, "wr_sect");
+    stats->errs     = read_bd_stat(device, domid, "oo_req");
 
     /* None of the files were found - it's likely that this version
      * of Xen is an old one which just doesn't support stats collection.
@@ -181,8 +165,9 @@ read_bd_stats (virConnectPtr conn, xenUnifiedPrivatePtr priv,
     if (stats->rd_req == -1 && stats->rd_bytes == -1 &&
         stats->wr_req == -1 && stats->wr_bytes == -1 &&
         stats->errs == -1) {
-        statsErrorFunc (conn, VIR_ERR_INTERNAL_ERROR, __FUNCTION__,
-                        "Failed to read any block statistics", domid);
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Failed to read any block statistics for domain %d"),
+                       domid);
         return -1;
     }
 
@@ -193,9 +178,10 @@ read_bd_stats (virConnectPtr conn, xenUnifiedPrivatePtr priv,
     if (stats->rd_req == 0 && stats->rd_bytes == 0 &&
         stats->wr_req == 0 && stats->wr_bytes == 0 &&
         stats->errs == 0 &&
-        !check_bd_connected (priv, device, domid)) {
-        statsErrorFunc (conn, VIR_ERR_INTERNAL_ERROR, __FUNCTION__,
-                        "Frontend block device not connected", domid);
+        !check_bd_connected(priv, device, domid)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Frontend block device not connected for domain %d"),
+                       domid);
         return -1;
     }
 
@@ -204,18 +190,18 @@ read_bd_stats (virConnectPtr conn, xenUnifiedPrivatePtr priv,
      */
     if (stats->rd_bytes > 0) {
         if (stats->rd_bytes >= ((unsigned long long)1)<<(63-9)) {
-            statsErrorFunc (conn, VIR_ERR_INTERNAL_ERROR, __FUNCTION__,
-                            "stats->rd_bytes would overflow 64 bit counter",
-                            domid);
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("stats->rd_bytes would overflow 64 bit counter for domain %d"),
+                           domid);
             return -1;
         }
         stats->rd_bytes *= 512;
     }
     if (stats->wr_bytes > 0) {
         if (stats->wr_bytes >= ((unsigned long long)1)<<(63-9)) {
-            statsErrorFunc (conn, VIR_ERR_INTERNAL_ERROR, __FUNCTION__,
-                            "stats->wr_bytes would overflow 64 bit counter",
-                            domid);
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("stats->wr_bytes would overflow 64 bit counter for domain %d"),
+                           domid);
             return -1;
         }
         stats->wr_bytes *= 512;
@@ -256,7 +242,7 @@ disk_re_match(const char *regex, const char *path, int *part)
 }
 
 int
-xenLinuxDomainDeviceID(virConnectPtr conn, int domid, const char *path)
+xenLinuxDomainDeviceID(int domid, const char *path)
 {
     int major, minor;
     int part;
@@ -289,14 +275,12 @@ xenLinuxDomainDeviceID(virConnectPtr conn, int domid, const char *path)
      * /sys/devices/xen-backend/(vbd|tap)-{domid}-{devid}/statistics/{...}
      */
 
-    if (strlen(path) >= 5 && STRPREFIX(path, "/dev/"))
-        retval = virAsprintf(&mod_path, "%s", path);
-    else
-        retval = virAsprintf(&mod_path, "/dev/%s", path);
-
-    if (retval < 0) {
-        virReportOOMError();
-        return -1;
+    if (strlen(path) >= 5 && STRPREFIX(path, "/dev/")) {
+        if (VIR_STRDUP(mod_path, path) < 0)
+            return -1;
+    } else {
+        if (virAsprintf(&mod_path, "/dev/%s", path) < 0)
+            return -1;
     }
 
     retval = -1;
@@ -333,20 +317,21 @@ xenLinuxDomainDeviceID(virConnectPtr conn, int domid, const char *path)
      * beginning of the strings for better error messages
      */
     else if (strlen(mod_path) >= 7 && STRPREFIX(mod_path, "/dev/sd"))
-        statsErrorFunc (conn, VIR_ERR_INVALID_ARG, __FUNCTION__,
-                        "invalid path, device names must be in the range sda[1-15] - sdiv[1-15]",
-                        domid);
+        virReportError(VIR_ERR_INVALID_ARG,
+                       _("invalid path, device names must be in the range "
+                         "sda[1-15] - sdiv[1-15] for domain %d"), domid);
     else if (strlen(mod_path) >= 7 && STRPREFIX(mod_path, "/dev/hd"))
-        statsErrorFunc (conn, VIR_ERR_INVALID_ARG, __FUNCTION__,
-                        "invalid path, device names must be in the range hda[1-63] - hdt[1-63]",
-                        domid);
+        virReportError(VIR_ERR_INVALID_ARG,
+                       _("invalid path, device names must be in the range "
+                         "hda[1-63] - hdt[1-63] for domain %d"), domid);
     else if (strlen(mod_path) >= 8 && STRPREFIX(mod_path, "/dev/xvd"))
-        statsErrorFunc (conn, VIR_ERR_INVALID_ARG, __FUNCTION__,
-                        "invalid path, device names must be in the range xvda[1-15] - xvdiz[1-15]",
-                        domid);
+        virReportError(VIR_ERR_INVALID_ARG,
+                       _("invalid path, device names must be in the range "
+                         "xvda[1-15] - xvdiz[1-15] for domain %d"), domid);
     else
-        statsErrorFunc (conn, VIR_ERR_INVALID_ARG, __FUNCTION__,
-                        "unsupported path, use xvdN, hdN, or sdN", domid);
+        virReportError(VIR_ERR_INVALID_ARG,
+                       _("unsupported path, use xvdN, hdN, or sdN for domain %d"),
+                       domid);
 
     VIR_FREE(mod_path);
 
@@ -354,17 +339,17 @@ xenLinuxDomainDeviceID(virConnectPtr conn, int domid, const char *path)
 }
 
 int
-xenLinuxDomainBlockStats (xenUnifiedPrivatePtr priv,
-                          virDomainPtr dom,
-                          const char *path,
-                          struct _virDomainBlockStats *stats)
+xenLinuxDomainBlockStats(xenUnifiedPrivatePtr priv,
+                         virDomainDefPtr def,
+                         const char *path,
+                         virDomainBlockStatsPtr stats)
 {
-    int device = xenLinuxDomainDeviceID(dom->conn, dom->id, path);
+    int device = xenLinuxDomainDeviceID(def->id, path);
 
     if (device < 0)
         return -1;
 
-    return read_bd_stats (dom->conn, priv, device, dom->id, stats);
+    return read_bd_stats(priv, device, def->id, stats);
 }
 
 #endif /* __linux__ */

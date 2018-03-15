@@ -1,73 +1,92 @@
 ## Process this file with automake to produce Makefile.in
 
+## Copyright (C) 2005-2013 Red Hat, Inc.
+##
+## This library is free software; you can redistribute it and/or
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+##
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+##
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library.  If not, see
+## <http://www.gnu.org/licenses/>.
+
 LCOV = lcov
 GENHTML = genhtml
 
-SUBDIRS = gnulib/lib include src daemon tools proxy docs gnulib/tests \
-  python tests po examples/domain-events/events-c examples/hellolibvirt \
-  examples/dominfo examples/domsuspend examples/python examples/apparmor \
-  examples/xml/nwfilter examples/openauth
+SUBDIRS = . gnulib/lib include/libvirt src daemon tools docs gnulib/tests \
+  tests po examples
 
-ACLOCAL_AMFLAGS = -I m4 -I gnulib/m4
+XZ_OPT ?= -v -T0
+export XZ_OPT
 
-XML_EXAMPLES = \
-  $(patsubst $(srcdir)/%,%,$(wildcard $(addprefix $(srcdir)/examples/xml/, \
-					test/*.xml storage/*.xml)))
+ACLOCAL_AMFLAGS = -I m4
 
 EXTRA_DIST = \
+  config-post.h \
   ChangeLog-old \
   libvirt.spec libvirt.spec.in \
-  mingw32-libvirt.spec.in \
-  libvirt.pc libvirt.pc.in \
+  mingw-libvirt.spec.in \
+  libvirt.pc.in \
+  libvirt-qemu.pc.in \
+  libvirt-lxc.pc.in \
+  libvirt-admin.pc.in \
   autobuild.sh \
-  .x-sc_avoid_ctype_macros \
-  .x-sc_avoid_if_before_free \
-  .x-sc_avoid_write \
-  .x-sc_m4_quote_check \
-  .x-sc_prohibit_asprintf \
-  .x-sc_prohibit_gethostby \
-  .x-sc_prohibit_gethostname \
-  .x-sc_prohibit_gettext_noop \
-  .x-sc_prohibit_have_config_h \
-  .x-sc_prohibit_HAVE_MBRTOWC \
-  .x-sc_prohibit_nonreentrant \
-  .x-sc_prohibit_strcmp \
-  .x-sc_prohibit_strcmp_and_strncmp \
-  .x-sc_prohibit_strncpy \
-  .x-sc_prohibit_test_minus_ao \
-  .x-sc_prohibit_VIR_ERR_NO_MEMORY \
-  .x-sc_require_config_h \
-  .x-sc_require_config_h_first \
-  .x-sc_trailing_blank \
   Makefile.nonreentrant \
   autogen.sh \
-  examples/domain-events/events-python \
-  $(XML_EXAMPLES)
+  cfg.mk \
+  run.in \
+  AUTHORS.in
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = libvirt.pc
+pkgconfig_DATA = libvirt.pc libvirt-qemu.pc libvirt-lxc.pc libvirt-admin.pc
 
-NEWS: $(top_srcdir)/docs/news.xsl $(top_srcdir)/docs/news.html.in
-	-@(if [ -x $(XSLTPROC) ] ; then				\
-	  $(XSLTPROC) --nonet $(top_srcdir)/docs/news.xsl	\
-	     $(top_srcdir)/docs/news.html.in			\
-	   | perl -0777 -pe 's/\n\n+$$/\n/'			\
-	   | perl -pe 's/[ \t]+$$//'				\
-	   > $@-t && mv $@-t $@ ; fi );
+NEWS: \
+	  $(srcdir)/docs/news.xml \
+	  $(srcdir)/docs/news-ascii.xsl \
+	  $(srcdir)/docs/reformat-news.py
+	$(AM_V_GEN) \
+	if [ -x $(XSLTPROC) ]; then \
+	  $(XSLTPROC) --nonet \
+	    $(srcdir)/docs/news-ascii.xsl \
+	    $(srcdir)/docs/news.xml \
+	  >$@-tmp \
+	    || { rm -f $@-tmp; exit 1; }; \
+	  $(srcdir)/docs/reformat-news.py $@-tmp >$@ \
+	    || { rm -f $@-tmp; exit 1; }; \
+	  rm -f $@-tmp; \
+	fi
+EXTRA_DIST += \
+	$(srcdir)/docs/news.xml \
+	$(srcdir)/docs/news-ascii.xsl \
+	$(srcdir)/docs/reformat-news.py
 
+$(top_srcdir)/HACKING: $(top_srcdir)/docs/hacking1.xsl \
+			$(top_srcdir)/docs/hacking2.xsl \
+			$(top_srcdir)/docs/wrapstring.xsl \
+			$(top_srcdir)/docs/hacking.html.in
+	$(AM_V_GEN)if [ -x $(XSLTPROC) ] ; then \
+	   $(XSLTPROC) --nonet $(top_srcdir)/docs/hacking1.xsl \
+		$(top_srcdir)/docs/hacking.html.in | \
+	   $(XSLTPROC) --nonet $(top_srcdir)/docs/hacking2.xsl - \
+	   | perl -0777 -pe 's/\n\n+$$/\n/' \
+	   > $@-t && mv $@-t $@ ; fi;
 
 rpm: clean
-	@(unset CDPATH ; $(MAKE) dist && rpmbuild -ta $(distdir).tar.gz)
+	@(unset CDPATH ; $(MAKE) dist && rpmbuild -ta $(distdir).tar.xz)
 
 check-local: all tests
 
-tests:
-	@(cd docs/examples ; $(MAKE) MAKEFLAGS+=--silent tests)
-	@(if [ "$(pythondir)" != "" ] ; then cd python ; \
-	  $(MAKE) MAKEFLAGS+=--silent tests ; fi)
+check-access:
+	@($(MAKE) $(AM_MAKEFLAGS) -C tests check-access)
 
 cov: clean-cov
-	mkdir $(top_builddir)/coverage
+	$(MKDIR_P) $(top_builddir)/coverage
 	$(LCOV) -c -o $(top_builddir)/coverage/libvirt.info.tmp \
 	  -d $(top_builddir)/src  -d $(top_builddir)/daemon \
 	  -d $(top_builddir)/tests
@@ -82,19 +101,25 @@ clean-cov:
 
 MAINTAINERCLEANFILES = .git-module-status
 
-# disable this check
-distuninstallcheck:
-
-dist-hook: gen-ChangeLog
+dist-hook: gen-ChangeLog gen-AUTHORS
 
 # Generate the ChangeLog file (with all entries since the switch to git)
 # and insert it into the directory we're about to use to create a tarball.
 gen_start_date = 2009-07-04
 .PHONY: gen-ChangeLog
 gen-ChangeLog:
-	if test -d .git; then					\
+	$(AM_V_GEN)if test -d .git; then			\
 	  $(top_srcdir)/build-aux/gitlog-to-changelog		\
 	    --since=$(gen_start_date) > $(distdir)/cl-t;	\
 	  rm -f $(distdir)/ChangeLog;				\
 	  mv $(distdir)/cl-t $(distdir)/ChangeLog;		\
+	fi
+
+.PHONY: gen-AUTHORS
+gen-AUTHORS:
+	$(AM_V_GEN)if test -d $(srcdir)/.git; then \
+	    out="`cd $(srcdir) && git log --pretty=format:'%aN <%aE>' | sort -u`" && \
+	    perl -p -e "s/#authorslist#// and print '$$out'" \
+	      < $(srcdir)/AUTHORS.in > $(distdir)/AUTHORS-tmp && \
+	    mv -f $(distdir)/AUTHORS-tmp $(distdir)/AUTHORS ; \
 	fi

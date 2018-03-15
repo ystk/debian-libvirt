@@ -1,7 +1,7 @@
 /*
  * xmconfigtest.c: Test backend for xm_internal config file handling
  *
- * Copyright (C) 2007, 2010 Red Hat, Inc.
+ * Copyright (C) 2007, 2010-2011, 2014 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  *
@@ -31,78 +31,73 @@
 #include "datatypes.h"
 #include "xen/xen_driver.h"
 #include "xen/xm_internal.h"
+#include "xenconfig/xen_xm.h"
 #include "testutils.h"
 #include "testutilsxen.h"
-#include "memory.h"
+#include "viralloc.h"
+#include "virstring.h"
 
-static char *progname;
-static char *abs_srcdir;
+#define VIR_FROM_THIS VIR_FROM_NONE
+
 static virCapsPtr caps;
+static virDomainXMLOptionPtr xmlopt;
 
-#define MAX_FILE 4096
-
-static int testCompareParseXML(const char *xmcfg, const char *xml,
-                               int xendConfigVersion) {
-    char xmlData[MAX_FILE];
-    char xmcfgData[MAX_FILE];
-    char gotxmcfgData[MAX_FILE];
-    char *xmlPtr = &(xmlData[0]);
-    char *xmcfgPtr = &(xmcfgData[0]);
-    char *gotxmcfgPtr = &(gotxmcfgData[0]);
+static int
+testCompareParseXML(const char *xmcfg, const char *xml)
+{
+    char *gotxmcfgData = NULL;
     virConfPtr conf = NULL;
     int ret = -1;
-    virConnectPtr conn;
-    int wrote = MAX_FILE;
+    virConnectPtr conn = NULL;
+    int wrote = 4096;
     struct _xenUnifiedPrivate priv;
     virDomainDefPtr def = NULL;
+
+    if (VIR_ALLOC_N(gotxmcfgData, wrote) < 0)
+        goto fail;
 
     conn = virGetConnect();
     if (!conn) goto fail;
 
-    if (virtTestLoadFile(xml, &xmlPtr, MAX_FILE) < 0)
-        goto fail;
-
-    if (virtTestLoadFile(xmcfg, &xmcfgPtr, MAX_FILE) < 0)
-        goto fail;
-
     /* Many puppies died to bring you this code. */
-    priv.xendConfigVersion = xendConfigVersion;
     priv.caps = caps;
     conn->privateData = &priv;
 
-    if (!(def = virDomainDefParseString(caps, xmlPtr,
-                                        VIR_DOMAIN_XML_INACTIVE)))
+    if (!(def = virDomainDefParseFile(xml, caps, xmlopt, NULL,
+                                      VIR_DOMAIN_DEF_PARSE_INACTIVE)))
         goto fail;
 
-    if (!(conf = xenXMDomainConfigFormat(conn, def)))
-        goto fail;
-
-    if (virConfWriteMem(gotxmcfgPtr, &wrote, conf) < 0)
-        goto fail;
-    gotxmcfgPtr[wrote] = '\0';
-
-    if (STRNEQ(xmcfgData, gotxmcfgData)) {
-        virtTestDifference(stderr, xmcfgData, gotxmcfgData);
+    if (!virDomainDefCheckABIStability(def, def)) {
+        fprintf(stderr, "ABI stability check failed on %s", xml);
         goto fail;
     }
+
+    if (!(conf = xenFormatXM(conn, def)))
+        goto fail;
+
+    if (virConfWriteMem(gotxmcfgData, &wrote, conf) < 0)
+        goto fail;
+    gotxmcfgData[wrote] = '\0';
+
+    if (virTestCompareToFile(gotxmcfgData, xmcfg) < 0)
+        goto fail;
 
     ret = 0;
 
  fail:
+    VIR_FREE(gotxmcfgData);
     if (conf)
         virConfFree(conf);
     virDomainDefFree(def);
-    virUnrefConnect(conn);
+    virObjectUnref(conn);
 
     return ret;
 }
 
-static int testCompareFormatXML(const char *xmcfg, const char *xml,
-                                int xendConfigVersion) {
-    char xmlData[MAX_FILE];
-    char xmcfgData[MAX_FILE];
-    char *xmlPtr = &(xmlData[0]);
-    char *xmcfgPtr = &(xmcfgData[0]);
+static int
+testCompareFormatXML(const char *xmcfg, const char *xml)
+{
+    char *xmcfgData = NULL;
     char *gotxml = NULL;
     virConfPtr conf = NULL;
     int ret = -1;
@@ -113,39 +108,34 @@ static int testCompareFormatXML(const char *xmcfg, const char *xml,
     conn = virGetConnect();
     if (!conn) goto fail;
 
-    if (virtTestLoadFile(xml, &xmlPtr, MAX_FILE) < 0)
-        goto fail;
-
-    if (virtTestLoadFile(xmcfg, &xmcfgPtr, MAX_FILE) < 0)
+    if (virTestLoadFile(xmcfg, &xmcfgData) < 0)
         goto fail;
 
     /* Many puppies died to bring you this code. */
-    priv.xendConfigVersion = xendConfigVersion;
     priv.caps = caps;
     conn->privateData = &priv;
 
-    if (!(conf = virConfReadMem(xmcfgPtr, strlen(xmcfgPtr), 0)))
+    if (!(conf = virConfReadMem(xmcfgData, strlen(xmcfgData), 0)))
         goto fail;
 
-    if (!(def = xenXMDomainConfigParse(conn, conf)))
+    if (!(def = xenParseXM(conf, caps, xmlopt)))
         goto fail;
 
-    if (!(gotxml = virDomainDefFormat(def, VIR_DOMAIN_XML_SECURE)))
+    if (!(gotxml = virDomainDefFormat(def, caps, VIR_DOMAIN_DEF_FORMAT_SECURE)))
         goto fail;
 
-    if (STRNEQ(xmlData, gotxml)) {
-        virtTestDifference(stderr, xmlData, gotxml);
+    if (virTestCompareToFile(gotxml, xml) < 0)
         goto fail;
-    }
 
     ret = 0;
 
  fail:
     if (conf)
         virConfFree(conf);
+    VIR_FREE(xmcfgData);
     VIR_FREE(gotxml);
     virDomainDefFree(def);
-    virUnrefConnect(conn);
+    virObjectUnref(conn);
 
     return ret;
 }
@@ -153,93 +143,117 @@ static int testCompareFormatXML(const char *xmcfg, const char *xml,
 
 struct testInfo {
     const char *name;
-    int version;
     int mode;
 };
 
-static int testCompareHelper(const void *data) {
+static int
+testCompareHelper(const void *data)
+{
+    int result = -1;
     const struct testInfo *info = data;
-    char xml[PATH_MAX];
-    char cfg[PATH_MAX];
-    snprintf(xml, PATH_MAX, "%s/xmconfigdata/test-%s.xml",
-             abs_srcdir, info->name);
-    snprintf(cfg, PATH_MAX, "%s/xmconfigdata/test-%s.cfg",
-             abs_srcdir, info->name);
+    char *xml = NULL;
+    char *cfg = NULL;
+    char *cfgout = NULL;
+
+    if (virAsprintf(&xml, "%s/xmconfigdata/test-%s.xml",
+                    abs_srcdir, info->name) < 0 ||
+        virAsprintf(&cfg, "%s/xmconfigdata/test-%s.cfg",
+                    abs_srcdir, info->name) < 0)
+        goto cleanup;
+
     if (info->mode == 0)
-        return testCompareParseXML(cfg, xml, info->version);
+        result = testCompareParseXML(cfg, xml);
     else
-        return testCompareFormatXML(cfg, xml, info->version);
+        result = testCompareFormatXML(cfg, xml);
+
+ cleanup:
+    VIR_FREE(xml);
+    VIR_FREE(cfg);
+    VIR_FREE(cfgout);
+
+    return result;
 }
 
 
 static int
-mymain(int argc, char **argv)
+mymain(void)
 {
     int ret = 0;
-    char cwd[PATH_MAX];
-
-    progname = argv[0];
-
-    if (argc > 1) {
-        fprintf(stderr, "Usage: %s\n", progname);
-        return(EXIT_FAILURE);
-    }
-
-    abs_srcdir = getenv("abs_srcdir");
-    if (!abs_srcdir)
-        abs_srcdir = getcwd(cwd, sizeof(cwd));
 
     if (!(caps = testXenCapsInit()))
-        return(EXIT_FAILURE);
+        return EXIT_FAILURE;
 
-#define DO_TEST(name, version)                                          \
+    if (!(xmlopt = xenDomainXMLConfInit()))
+        return EXIT_FAILURE;
+
+#define DO_TEST_PARSE(name)                                             \
     do {                                                                \
-        struct testInfo info0 = { name, version, 0 };                   \
-        struct testInfo info1 = { name, version, 1 };                   \
-        if (virtTestRun("Xen XM-2-XML Parse  " name,                    \
-                        1, testCompareHelper, &info0) < 0)              \
-            ret = -1;                                                   \
-        if (virtTestRun("Xen XM-2-XML Format " name,                    \
-                        1, testCompareHelper, &info1) < 0)              \
+        struct testInfo info0 = { name, 0 };                            \
+        if (virTestRun("Xen XM-2-XML Parse  " name,                     \
+                       testCompareHelper, &info0) < 0)                  \
             ret = -1;                                                   \
     } while (0)
 
-    DO_TEST("paravirt-old-pvfb", 2);
-    DO_TEST("paravirt-old-pvfb-vncdisplay", 2);
-    DO_TEST("paravirt-new-pvfb", 3);
-    DO_TEST("paravirt-new-pvfb-vncdisplay", 3);
-    DO_TEST("paravirt-net-e1000", 3);
-    DO_TEST("paravirt-net-vifname", 3);
-    DO_TEST("fullvirt-old-cdrom", 1);
-    DO_TEST("fullvirt-new-cdrom", 2);
-    DO_TEST("fullvirt-utc", 2);
-    DO_TEST("fullvirt-localtime", 2);
-    DO_TEST("fullvirt-usbtablet", 2);
-    DO_TEST("fullvirt-usbmouse", 2);
-    DO_TEST("fullvirt-serial-file", 2);
-    DO_TEST("fullvirt-serial-null", 2);
-    DO_TEST("fullvirt-serial-pipe", 2);
-    DO_TEST("fullvirt-serial-pty", 2);
-    DO_TEST("fullvirt-serial-stdio", 2);
-    DO_TEST("fullvirt-serial-tcp", 2);
-    DO_TEST("fullvirt-serial-tcp-telnet", 2);
-    DO_TEST("fullvirt-serial-udp", 2);
-    DO_TEST("fullvirt-serial-unix", 2);
 
-    DO_TEST("fullvirt-parallel-tcp", 2);
+#define DO_TEST_FORMAT(name)                                            \
+    do {                                                                \
+        struct testInfo info1 = { name, 1 };                            \
+        if (virTestRun("Xen XM-2-XML Format " name,                     \
+                       testCompareHelper, &info1) < 0)                  \
+            ret = -1;                                                   \
+    } while (0)
 
-    DO_TEST("fullvirt-sound", 2);
 
-    DO_TEST("fullvirt-net-ioemu", 2);
-    DO_TEST("fullvirt-net-netfront", 2);
+#define DO_TEST(name)                                                   \
+    do {                                                                \
+        DO_TEST_PARSE(name);                                            \
+        DO_TEST_FORMAT(name);                                           \
+    } while (0)
 
-    DO_TEST("escape-paths", 2);
-    DO_TEST("no-source-cdrom", 2);
-    DO_TEST("pci-devs", 2);
+    DO_TEST("paravirt-new-pvfb");
+    DO_TEST("paravirt-new-pvfb-vncdisplay");
+    DO_TEST("paravirt-net-e1000");
+    DO_TEST("paravirt-net-vifname");
+    DO_TEST("paravirt-vcpu");
+    DO_TEST("paravirt-maxvcpus");
+    DO_TEST("fullvirt-new-cdrom");
+    DO_TEST("fullvirt-utc");
+    DO_TEST("fullvirt-localtime");
+    DO_TEST("fullvirt-usbtablet");
+    DO_TEST("fullvirt-usbmouse");
+    DO_TEST("fullvirt-serial-file");
+    DO_TEST("fullvirt-serial-null");
+    DO_TEST("fullvirt-serial-pipe");
+    DO_TEST("fullvirt-serial-pty");
+    DO_TEST("fullvirt-serial-stdio");
+    DO_TEST("fullvirt-serial-tcp");
+    DO_TEST("fullvirt-serial-tcp-telnet");
+    DO_TEST("fullvirt-serial-udp");
+    DO_TEST("fullvirt-serial-unix");
 
-    virCapabilitiesFree(caps);
+    DO_TEST("fullvirt-force-hpet");
+    DO_TEST("fullvirt-force-nohpet");
+    DO_TEST("fullvirt-nohap");
 
-    return(ret==0 ? EXIT_SUCCESS : EXIT_FAILURE);
+    DO_TEST("fullvirt-parallel-tcp");
+
+    DO_TEST("fullvirt-sound");
+
+    DO_TEST("fullvirt-net-netfront");
+
+    DO_TEST_FORMAT("fullvirt-default-feature");
+
+    DO_TEST("escape-paths");
+    DO_TEST("no-source-cdrom");
+    DO_TEST("pci-devs");
+
+    DO_TEST("disk-drv-blktap-raw");
+    DO_TEST("disk-drv-blktap2-raw");
+
+    virObjectUnref(caps);
+    virObjectUnref(xmlopt);
+
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 VIRT_TEST_MAIN(mymain)

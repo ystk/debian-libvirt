@@ -1,7 +1,7 @@
 /*
  * storage_backend_mpath.c: storage backend for multipath handling
  *
- * Copyright (C) 2009-2010 Red Hat, Inc.
+ * Copyright (C) 2009-2014 Red Hat, Inc.
  * Copyright (C) 2009-2008 Dave Allan
  *
  * This library is free software; you can redistribute it and/or
@@ -15,8 +15,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Dave Allan <dallan@redhat.com>
  */
@@ -25,48 +25,21 @@
 
 #include <unistd.h>
 #include <stdio.h>
-#include <dirent.h>
 #include <fcntl.h>
 
 #include <libdevmapper.h>
 
-#include "virterror_internal.h"
+#include "virerror.h"
 #include "storage_conf.h"
 #include "storage_backend.h"
-#include "memory.h"
-#include "logging.h"
+#include "viralloc.h"
+#include "virlog.h"
+#include "virfile.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_STORAGE
 
-static int
-virStorageBackendMpathUpdateVolTargetInfo(virStorageVolTargetPtr target,
-                                          unsigned long long *allocation,
-                                          unsigned long long *capacity)
-{
-    int ret = -1;
-    int fdret, fd = -1;
-
-    if ((fdret = virStorageBackendVolOpen(target->path)) < 0)
-        goto out;
-    fd = fdret;
-
-    if (virStorageBackendUpdateVolTargetInfoFD(target,
-                                               fd,
-                                               allocation,
-                                               capacity) < 0)
-        goto out;
-
-    if (virStorageBackendDetectBlockVolFormatFD(target, fd) < 0)
-        goto out;
-
-    ret = 0;
-out:
-    if (fd != -1) {
-        close(fd);
-    }
-    return ret;
-}
-
+VIR_LOG_INIT("storage.storage_backend_mpath");
 
 static int
 virStorageBackendMpathNewVol(virStoragePoolObjPtr pool,
@@ -76,47 +49,33 @@ virStorageBackendMpathNewVol(virStoragePoolObjPtr pool,
     virStorageVolDefPtr vol;
     int ret = -1;
 
-    if (VIR_ALLOC(vol) < 0) {
-        virReportOOMError();
+    if (VIR_ALLOC(vol) < 0)
         goto cleanup;
-    }
 
     vol->type = VIR_STORAGE_VOL_BLOCK;
 
-    if (virAsprintf(&(vol->name), "dm-%u", devnum) < 0) {
-        virReportOOMError();
+    if (virAsprintf(&(vol->name), "dm-%u", devnum) < 0)
         goto cleanup;
-    }
 
-    if (virAsprintf(&vol->target.path, "/dev/%s", dev) < 0) {
-        virReportOOMError();
+    if (virAsprintf(&vol->target.path, "/dev/%s", dev) < 0)
         goto cleanup;
-    }
 
-    if (virStorageBackendMpathUpdateVolTargetInfo(&vol->target,
-                                                  &vol->allocation,
-                                                  &vol->capacity) < 0) {
+    if (virStorageBackendUpdateVolInfo(vol, true,
+                                       VIR_STORAGE_VOL_OPEN_DEFAULT, 0) < 0) {
         goto cleanup;
     }
 
     /* XXX should use logical unit's UUID instead */
-    vol->key = strdup(vol->target.path);
-    if (vol->key == NULL) {
-        virReportOOMError();
+    if (VIR_STRDUP(vol->key, vol->target.path) < 0)
         goto cleanup;
-    }
 
-    if (VIR_REALLOC_N(pool->volumes.objs,
-                      pool->volumes.count + 1) < 0) {
-        virReportOOMError();
+    if (VIR_APPEND_ELEMENT_COPY(pool->volumes.objs, pool->volumes.count, vol) < 0)
         goto cleanup;
-    }
-    pool->volumes.objs[pool->volumes.count++] = vol;
-    pool->def->capacity += vol->capacity;
-    pool->def->allocation += vol->allocation;
+    pool->def->capacity += vol->target.capacity;
+    pool->def->allocation += vol->target.allocation;
     ret = 0;
 
-cleanup:
+ cleanup:
 
     if (ret != 0)
         virStorageVolDefFree(vol);
@@ -126,7 +85,7 @@ cleanup:
 
 
 static int
-virStorageBackendIsMultipath(const char *devname)
+virStorageBackendIsMultipath(const char *dev_name)
 {
     int ret = 0;
     struct dm_task *dmt = NULL;
@@ -141,7 +100,7 @@ virStorageBackendIsMultipath(const char *devname)
         goto out;
     }
 
-    if (dm_task_set_name(dmt, devname) == 0) {
+    if (dm_task_set_name(dmt, dev_name) == 0) {
         ret = -1;
         goto out;
     }
@@ -155,50 +114,39 @@ virStorageBackendIsMultipath(const char *devname)
 
     dm_get_next_target(dmt, next, &start, &length, &target_type, &params);
 
-    if (target_type == NULL) {
-        ret = -1;
-        goto out;
-    }
-
-    if (STREQ(target_type, "multipath")) {
+    if (STREQ_NULLABLE(target_type, "multipath"))
         ret = 1;
-    }
 
-out:
-    if (dmt != NULL) {
+ out:
+    if (dmt != NULL)
         dm_task_destroy(dmt);
-    }
     return ret;
 }
 
 
 static int
-virStorageBackendGetMinorNumber(const char *devname, uint32_t *minor)
+virStorageBackendGetMinorNumber(const char *dev_name, uint32_t *minor)
 {
     int ret = -1;
     struct dm_task *dmt;
     struct dm_info info;
 
-    if (!(dmt = dm_task_create(DM_DEVICE_INFO))) {
+    if (!(dmt = dm_task_create(DM_DEVICE_INFO)))
         goto out;
-    }
 
-    if (!dm_task_set_name(dmt, devname)) {
+    if (!dm_task_set_name(dmt, dev_name))
         goto out;
-    }
 
-    if (!dm_task_run(dmt)) {
+    if (!dm_task_run(dmt))
         goto out;
-    }
 
-    if (!dm_task_get_info(dmt, &info)) {
+    if (!dm_task_get_info(dmt, &info))
         goto out;
-    }
 
     *minor = info.minor;
     ret = 0;
 
-out:
+ out:
     if (dmt != NULL)
         dm_task_destroy(dmt);
 
@@ -213,43 +161,43 @@ virStorageBackendCreateVols(virStoragePoolObjPtr pool,
     int retval = -1, is_mpath = 0;
     char *map_device = NULL;
     uint32_t minor = -1;
+    uint32_t next;
 
     do {
         is_mpath = virStorageBackendIsMultipath(names->name);
 
-        if (is_mpath < 0) {
+        if (is_mpath < 0)
             goto out;
-        }
 
         if (is_mpath == 1) {
 
-            if (virAsprintf(&map_device, "mapper/%s", names->name) < 0) {
-                virReportOOMError();
+            if (virAsprintf(&map_device, "mapper/%s", names->name) < 0)
                 goto out;
-            }
 
             if (virStorageBackendGetMinorNumber(names->name, &minor) < 0) {
-                virStorageReportError(VIR_ERR_INTERNAL_ERROR,
-                                      _("Failed to get %s minor number"),
-                                      names->name);
+                virReportError(VIR_ERR_INTERNAL_ERROR,
+                               _("Failed to get %s minor number"),
+                               names->name);
                 goto out;
             }
 
-            if (virStorageBackendMpathNewVol(pool, minor, map_device) < 0) {
+            if (virStorageBackendMpathNewVol(pool, minor, map_device) < 0)
                 goto out;
-            }
 
             VIR_FREE(map_device);
         }
 
         /* Given the way libdevmapper returns its data, I don't see
          * any way to avoid this series of casts. */
-        names = (struct dm_names *)(((char *)names) + names->next);
+        VIR_WARNINGS_NO_CAST_ALIGN
+        next = names->next;
+        names = (struct dm_names *)(((char *)names) + next);
+        VIR_WARNINGS_RESET
 
-    } while (names->next);
+    } while (next);
 
     retval = 0;
-out:
+ out:
     return retval;
 }
 
@@ -285,12 +233,21 @@ virStorageBackendGetMaps(virStoragePoolObjPtr pool)
 
     virStorageBackendCreateVols(pool, names);
 
-out:
-    if (dmt != NULL) {
-        dm_task_destroy (dmt);
-    }
+ out:
+    if (dmt != NULL)
+        dm_task_destroy(dmt);
     return retval;
 }
+
+static int
+virStorageBackendMpathCheckPool(virStoragePoolObjPtr pool ATTRIBUTE_UNUSED,
+                                bool *isActive)
+{
+    *isActive = virFileExists("/dev/mapper") ||
+                virFileExists("/dev/mpath");
+    return 0;
+}
+
 
 
 static int
@@ -299,7 +256,7 @@ virStorageBackendMpathRefreshPool(virConnectPtr conn ATTRIBUTE_UNUSED,
 {
     int retval = 0;
 
-    VIR_DEBUG("in %s", __func__);
+    VIR_DEBUG("conn=%p, pool=%p", conn, pool);
 
     pool->def->allocation = pool->def->capacity = pool->def->available = 0;
 
@@ -314,5 +271,9 @@ virStorageBackendMpathRefreshPool(virConnectPtr conn ATTRIBUTE_UNUSED,
 virStorageBackend virStorageBackendMpath = {
     .type = VIR_STORAGE_POOL_MPATH,
 
+    .checkPool = virStorageBackendMpathCheckPool,
     .refreshPool = virStorageBackendMpathRefreshPool,
+    .uploadVol = virStorageBackendVolUploadLocal,
+    .downloadVol = virStorageBackendVolDownloadLocal,
+    .wipeVol = virStorageBackendVolWipeLocal,
 };

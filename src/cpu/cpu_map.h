@@ -14,8 +14,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *      Jiri Denemark <jdenemar@redhat.com>
@@ -24,26 +24,28 @@
 #ifndef __VIR_CPU_MAP_H__
 # define __VIR_CPU_MAP_H__
 
-# include "xml.h"
+# include "virxml.h"
 
 
-enum cpuMapElement {
+typedef enum {
     CPU_MAP_ELEMENT_VENDOR,
     CPU_MAP_ELEMENT_FEATURE,
     CPU_MAP_ELEMENT_MODEL,
 
     CPU_MAP_ELEMENT_LAST
-};
+} cpuMapElement;
 
 VIR_ENUM_DECL(cpuMapElement)
 
 
 typedef int
-(*cpuMapLoadCallback)  (enum cpuMapElement element,
+(*cpuMapLoadCallback)  (cpuMapElement element,
                         xmlXPathContextPtr ctxt,
+                        xmlNodePtr *nodes,
+                        int n,
                         void *data);
 
-extern int
+int
 cpuMapLoad(const char *arch,
            cpuMapLoadCallback cb,
            void *data);

@@ -4,6 +4,7 @@
     <cpu>
       <arch>ppc64</arch>
     </cpu>
+    <power_management/>
     <migration_features>
       <live/>
       <uri_transports>
@@ -18,8 +19,7 @@
       <wordsize>64</wordsize>
       <emulator>/usr/lib/xen/bin/qemu-dm</emulator>
       <machine>xenpv</machine>
-      <domain type='xen'>
-      </domain>
+      <domain type='xen'/>
     </arch>
   </guest>
 

@@ -1,9 +1,7 @@
-/* -*- buffer-read-only: t -*- vi: set ro: */
-/* DO NOT EDIT! GENERATED AUTOMATICALLY! */
 /* Emulation for poll(2)
    Contributed by Paolo Bonzini.
 
-   Copyright 2001-2003, 2006-2010 Free Software Foundation, Inc.
+   Copyright 2001-2003, 2006-2017 Free Software Foundation, Inc.
 
    This file is part of gnulib.
 
@@ -18,8 +16,7 @@
    GNU Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public License along
-   with this program; if not, write to the Free Software Foundation,
-   Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  */
+   with this program; if not, see <http://www.gnu.org/licenses/>.  */
 
 /* Tell gcc not to warn about the (nfd < 0) tests, below.  */
 #if (__GNUC__ == 4 && 3 <= __GNUC_MINOR__) || 4 < __GNUC__
@@ -30,24 +27,28 @@
 #include <alloca.h>
 
 #include <sys/types.h>
-#include "poll.h"
+
+/* Specification.  */
+#include <poll.h>
+
 #include <errno.h>
 #include <limits.h>
-#include <assert.h>
 
 #if (defined _WIN32 || defined __WIN32__) && ! defined __CYGWIN__
-# define WIN32_NATIVE
+# define WINDOWS_NATIVE
 # include <winsock2.h>
 # include <windows.h>
 # include <io.h>
 # include <stdio.h>
 # include <conio.h>
+# include "msvc-nothrow.h"
 #else
 # include <sys/time.h>
-# include <sys/socket.h>
-# include <sys/select.h>
 # include <unistd.h>
 #endif
+
+#include <sys/select.h>
+#include <sys/socket.h>
 
 #ifdef HAVE_SYS_IOCTL_H
 # include <sys/ioctl.h>
@@ -58,6 +59,8 @@
 
 #include <time.h>
 
+#include "assure.h"
+
 #ifndef INFTIM
 # define INFTIM (-1)
 #endif
@@ -67,9 +70,13 @@
 # define MSG_PEEK 0
 #endif
 
-#ifdef WIN32_NATIVE
+#ifdef WINDOWS_NATIVE
 
-#define IsConsoleHandle(h) (((long) (h) & 3) == 3)
+static BOOL IsConsoleHandle (HANDLE h)
+{
+  DWORD mode;
+  return GetConsoleMode (h, &mode) != 0;
+}
 
 static BOOL
 IsSocketHandle (HANDLE h)
@@ -124,7 +131,7 @@ typedef DWORD (WINAPI *PNtQueryInformationFile)
    for the handle, eliminate them from *P_SOUGHT.  */
 
 static int
-win32_compute_revents (HANDLE h, int *p_sought)
+windows_compute_revents (HANDLE h, int *p_sought)
 {
   int i, ret, happened;
   INPUT_RECORD *irbuffer;
@@ -152,16 +159,19 @@ win32_compute_revents (HANDLE h, int *p_sought)
           if (avail)
             happened |= *p_sought & (POLLIN | POLLRDNORM);
         }
+      else if (GetLastError () == ERROR_BROKEN_PIPE)
+        happened |= POLLHUP;
 
       else
         {
           /* It was the write-end of the pipe.  Check if it is writable.
              If NtQueryInformationFile fails, optimistically assume the pipe is
-             writable.  This could happen on Win9x, where NtQueryInformationFile
-             is not available, or if we inherit a pipe that doesn't permit
-             FILE_READ_ATTRIBUTES access on the write end (I think this should
-             not happen since WinXP SP2; WINE seems fine too).  Otherwise,
-             ensure that enough space is available for atomic writes.  */
+             writable.  This could happen on Windows 9x, where
+             NtQueryInformationFile is not available, or if we inherit a pipe
+             that doesn't permit FILE_READ_ATTRIBUTES access on the write end
+             (I think this should not happen since Windows XP SP2; WINE seems
+             fine too).  Otherwise, ensure that enough space is available for
+             atomic writes.  */
           memset (&iosb, 0, sizeof (iosb));
           memset (&fpli, 0, sizeof (fpli));
 
@@ -220,7 +230,7 @@ win32_compute_revents (HANDLE h, int *p_sought)
 /* Convert fd_sets returned by select into revents values.  */
 
 static int
-win32_compute_revents_socket (SOCKET h, int sought, long lNetworkEvents)
+windows_compute_revents_socket (SOCKET h, int sought, long lNetworkEvents)
 {
   int happened = 0;
 
@@ -297,6 +307,10 @@ compute_revents (int fd, int sought, fd_set *rfds, fd_set *wfds, fd_set *efds)
                || socket_errno == ECONNABORTED || socket_errno == ENETRESET)
         happened |= POLLHUP;
 
+      /* some systems can't use recv() on non-socket, including HP NonStop */
+      else if (socket_errno == ENOTSOCK)
+        happened |= (POLLIN | POLLRDNORM) & sought;
+
       else
         happened |= POLLERR;
     }
@@ -312,42 +326,28 @@ compute_revents (int fd, int sought, fd_set *rfds, fd_set *wfds, fd_set *efds)
 #endif /* !MinGW */
 
 int
-poll (pfd, nfd, timeout)
-     struct pollfd *pfd;
-     nfds_t nfd;
-     int timeout;
+poll (struct pollfd *pfd, nfds_t nfd, int timeout)
 {
-#ifndef WIN32_NATIVE
+#ifndef WINDOWS_NATIVE
   fd_set rfds, wfds, efds;
   struct timeval tv;
   struct timeval *ptv;
   int maxfd, rc;
   nfds_t i;
 
-# ifdef _SC_OPEN_MAX
-  static int sc_open_max = -1;
-
-  if (nfd < 0
-      || (nfd > sc_open_max
-          && (sc_open_max != -1
-              || nfd > (sc_open_max = sysconf (_SC_OPEN_MAX)))))
+  if (nfd < 0)
     {
       errno = EINVAL;
       return -1;
     }
-# else /* !_SC_OPEN_MAX */
-#  ifdef OPEN_MAX
-  if (nfd < 0 || nfd > OPEN_MAX)
-    {
-      errno = EINVAL;
-      return -1;
-    }
-#  endif /* OPEN_MAX -- else, no check is needed */
-# endif /* !_SC_OPEN_MAX */
+  /* Don't check directly for NFD too large.  Any practical use of a
+     too-large NFD is caught by one of the other checks below, and
+     checking directly for getdtablesize is too much of a portability
+     and/or performance and/or correctness hassle.  */
 
   /* EFAULT is not necessary to implement, but let's do it in the
      simplest case. */
-  if (!pfd)
+  if (!pfd && nfd)
     {
       errno = EFAULT;
       return -1;
@@ -384,10 +384,17 @@ poll (pfd, nfd, timeout)
     {
       if (pfd[i].fd < 0)
         continue;
-
+      if (maxfd < pfd[i].fd)
+        {
+          maxfd = pfd[i].fd;
+          if (FD_SETSIZE <= maxfd)
+            {
+              errno = EINVAL;
+              return -1;
+            }
+        }
       if (pfd[i].events & (POLLIN | POLLRDNORM))
         FD_SET (pfd[i].fd, &rfds);
-
       /* see select(2): "the only exceptional condition detectable
          is out-of-band data received on a socket", hence we push
          POLLWRBAND events onto wfds instead of efds. */
@@ -395,18 +402,6 @@ poll (pfd, nfd, timeout)
         FD_SET (pfd[i].fd, &wfds);
       if (pfd[i].events & (POLLPRI | POLLRDBAND))
         FD_SET (pfd[i].fd, &efds);
-      if (pfd[i].fd >= maxfd
-          && (pfd[i].events & (POLLIN | POLLOUT | POLLPRI
-                               | POLLRDNORM | POLLRDBAND
-                               | POLLWRNORM | POLLWRBAND)))
-        {
-          maxfd = pfd[i].fd;
-          if (maxfd > FD_SETSIZE)
-            {
-              errno = EOVERFLOW;
-              return -1;
-            }
-        }
     }
 
   /* examine fd sets */
@@ -417,18 +412,13 @@ poll (pfd, nfd, timeout)
   /* establish results */
   rc = 0;
   for (i = 0; i < nfd; i++)
-    if (pfd[i].fd < 0)
-      pfd[i].revents = 0;
-    else
-      {
-        int happened = compute_revents (pfd[i].fd, pfd[i].events,
-                                        &rfds, &wfds, &efds);
-        if (happened)
-          {
-            pfd[i].revents = happened;
-            rc++;
-          }
-      }
+    {
+      pfd[i].revents = (pfd[i].fd < 0
+                        ? 0
+                        : compute_revents (pfd[i].fd, pfd[i].events,
+                                           &rfds, &wfds, &efds));
+      rc += pfd[i].revents != 0;
+    }
 
   return rc;
 #else
@@ -452,6 +442,7 @@ poll (pfd, nfd, timeout)
   if (!hEvent)
     hEvent = CreateEvent (NULL, FALSE, FALSE, NULL);
 
+restart:
   handle_array[0] = hEvent;
   nhandles = 1;
   FD_ZERO (&rfds);
@@ -470,7 +461,7 @@ poll (pfd, nfd, timeout)
         continue;
 
       h = (HANDLE) _get_osfhandle (pfd[i].fd);
-      assert (h != NULL);
+      assure (h != NULL);
       if (IsSocketHandle (h))
         {
           int requested = FD_CLOSE;
@@ -499,13 +490,13 @@ poll (pfd, nfd, timeout)
         {
           /* Poll now.  If we get an event, do not poll again.  Also,
              screen buffer handles are waitable, and they'll block until
-             a character is available.  win32_compute_revents eliminates
+             a character is available.  windows_compute_revents eliminates
              bits for the "wrong" direction. */
-          pfd[i].revents = win32_compute_revents (h, &sought);
+          pfd[i].revents = windows_compute_revents (h, &sought);
           if (sought)
             handle_array[nhandles++] = h;
           if (pfd[i].revents)
-            wait_timeout = 0;
+            timeout = 0;
         }
     }
 
@@ -577,19 +568,25 @@ poll (pfd, nfd, timeout)
           if (FD_ISSET ((SOCKET) h, &xfds))
             ev.lNetworkEvents |= FD_OOB;
 
-          happened = win32_compute_revents_socket ((SOCKET) h, pfd[i].events,
-                                                   ev.lNetworkEvents);
+          happened = windows_compute_revents_socket ((SOCKET) h, pfd[i].events,
+                                                     ev.lNetworkEvents);
         }
       else
         {
           /* Not a socket.  */
           int sought = pfd[i].events;
-          happened = win32_compute_revents (h, &sought);
+          happened = windows_compute_revents (h, &sought);
           nhandles++;
         }
 
        if ((pfd[i].revents |= happened) != 0)
         rc++;
+    }
+
+  if (!rc && timeout == INFTIM)
+    {
+      SleepEx (1, TRUE);
+      goto restart;
     }
 
   return rc;

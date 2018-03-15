@@ -8,7 +8,7 @@
  * This file is part of a free software library; you can redistribute
  * it and/or modify it under the terms of the GNU Lesser General
  * Public License version 2.1 as published by the Free Software
- * Foundation and shipped in the "COPYING" file with this library.
+ * Foundation and shipped in the "COPYING.LESSER" file with this library.
  * The library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY of any kind.
  *
@@ -30,28 +30,27 @@
 # define ___VBoxXPCOMC_cglue_h
 
 /* This has to be the oldest version we support. */
-# include "vbox_CAPI_v2_2.h"
+# include "vbox_CAPI_v4_0.h"
 
-# ifdef __cplusplus
-extern "C" {
-# endif
-
-/** The dlopen handle for VBoxXPCOMC. */
-extern void *g_hVBoxXPCOMC;
-/** The last load error. */
-extern char g_szVBoxErrMsg[256];
-/** Pointer to the VBoxXPCOMC function table. */
-extern PCVBOXXPCOM g_pVBoxFuncs;
 /** Pointer to VBoxGetXPCOMCFunctions for the loaded VBoxXPCOMC so/dylib/dll. */
 extern PFNVBOXGETXPCOMCFUNCTIONS g_pfnGetFunctions;
 
-
-int VBoxCGlueInit(void);
+int VBoxCGlueInit(unsigned int *version);
 void VBoxCGlueTerm(void);
 
+typedef struct _vboxArray vboxArray;
 
-# ifdef __cplusplus
-}
-# endif
+struct _vboxArray {
+    void **items;
+    size_t count;
+};
+
+# define VBOX_ARRAY_INITIALIZER { NULL, 0 }
+
+nsresult vboxArrayGet(vboxArray *array, void *self, void *getter);
+nsresult vboxArrayGetWithPtrArg(vboxArray *array, void *self, void *getter, void *arg);
+nsresult vboxArrayGetWithUintArg(vboxArray *array, void *self, void *getter, PRUint32 arg);
+void vboxArrayRelease(vboxArray *array);
+void vboxArrayUnalloc(vboxArray *array);
 
 #endif

@@ -10,7 +10,7 @@
  * in a reliable fashion if merely after a list of partitions & sizes,
  * though it is fine for creating partitions.
  *
- * Copyright (C) 2007-2008, 2010 Red Hat, Inc.
+ * Copyright (C) 2007-2008, 2010, 2013, 2016 Red Hat, Inc.
  * Copyright (C) 2007-2008 Daniel P. Berrange
  *
  * This library is free software; you can redistribute it and/or
@@ -24,8 +24,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Author: Daniel P. Berrange <berrange@redhat.com>
  */
@@ -40,11 +40,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "util.h"
+#include "virutil.h"
+#include "virfile.h"
 #include "c-ctype.h"
+#include "virstring.h"
+#include "virgettext.h"
 
 /* we don't need to include the full internal.h just for this */
-#define STREQ(a,b) (strcmp(a,b) == 0)
+#define STREQ(a, b) (strcmp(a, b) == 0)
 
 /* Make the comparisons below fail if your parted headers
    are so old that they lack the definition.  */
@@ -57,18 +60,6 @@ enum diskCommand {
     DISK_GEOMETRY
 };
 
-static int
-is_dm_device(const char *devname)
-{
-    struct stat buf;
-
-    if (devname && !stat(devname, &buf) && dm_is_dm_major(major(buf.st_rdev))) {
-        return 1;
-    }
-
-    return 0;
-}
-
 int main(int argc, char **argv)
 {
     PedDevice *dev;
@@ -78,37 +69,49 @@ int main(int argc, char **argv)
     const char *path;
     char *canonical_path;
     const char *partsep;
+    bool devmap_partsep = false;
+
+    if (virGettextInitialize() < 0)
+        exit(EXIT_FAILURE);
 
     if (argc == 3 && STREQ(argv[2], "-g")) {
         cmd = DISK_GEOMETRY;
+    } else if (argc == 3 && STREQ(argv[2], "-p")) {
+        devmap_partsep = true;
     } else if (argc != 2) {
-        fprintf(stderr, "syntax: %s DEVICE [-g]\n", argv[0]);
+        fprintf(stderr, _("syntax: %s DEVICE [-g]|[-p]\n"), argv[0]);
         return 1;
     }
 
+    /* NB: Changes to the following algorithm will need corresponding
+     * changes to virStorageBackendDiskDeleteVol */
     path = argv[1];
-    if (is_dm_device(path)) {
-        partsep = "p";
-        canonical_path = strdup(path);
-        if (canonical_path == NULL) {
+    if (virIsDevMapperDevice(path)) {
+        /* If the path ends with a number or we explicitly request it for
+         * path, then append the "p" partition separator. Otherwise, if
+         * the path ends with a letter already, then no need for a separator.
+         */
+        if (c_isdigit(path[strlen(path)-1]) || devmap_partsep)
+            partsep = "p";
+        else
+            partsep = "";
+        if (VIR_STRDUP_QUIET(canonical_path, path) < 0)
             return 2;
-        }
     } else {
-        if (virFileResolveLink(path, &canonical_path) != 0) {
+        if (virFileResolveLink(path, &canonical_path) != 0)
             return 2;
-        }
 
         partsep = *canonical_path &&
             c_isdigit(canonical_path[strlen(canonical_path)-1]) ? "p" : "";
     }
 
     if ((dev = ped_device_get(path)) == NULL) {
-        fprintf(stderr, "unable to access device %s\n", path);
+        fprintf(stderr, _("unable to access device %s\n"), path);
         return 2;
     }
 
     /* return the geometry of the disk and then exit */
-    if(cmd == DISK_GEOMETRY) {
+    if (cmd == DISK_GEOMETRY) {
         printf("%d%c%d%c%d%c",
                dev->hw_geom.cylinders, '\0',
                dev->hw_geom.heads, '\0',
@@ -117,7 +120,7 @@ int main(int argc, char **argv)
     }
 
     if ((disk = ped_disk_new(dev)) == NULL) {
-        fprintf(stderr, "unable to access disk %s\n", argv[1]);
+        fprintf(stderr, _("unable to access disk %s\n"), argv[1]);
         return 2;
     }
 
@@ -132,6 +135,7 @@ int main(int argc, char **argv)
                 content = "free";
             else if (part->type & PED_PARTITION_METADATA)
                 content = "metadata";
+            /* coverity[dead_error_condition] - not true if defined */
             else if (part->type & PED_PARTITION_PROTECTED)
                 content = "protected";
             else
@@ -145,6 +149,7 @@ int main(int argc, char **argv)
                 content = "free";
             else if (part->type & PED_PARTITION_METADATA)
                 content = "metadata";
+            /* coverity[dead_error_condition] - not true if defined */
             else if (part->type & PED_PARTITION_PROTECTED)
                 content = "protected";
             else
@@ -160,17 +165,17 @@ int main(int argc, char **argv)
                    part->num, '\0',
                    type, '\0',
                    content, '\0',
-                   part->geom.start * 512llu, '\0',
-                   (part->geom.end + 1 ) * 512llu, '\0',
-                   part->geom.length * 512llu, '\0');
+                   part->geom.start * dev->sector_size, '\0',
+                   (part->geom.end + 1) * dev->sector_size, '\0',
+                   part->geom.length * dev->sector_size, '\0');
         } else {
             printf("%s%c%s%c%s%c%llu%c%llu%c%llu%c",
                    "-", '\0',
                    type, '\0',
                    content, '\0',
-                   part->geom.start * 512llu, '\0',
-                   (part->geom.end + 1 ) * 512llu, '\0',
-                   part->geom.length * 512llu, '\0');
+                   part->geom.start * dev->sector_size, '\0',
+                   (part->geom.end + 1) * dev->sector_size, '\0',
+                   part->geom.length * dev->sector_size, '\0');
         }
         part = ped_disk_next_partition(disk, part);
     }

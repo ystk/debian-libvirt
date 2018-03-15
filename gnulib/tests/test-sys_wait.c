@@ -1,7 +1,5 @@
-/* -*- buffer-read-only: t -*- vi: set ro: */
-/* DO NOT EDIT! GENERATED AUTOMATICALLY! */
 /* Test of <sys/wait.h> substitute.
-   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2009-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,8 +23,25 @@
 /* Check for existence of required types.  */
 static pid_t a;
 
+#include "test-sys_wait.h"
+
 int
 main (void)
 {
-  return a;
+  if (test_sys_wait_macros ())
+    return 1;
+
+#if 0
+  switch (WCONTINUED)
+    {
+  /* Gnulib doesn't guarantee these, yet.  */
+    case WCONTINUED:
+    case WEXITED:
+    case WNOWAIT:
+    case WSTOPPED:
+      break;
+    }
+#endif
+
+  return a ? 1 : 0;
 }

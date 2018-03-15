@@ -1,10 +1,10 @@
-<volume>
+<volume type='block'>
   <name>sda1</name>
-  <key>(null)</key>
+  <key>/dev/sda1</key>
   <source>
   </source>
-  <capacity>106896384</capacity>
-  <allocation>106896384</allocation>
+  <capacity unit='bytes'>106896384</capacity>
+  <allocation unit='bytes'>106896384</allocation>
   <target>
     <path>/dev/sda1</path>
     <format type='none'/>

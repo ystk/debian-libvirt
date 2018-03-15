@@ -16,8 +16,8 @@
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
+ * License along with this library.  If not, see
+ * <http://www.gnu.org/licenses/>.
  *
  * Authors:
  * Shuveb Hussain <shuveb@binarykarma.com>
@@ -30,6 +30,16 @@
 # define OPENVZ_DRIVER_H
 
 # include "internal.h"
+
+# define OPENVZ_MIGRATION_FLAGS                 \
+    (VIR_MIGRATE_LIVE)
+
+/* All supported migration parameters and their types. */
+# define OPENVZ_MIGRATION_PARAMETERS                            \
+    VIR_MIGRATE_PARAM_URI,              VIR_TYPED_PARAM_STRING, \
+    VIR_MIGRATE_PARAM_DEST_NAME,        VIR_TYPED_PARAM_STRING, \
+    VIR_MIGRATE_PARAM_DEST_XML,         VIR_TYPED_PARAM_STRING, \
+    NULL
 
 int openvzRegister(void);
 
