@@ -35,3 +35,5 @@ security/CVE-2015-5313-storage-don-t-allow-in-filesystem-volu.patch
 debian/Debianize-bridge-helper-path.patch
 security/CVE-2016-5008-qemu-Let-empty-default-VNC-password-work-as.patch
 upstream/qemu-Specify-format-iff-disk-source-is-not-empty.patch
+security/CVE-2018-5748-qemu-avoid-denial-of-service-reading-from-Q.patch
+security/CVE-2018-1064-qemu-avoid-denial-of-service-reading-from-Q.patch

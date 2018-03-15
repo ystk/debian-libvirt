@@ -168,7 +168,7 @@ index a0bb5d3..d8d63a6 100644
  int virQEMUCapsParseDeviceStr(virQEMUCapsPtr qemuCaps, const char *str);
  
 diff --git a/tests/qemuhelptest.c b/tests/qemuhelptest.c
-index 975edf3..271fddc 100644
+index 975edf3..5b5970c 100644
 --- a/tests/qemuhelptest.c
 +++ b/tests/qemuhelptest.c
 @@ -58,7 +58,7 @@ static int testHelpStrParsing(const void *data)

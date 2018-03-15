@@ -1,5 +1,9 @@
-libvirt-daemon: Expects qemu-bridge-helper in /usr/libexec/
+From: Debian Libvirt Maintainers
+ <pkg-libvirt-maintainers@lists.alioth.debian.org>
+Date: Mon, 12 Mar 2018 19:34:19 +0100
+Subject: Debianize-bridge-helper-path
 
+libvirt-daemon: Expects qemu-bridge-helper in /usr/libexec/
 $ strings /usr/lib/libvirt/connection-driver/libvirt_driver_qemu.so | grep bridge-helper
 /usr/libexec/qemu-bridge-helper
 
@@ -7,6 +11,14 @@ $ dpkg -S bridge-helper
 qemu-system-common: /usr/lib/qemu/qemu-bridge-helper
 
 Closes #816602
+---
+ src/qemu/qemu.conf                 | 2 +-
+ src/qemu/qemu_conf.c               | 2 +-
+ src/qemu/test_libvirtd_qemu.aug.in | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/qemu/qemu.conf b/src/qemu/qemu.conf
+index 92ca715..0b1669e 100644
 --- a/src/qemu/qemu.conf
 +++ b/src/qemu/qemu.conf
 @@ -357,7 +357,7 @@
@@ -18,9 +30,11 @@ Closes #816602
  
  
  
+diff --git a/src/qemu/qemu_conf.c b/src/qemu/qemu_conf.c
+index adc6caf..d5c6fe4 100644
 --- a/src/qemu/qemu_conf.c
 +++ b/src/qemu/qemu_conf.c
-@@ -244,7 +244,7 @@ virQEMUDriverConfigPtr virQEMUDriverConf
+@@ -244,7 +244,7 @@ virQEMUDriverConfigPtr virQEMUDriverConfigNew(bool privileged)
              goto error;
      }
  
@@ -29,6 +43,8 @@ Closes #816602
          goto error;
  
      cfg->clearEmulatorCapabilities = true;
+diff --git a/src/qemu/test_libvirtd_qemu.aug.in b/src/qemu/test_libvirtd_qemu.aug.in
+index d2bc2c0..2d6c675 100644
 --- a/src/qemu/test_libvirtd_qemu.aug.in
 +++ b/src/qemu/test_libvirtd_qemu.aug.in
 @@ -56,7 +56,7 @@ module Test_libvirtd_qemu =
