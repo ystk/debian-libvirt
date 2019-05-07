@@ -1,3 +1,10 @@
+libvirt (1.2.9-9+deb8u6) jessie-security; urgency=high
+
+  * Non-maintainer upload by the LTS Team.
+  * CVE-2016-10746: Ensure get time RPC calls require write access.
+
+ -- Brian May <bam@debian.org>  Mon, 08 Apr 2019 17:29:21 +1000
+
 libvirt (1.2.9-9+deb8u5) jessie-security; urgency=high
 
   * Switch gbp.conf to jessie

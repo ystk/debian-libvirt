@@ -37,3 +37,4 @@ security/CVE-2016-5008-qemu-Let-empty-default-VNC-password-work-as.patch
 upstream/qemu-Specify-format-iff-disk-source-is-not-empty.patch
 security/CVE-2018-5748-qemu-avoid-denial-of-service-reading-from-Q.patch
 security/CVE-2018-1064-qemu-avoid-denial-of-service-reading-from-Q.patch
+CVE-2016-10746.patch
