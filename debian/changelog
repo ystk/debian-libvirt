@@ -1,3 +1,18 @@
+libvirt (1.2.9-9+deb8u7) jessie-security; urgency=high
+
+  * CVE-2019-10161: Prevent an vulnerability where readonly clients could use
+    the API to specify an arbitrary path which would be accessed with the
+    permissions of the libvirtd process. An attacker with access to the
+    libvirtd socket could use this to probe the existence of arbitrary files,
+    cause a denial of service or otherwise cause libvirtd to execute arbitrary
+    programs.
+  * CVE-2019-10167: Prevent an arbitrary code execution vulnerability via the
+    API where a user-specified binary used to probe the domain's capabilities.
+    read-only clients could specify an arbitrary path for this argument,
+    causing libvirtd to execute a crafted executable with its own privileges.
+
+ -- Chris Lamb <lamby@debian.org>  Mon, 24 Jun 2019 20:08:51 +0100
+
 libvirt (1.2.9-9+deb8u6) jessie-security; urgency=high
 
   * Non-maintainer upload by the LTS Team.
