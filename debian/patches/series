@@ -40,3 +40,9 @@ security/CVE-2018-1064-qemu-avoid-denial-of-service-reading-from-Q.patch
 CVE-2016-10746.patch
 CVE-2019-10161.patch
 CVE-2019-10167.patch
+
+CVE-2021-3631.patch
+CVE-2024-1441.patch
+CVE-2024-2496.patch
+CVE-2022-0897.patch 
+CVE-2024-2494.patch

@@ -1,3 +1,23 @@
+libvirt (1.2.9-9+deb8u8) jessie-security; urgency=high
+
+  * Non-maintainer upload by the ELTS Team.
+  * CVE-2021-3631
+    Fix break out of sVirt confinement.
+  * CVE-2024-1441
+    Fix an off-by-one error that could be used to crash the libvirt daemon
+    and cause a denial of service.
+  * CVE-2024-2496
+    Fix null pointer dereference that could be used to crash the libvirt
+    daemon and cause a denial of service.
+  * CVE-2022-0897
+    Fix bad mutex handling that could be used to crash the network filter
+    management daemon.
+  * CVE-2024-2494
+    Fix length check in deserialization data that could be used to crash
+    the libvirt daemon and cause a denial of service.
+
+ -- Thorsten Alteholz <debian@alteholz.de>  Sat, 24 Aug 2024 17:47:51 +0200
+
 libvirt (1.2.9-9+deb8u7) jessie-security; urgency=high
 
   * CVE-2019-10161: Prevent an vulnerability where readonly clients could use
